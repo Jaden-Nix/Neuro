@@ -1,0 +1,70 @@
+Remaining Tasks (Pending Implementation)
+
+### Task 7: Solana + Helius RPC Integration
+**Priority**: High (expands ecosystem)
+- Create separate SolanaRPCClient with Helius endpoints
+- Fetch Solana wallet balances and token holdings
+- Integrate Jupiter aggregator for swap data
+- Add Marinade staking metrics
+- Add Orca liquidity pool analysis
+- Update Wagmi config for Solana chains
+- Add Phantom/Solflare wallet support to RainbowKit
+
+### Task 8: MEV Protection & Flashbots Integration
+**Priority**: Critical (security)
+- Implement Flashbots RPC relay for Ethereum private transactions
+- Add MEV sandwich attack detection in RiskAgent
+- Create MEV protection strategies:
+  - Private mempool submission
+  - Slippage protection (0.5% default)
+  - Time-based execution windows (2-10 second blocks)
+- Display MEV risk metrics in UI dashboard
+- Calculate MEV loss estimates per transaction
+
+### Task 9: Machine Learning Pattern Recognition Layer
+**Priority**: Medium (intelligence)
+- Build ML service analyzing memory vault historical data
+- Implement clustering for market condition grouping
+- Create predictive model for opportunity success probability (0-100%)
+- Train on credit economy transaction history
+- Feature engineering: price volatility, TVL changes, gas prices, agent performance
+- Integrate ML insights into Meta-Agent decision-making
+- Update opportunity scoring to use ML predictions
+
+### Task 10: Multi-Signature Governance System
+**Priority**: High (governance)
+- Implement multi-sig approval workflow (2-of-3, 3-of-5 options)
+- Create governance proposal system for high-value transactions (>$50k)
+- Add Safe (Gnosis Safe) integration
+- Build approval UI showing pending proposals and signature status
+- Implement time-locks for critical decisions (24-hour minimum)
+- Add proposal voting and execution tracking
+
+### Task 11: Agent Marketplace
+**Priority**: Medium (monetization)
+- Build marketplace UI for agent deployment
+- Create agent template system with configurable parameters:
+  - Personality traits (curious, cautious, precise, sovereign)
+  - Risk tolerance (conservative, moderate, aggressive)
+  - Strategy type (arbitrage, yield farming, liquidity provision)
+- Implement agent NFT minting for tradeable instances
+- Add performance leaderboard
+- Create agent rental system with % yield sharing
+- Build marketplace browsing and discovery
+
+### Task 12: End-to-End Testing & Polish
+**Priority**: Critical (launch readiness)
+- Complete user journey testing:
+  1. Wallet connection (MetaMask, Rainbow Wallet)
+  2. Enable autonomous mode
+  3. Watch agents negotiate (real negotiations with logs)
+  4. Approve manual transactions
+  5. Monitor execution and gas costs
+  6. View results in memory vault
+- Verify all WebSocket updates are reliable
+- Error handling and graceful fallbacks
+- Add loading states and skeleton screens
+- Toast notifications for all actions
+- Mobile responsiveness testing
+- Performance optimization (bundle size, render optimization)
+- Final security audit and architect review
