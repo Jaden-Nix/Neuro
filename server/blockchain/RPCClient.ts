@@ -325,7 +325,7 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Fetch real APY from Aave V3 protocol
+   * Fetch real APY from Aave V3 protocol with retry logic
    */
   async getAaveV3APY(): Promise<number> {
     const client = this.clients.get(mainnet.id);
@@ -337,12 +337,15 @@ export class BlockchainRPCClient {
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 
     try {
-      const reserveData = await client.readContract({
-        address: AAVE_V3_POOL,
-        abi: AAVE_V3_POOL_ABI,
-        functionName: "getReserveData",
-        args: [USDC_ADDRESS],
-      });
+      const reserveData = await withRetry(
+        () => client.readContract({
+          address: AAVE_V3_POOL,
+          abi: AAVE_V3_POOL_ABI,
+          functionName: "getReserveData",
+          args: [USDC_ADDRESS],
+        }),
+        "getAaveV3APY.getReserveData"
+      );
 
       // currentLiquidityRate is at index 2 (uint128)
       const liquidityRate = reserveData[2];
@@ -379,7 +382,7 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Fetch ETH/USD price from Chainlink Price Feed
+   * Fetch ETH/USD price from Chainlink Price Feed with retry logic
    */
   async getETHUSDPrice(): Promise<number> {
     const client = this.clients.get(mainnet.id);
@@ -389,12 +392,18 @@ export class BlockchainRPCClient {
     const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419";
 
     try {
-      const [, answer, , ,] = await client.readContract({
-        address: ETH_USD_FEED,
-        abi: CHAINLINK_AGGREGATOR_V3_ABI,
-        functionName: "latestRoundData",
-      });
+      const result = await withRetry(
+        () => client.readContract({
+          address: ETH_USD_FEED,
+          abi: CHAINLINK_AGGREGATOR_V3_ABI,
+          functionName: "latestRoundData",
+        }),
+        "getETHUSDPrice.latestRoundData"
+      );
 
+      // Extract answer (second element)
+      const answer = result[1];
+      
       // Chainlink ETH/USD has 8 decimals
       const price = Number(answer) / 1e8;
       return price;
@@ -406,14 +415,17 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Get gas price in Gwei (proper units for simulation)
+   * Get gas price in Gwei (proper units for simulation) with retry logic
    */
   async getGasPriceGwei(chainId: number = mainnet.id): Promise<number> {
     const client = this.clients.get(chainId);
     if (!client) return 20;
 
     try {
-      const gasPrice = await client.getGasPrice();
+      const gasPrice = await withRetry(
+        () => client.getGasPrice(),
+        `getGasPriceGwei(chain=${chainId})`
+      );
       // Convert wei to gwei (1 gwei = 1e9 wei)
       return Number(gasPrice) / 1e9;
     } catch (error) {
