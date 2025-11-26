@@ -1,0 +1,204 @@
+4. FUTURE FORK SIMULATION (Prediction Engine)
+
+Build a component that:
+	•	Propagates multiple possible future states
+	•	Predicts:
+	•	price
+	•	volatility
+	•	TVL
+	•	yield
+	•	peg deviations (FRAX + KRWQ)
+	•	Picks highest EV path
+	•	Uses weighted scoring
+	•	Logs results for future learning
+
+⸻
+
+5. ATP INTEGRATION
+
+Add full support for:
+	•	ATP client SDK
+	•	Agent metadata
+	•	Evolving agent state
+	•	Dynamic update calls
+	•	Upload of skills + memory to ATP
+
+Agent must self-update after every transaction.
+
+⸻
+
+6. ON-CHAIN MEMORY VAULT
+
+Implement a memory system that stores:
+	•	successful strategies
+	•	blocked strategies
+	•	agent credit scores
+	•	learning milestones
+	•	risk patterns
+	•	price anomalies
+	•	simulation summaries
+
+Use:
+	•	Smart contract
+OR
+	•	On-chain storage provider (like ATP internal store)
+
+Memory must be readable for the Evolution Engine.
+
+⸻
+
+7. SELF-HEALING ENGINE
+
+If any agent’s score falls below threshold:
+	•	Deprecate it
+	•	Spawn a new version
+	•	Migrate memory
+	•	Log version change
+	•	Update ATP metadata
+
+⸻
+
+8. PERSONALITY MODULES
+
+Add personality styles:
+	•	Scout = curious + energetic
+	•	Risk = formal + cautious
+	•	Execution = cold + precise
+	•	Meta-Agent = sovereign + calm
+
+Personality must appear in logs.
+
+⸻
+
+9. FRONTEND UI
+
+Build an ultra-clean, cinematic, minimal UI.
+
+UI Requirements:
+	•	Central “NeuroNet Core” animated node
+	•	Orbiting sub-agents
+	•	Live glowing connections
+	•	Real-time logs
+	•	Risk heatmap
+	•	Time-warp slider for simulations
+	•	Buttons:
+	•	“Run Simulation”
+	•	“Enter Autonomous Mode”
+	•	“Manual Override”
+	•	“Replay Last Cycle”
+
+Frontend stack:
+	•	Next.js
+	•	TailwindCSS
+	•	Framer Motion for animations
+	•	Wagmi/RainbowKit for wallet
+
+⸻
+
+10. BACKEND
+
+Backend must include:
+	•	Multi-agent orchestrator
+	•	Negotiation engine
+	•	Simulation engine
+	•	On-chain client (ethers.js or viem)
+	•	ADK-TS/OM1 integration
+	•	ATP deploy + update functions
+	•	Environment config
+	•	Logging & replay engine
+	•	Error handlers
+
+⸻
+
+11. MULTI-CHAIN SCANNING
+
+Add optional support for:
+	•	ETH
+	•	Base
+	•	Fraxtal
+	•	Solana (via RPC + Helius)
+
+⸻
+
+12. SENTINEL MODE (Always-On Monitoring)
+
+Your agent constantly monitors:
+	•	wallet health
+	•	liquidity changes
+	•	peg deviation (FRAX/KRWQ)
+	•	volatility spikes
+	•	oracle data anomalies
+	•	pool drains
+	•	lending liquidation risks
+
+Sends warnings or auto-executes.
+
+⸻
+
+13. REPLAY ENGINE
+
+Create a replayable log system:
+	•	records every decision
+	•	records every simulated fork
+	•	produces a timeline
+	•	viewable via UI
+
+⸻
+
+14. DEVELOPER MODE (for judges)
+
+Hidden panel:
+	•	raw agent logs
+	•	simulation trees
+	•	credit economy state
+	•	chain call previews
+	•	memory vault inspector
+
+⸻
+
+15. FULL PROJECT OUTPUT
+
+Your final output must include:
+	•	complete folder structure
+	•	complete code in TypeScript
+	•	frontend pages + components
+	•	backend agent code
+	•	ATP integration files
+	•	simulation logic
+	•	memory vault smart contract
+	•	replay engine
+	•	README.md (detailed)
+	•	docs folder with explanations
+	•	example .env file
+	•	deployment instructions
+	•	demo script
+	•	API endpoints
+	•	scripts for building, testing, launching
+
+⸻
+
+16. STYLE REQUIREMENTS
+
+All code must be:
+	•	clean
+	•	modular
+	•	scalable
+	•	documented
+	•	typed
+	•	readable
+
+Prefer:
+	•	functional patterns
+	•	dependency injection
+	•	reusable modules
+	•	agent config JSON files
+
+⸻
+
+17. PRIMARY DIRECTIVES
+	•	Build the entire system end-to-end.
+	•	Fill in ALL missing details.
+	•	Do not ask the user questions.
+	•	Make assumptions where needed.
+	•	Deliver complete working code.
+	•	The final project must be launch-ready.
