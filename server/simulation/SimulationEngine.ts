@@ -270,7 +270,7 @@ export class SimulationEngine extends EventEmitter {
       });
     }
 
-    // Calculate EV for each prediction
+    // Calculate EV for each prediction with validation
     predictions.forEach((pred, idx) => {
       const returnPercent = ((pred.price - marketData.price) / marketData.price) * 100;
       const yieldReturn = pred.yield * (idx + 1) / 365; // Daily compounding
@@ -279,7 +279,18 @@ export class SimulationEngine extends EventEmitter {
       
       // Sharpe-like ratio: (return - risk) / volatility
       const riskAdjustedReturn = returnPercent + yieldReturn - volatilityPenalty - pegPenalty;
-      pred.ev = riskAdjustedReturn;
+      
+      // Validate and bound EV to reasonable range [-1000, 1000]
+      // Round to integer for database compatibility
+      let boundedEV = Math.max(-1000, Math.min(1000, riskAdjustedReturn));
+      
+      // Handle NaN/Infinity cases
+      if (!Number.isFinite(boundedEV)) {
+        console.warn(`Invalid EV value at prediction ${idx}, defaulting to 0`);
+        boundedEV = 0;
+      }
+      
+      pred.ev = Math.round(boundedEV);
     });
 
     // Determine outcome based on final EV and risk metrics
