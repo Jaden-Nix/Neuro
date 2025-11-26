@@ -6,12 +6,11 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: ".5625rem",
+        md: ".375rem",
+        sm: ".1875rem",
       },
       colors: {
-        // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         border: "hsl(var(--border) / <alpha-value>)",
@@ -81,11 +80,28 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        // Agent personality colors
+        scout: {
+          DEFAULT: "hsl(var(--scout) / <alpha-value>)",
+          foreground: "hsl(var(--scout-foreground) / <alpha-value>)",
+        },
+        risk: {
+          DEFAULT: "hsl(var(--risk) / <alpha-value>)",
+          foreground: "hsl(var(--risk-foreground) / <alpha-value>)",
+        },
+        execution: {
+          DEFAULT: "hsl(var(--execution) / <alpha-value>)",
+          foreground: "hsl(var(--execution-foreground) / <alpha-value>)",
+        },
+        meta: {
+          DEFAULT: "hsl(var(--meta) / <alpha-value>)",
+          foreground: "hsl(var(--meta-foreground) / <alpha-value>)",
+        },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
-        serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        sans: ["Inter", "sans-serif"],
+        display: ["Space Grotesk", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       keyframes: {
         "accordion-down": {
@@ -96,10 +112,37 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        pulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+        orbit: {
+          "0%": { transform: "rotate(0deg) translateX(180px) rotate(0deg)" },
+          "100%": { transform: "rotate(360deg) translateX(180px) rotate(-360deg)" },
+        },
+        "orbit-reverse": {
+          "0%": { transform: "rotate(0deg) translateX(180px) rotate(0deg)" },
+          "100%": { transform: "rotate(-360deg) translateX(180px) rotate(360deg)" },
+        },
+        glow: {
+          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.5)" },
+          "50%": { boxShadow: "0 0 40px hsl(var(--primary) / 0.8)" },
+        },
+        particle: {
+          "0%": { transform: "translateX(0) translateY(0)", opacity: "0" },
+          "10%": { opacity: "1" },
+          "90%": { opacity: "1" },
+          "100%": { transform: "translateX(100px) translateY(-20px)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        orbit: "orbit 20s linear infinite",
+        "orbit-reverse": "orbit-reverse 15s linear infinite",
+        glow: "glow 3s ease-in-out infinite",
+        particle: "particle 2s ease-in-out infinite",
       },
     },
   },
