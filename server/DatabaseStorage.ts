@@ -10,6 +10,7 @@ import {
   replayEvents,
   alerts,
   systemState,
+  chainTransactions,
   type Agent,
   type LogEntry,
   type LiveMetrics,
@@ -20,6 +21,7 @@ import {
   type ReplayEvent,
   type SentinelAlert,
   type SystemState,
+  type ChainTransaction,
   AgentType,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -474,6 +476,79 @@ export class DatabaseStorage implements IStorage {
     return {
       ...result,
       timestamp: result.timestamp.getTime(),
+    };
+  }
+
+  // Chain Transactions
+  async getChainTransactions(filters?: any): Promise<ChainTransaction[]> {
+    const conditions = [];
+    if (filters?.chainId) {
+      conditions.push(eq(chainTransactions.chainId, filters.chainId));
+    }
+    if (filters?.status) {
+      conditions.push(eq(chainTransactions.status, filters.status));
+    }
+
+    const results =
+      conditions.length > 0
+        ? await db
+            .select()
+            .from(chainTransactions)
+            .where(and(...conditions))
+            .orderBy(desc(chainTransactions.timestamp))
+            .limit(100)
+        : await db
+            .select()
+            .from(chainTransactions)
+            .orderBy(desc(chainTransactions.timestamp))
+            .limit(100);
+
+    return results.map((tx) => ({
+      ...tx,
+      timestamp: tx.timestamp.getTime(),
+      blockNumber: tx.blockNumber || undefined,
+    }));
+  }
+
+  async addChainTransaction(tx: ChainTransaction): Promise<ChainTransaction> {
+    const txDate = typeof tx.timestamp === 'number'
+      ? new Date(tx.timestamp)
+      : tx.timestamp;
+
+    const [result] = await db
+      .insert(chainTransactions)
+      .values({
+        ...tx,
+        timestamp: txDate,
+      })
+      .returning();
+
+    return {
+      ...result,
+      timestamp: result.timestamp.getTime(),
+      blockNumber: result.blockNumber || undefined,
+    };
+  }
+
+  async updateChainTransaction(id: string, updates: Partial<ChainTransaction>): Promise<ChainTransaction | undefined> {
+    // Normalize timestamp to Date if provided as number
+    const normalizedUpdates = { ...updates };
+    if (typeof normalizedUpdates.timestamp === 'number') {
+      (normalizedUpdates as any).timestamp = new Date(normalizedUpdates.timestamp);
+    }
+    
+    const [result] = await db
+      .update(chainTransactions)
+      .set(normalizedUpdates)
+      .where(eq(chainTransactions.id, id))
+      .returning();
+
+    if (!result) return undefined;
+
+    return {
+      ...result,
+      timestamp: result.timestamp.getTime(),
+      blockNumber: result.blockNumber || undefined,
     };
   }
 }

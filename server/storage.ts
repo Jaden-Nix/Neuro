@@ -9,6 +9,7 @@ import type {
   ReplayEvent,
   SentinelAlert,
   SystemState,
+  ChainTransaction,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -50,6 +51,11 @@ export interface IStorage {
   // Alerts
   getAlerts(filters?: any): Promise<SentinelAlert[]>;
   addAlert(alert: SentinelAlert): Promise<SentinelAlert>;
+
+  // Chain Transactions
+  getChainTransactions(filters?: any): Promise<ChainTransaction[]>;
+  addChainTransaction(tx: ChainTransaction): Promise<ChainTransaction>;
+  updateChainTransaction(id: string, updates: Partial<ChainTransaction>): Promise<ChainTransaction | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -63,6 +69,7 @@ export class MemStorage implements IStorage {
   private simulations: SimulationBranch[];
   private replayEvents: ReplayEvent[];
   private alerts: SentinelAlert[];
+  private chainTransactions: Map<string, ChainTransaction>;
 
   constructor() {
     this.systemState = {
@@ -82,6 +89,7 @@ export class MemStorage implements IStorage {
     this.simulations = [];
     this.replayEvents = [];
     this.alerts = [];
+    this.chainTransactions = new Map();
 
     this.metrics = {
       walletBalance: "1250000",
@@ -258,6 +266,34 @@ export class MemStorage implements IStorage {
     }
     
     return alert;
+  }
+
+  async getChainTransactions(filters?: any): Promise<ChainTransaction[]> {
+    let results = Array.from(this.chainTransactions.values());
+    
+    if (filters?.chainId) {
+      results = results.filter((tx) => tx.chainId === filters.chainId);
+    }
+    
+    if (filters?.status) {
+      results = results.filter((tx) => tx.status === filters.status);
+    }
+    
+    return results.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  async addChainTransaction(tx: ChainTransaction): Promise<ChainTransaction> {
+    this.chainTransactions.set(tx.id, tx);
+    return tx;
+  }
+
+  async updateChainTransaction(id: string, updates: Partial<ChainTransaction>): Promise<ChainTransaction | undefined> {
+    const existing = this.chainTransactions.get(id);
+    if (!existing) return undefined;
+    
+    const updated = { ...existing, ...updates };
+    this.chainTransactions.set(id, updated);
+    return updated;
   }
 }
 

@@ -8,6 +8,9 @@ import { CreditEconomy } from "./economy/CreditEconomy";
 import { MemoryVault } from "./memory/MemoryVault";
 import { SentinelMonitor } from "./monitoring/SentinelMonitor";
 import { ReplayEngine } from "./replay/ReplayEngine";
+import { AutonomousCycleManager } from "./autonomous/AutonomousCycleManager";
+import { transactionManager } from "./execution/TransactionManager";
+import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
 import type { WSMessage, LogEntry } from "@shared/schema";
 
 // Initialize all services
@@ -17,9 +20,49 @@ const creditEconomy = new CreditEconomy();
 const memoryVault = new MemoryVault();
 const sentinelMonitor = new SentinelMonitor();
 const replayEngine = new ReplayEngine();
+const autonomousCycleManager = new AutonomousCycleManager(orchestrator, {
+  intervalMs: 30000,
+  maxConcurrentCycles: 1,
+  retryAttempts: 3,
+  retryDelayMs: 2000,
+  timeoutMs: 60000,
+});
 
 // Start sentinel monitoring
 sentinelMonitor.start();
+
+// Setup autonomous cycle event listeners
+autonomousCycleManager.on("cycleStarted", (data) => {
+  broadcastToClients({
+    type: "autonomousCycle",
+    data: { status: "started", ...data },
+    timestamp: Date.now(),
+  });
+});
+
+autonomousCycleManager.on("cycleCompleted", (data) => {
+  broadcastToClients({
+    type: "autonomousCycle",
+    data: { status: "completed", ...data },
+    timestamp: Date.now(),
+  });
+});
+
+autonomousCycleManager.on("cycleFailed", (data) => {
+  broadcastToClients({
+    type: "autonomousCycle",
+    data: { status: "failed", ...data },
+    timestamp: Date.now(),
+  });
+});
+
+autonomousCycleManager.on("retryAttempt", (data) => {
+  broadcastToClients({
+    type: "autonomousCycle",
+    data: { status: "retrying", ...data },
+    timestamp: Date.now(),
+  });
+});
 
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
@@ -285,37 +328,347 @@ export async function registerRoutes(
       await storage.updateSystemState({ autonomousMode: newMode });
 
       if (newMode) {
-        // Start autonomous cycle
-        setInterval(async () => {
-          try {
-            await orchestrator.runNegotiationCycle();
-          } catch (error) {
-            console.error("Autonomous cycle error:", error);
-          }
-        }, 30000); // Every 30 seconds
+        autonomousCycleManager.start();
+      } else {
+        autonomousCycleManager.stop();
       }
 
       res.json({
         autonomousMode: newMode,
         message: newMode ? "Autonomous mode activated" : "Autonomous mode deactivated",
+        cycleMetrics: autonomousCycleManager.getMetrics(),
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to toggle autonomous mode" });
     }
   });
 
-  app.post("/api/execute", async (req, res) => {
+  // Get autonomous cycle metrics
+  app.get("/api/autonomous/metrics", async (_req, res) => {
     try {
-      // Manual execution would happen here
+      const metrics = autonomousCycleManager.getMetrics();
+      const state = await storage.getSystemState();
       res.json({
-        transactionId: `tx-${Date.now()}`,
-        status: "pending",
-        hash: "0x" + Math.random().toString(16).substring(2),
+        ...metrics,
+        autonomousMode: state.autonomousMode,
       });
     } catch (error) {
-      res.status(500).json({ error: "Failed to execute" });
+      res.status(500).json({ error: "Failed to get cycle metrics" });
     }
   });
+
+  // Manually trigger a single negotiation cycle
+  app.post("/api/autonomous/trigger", async (_req, res) => {
+    try {
+      const result = await orchestrator.runNegotiationCycle({
+        timestamp: Date.now(),
+        manual: true,
+      });
+      res.json({
+        success: true,
+        result,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to trigger negotiation cycle" });
+    }
+  });
+
+  // Transaction Execution Endpoints
+  app.post("/api/execute", async (req, res) => {
+    try {
+      const proposal = transactionManager.validateProposal(req.body.proposal || {});
+      const executionPlan = transactionManager.validateExecutionPlan(req.body.executionPlan || {});
+      const agentId = req.body.agentId || "manual";
+      
+      const txRequest = transactionManager.createTransactionBundle(proposal, executionPlan, agentId);
+      const unsignedTx = transactionManager.buildUnsignedTransaction(txRequest);
+
+      res.json({
+        transactionId: txRequest.id,
+        unsignedTransaction: unsignedTx,
+        status: "pending",
+        message: "Transaction bundle created. Sign and submit via wallet.",
+      });
+    } catch (error: any) {
+      if (error.name === "ZodError") {
+        res.status(400).json({ error: "Invalid request", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create transaction" });
+      }
+    }
+  });
+
+  app.post("/api/execute/:txId/submit", async (req, res) => {
+    try {
+      const { txId } = req.params;
+      const { signedHash } = req.body;
+
+      if (!signedHash) {
+        res.status(400).json({ error: "signedHash required" });
+        return;
+      }
+
+      const status = await transactionManager.submitTransaction(txId, signedHash);
+      
+      broadcastToClients({
+        type: "transaction",
+        data: { status: "submitted", txId, hash: signedHash },
+        timestamp: Date.now(),
+      });
+
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit transaction" });
+    }
+  });
+
+  app.post("/api/execute/:txId/confirm", async (req, res) => {
+    try {
+      const { txId } = req.params;
+      const { blockNumber, gasUsed } = req.body;
+
+      const result = await transactionManager.confirmTransaction(
+        txId,
+        blockNumber || 0,
+        gasUsed || "0"
+      );
+
+      broadcastToClients({
+        type: "transaction",
+        data: { status: "confirmed", ...result },
+        timestamp: Date.now(),
+      });
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to confirm transaction" });
+    }
+  });
+
+  app.get("/api/transactions", async (_req, res) => {
+    try {
+      const transactions = transactionManager.getAllTransactions();
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get transactions" });
+    }
+  });
+
+  app.get("/api/transactions/pending", async (_req, res) => {
+    try {
+      const pending = transactionManager.getPendingTransactions();
+      res.json(pending);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get pending transactions" });
+    }
+  });
+
+  app.get("/api/transactions/chain", async (req, res) => {
+    try {
+      const chainId = req.query.chainId ? parseInt(req.query.chainId as string) : undefined;
+      const status = req.query.status as string | undefined;
+      const transactions = await storage.getChainTransactions({ chainId, status });
+      res.json(transactions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get chain transactions" });
+    }
+  });
+
+  // Self-Healing Engine Endpoints
+  app.get("/api/selfhealing/health", async (_req, res) => {
+    try {
+      const agents = await storage.getAgents();
+      const healthResults = agents.map(agent => 
+        selfHealingEngine.evaluateAgentHealth(agent)
+      );
+      res.json({
+        agents: healthResults,
+        summary: selfHealingEngine.getSystemHealthSummary(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get health status" });
+    }
+  });
+
+  app.get("/api/selfhealing/lineages", async (_req, res) => {
+    try {
+      const lineages = selfHealingEngine.getAllLineages();
+      const lineageArray = Array.from(lineages.entries()).map(([parentId, tree]) => ({
+        parentId,
+        versions: tree,
+      }));
+      res.json(lineageArray);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get lineages" });
+    }
+  });
+
+  app.post("/api/selfhealing/check", async (_req, res) => {
+    try {
+      orchestrator.checkForDeprecation();
+      res.json({ success: true, message: "Health check completed" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to run health check" });
+    }
+  });
+
+  // Setup transaction event listeners
+  transactionManager.on("transactionCreated", (tx) => {
+    broadcastToClients({
+      type: "transaction",
+      data: { status: "created", ...tx },
+      timestamp: Date.now(),
+    });
+  });
+
+  transactionManager.on("transactionSubmitted", async (data) => {
+    broadcastToClients({
+      type: "transaction",
+      data: { status: "submitted", ...data },
+      timestamp: Date.now(),
+    });
+
+    if (data.chainTransaction) {
+      try {
+        await storage.addChainTransaction(data.chainTransaction as any);
+      } catch (err) {
+        console.error("Failed to persist chain transaction:", err);
+      }
+    }
+  });
+
+  transactionManager.on("transactionConfirmed", async (data) => {
+    broadcastToClients({
+      type: "transaction",
+      data: { status: "confirmed", ...data },
+      timestamp: Date.now(),
+    });
+
+    try {
+      await storage.updateSystemState({
+        totalTransactionsExecuted: 1,
+      });
+
+      if (data.agentId && data.result) {
+        await creditEconomy.recordTransaction({
+          agentId: data.agentId,
+          amount: data.result.creditAdjustment,
+          reason: "Transaction confirmed successfully",
+          success: true,
+        });
+      }
+
+      if (data.chainTransaction) {
+        await storage.updateChainTransaction(data.txId, {
+          status: "confirmed",
+          blockNumber: data.blockNumber,
+          gasUsed: data.gasUsed,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update transaction confirmation:", err);
+    }
+  });
+
+  transactionManager.on("transactionFailed", async (data) => {
+    broadcastToClients({
+      type: "transaction",
+      data: { status: "failed", ...data },
+      timestamp: Date.now(),
+    });
+
+    try {
+      if (data.agentId && data.result) {
+        await creditEconomy.recordTransaction({
+          agentId: data.agentId,
+          amount: data.result.creditAdjustment,
+          reason: `Transaction failed: ${data.error}`,
+          success: false,
+        });
+      }
+
+      if (data.chainTransaction) {
+        await storage.updateChainTransaction(data.txId, {
+          status: "failed",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update transaction failure:", err);
+    }
+  });
+
+  transactionManager.on("transactionMonitorCheck", (data) => {
+    broadcastToClients({
+      type: "transactionMonitor",
+      data: { status: "checking", ...data },
+      timestamp: Date.now(),
+    });
+  });
+
+  transactionManager.on("transactionMonitorTimeout", (data) => {
+    broadcastToClients({
+      type: "transactionMonitor",
+      data: { status: "timeout", ...data },
+      timestamp: Date.now(),
+    });
+  });
+
+  // Setup self-healing event listeners
+  selfHealingEngine.on("healthCheckStarted", async () => {
+    try {
+      const agents = await storage.getAgents();
+      const healthResults = [];
+
+      for (const agent of agents) {
+        const result = selfHealingEngine.evaluateAgentHealth(agent);
+        healthResults.push(result);
+
+        if (selfHealingEngine.shouldDeprecate(agent)) {
+          orchestrator.checkForDeprecation();
+          
+          selfHealingEngine.recordLineage(
+            agent.id,
+            agent.version,
+            undefined,
+            `Credit score dropped to ${agent.creditScore}`,
+            ["automatic_deprecation"]
+          );
+
+          broadcastToClients({
+            type: "selfHealing",
+            data: { 
+              action: "deprecated", 
+              agentId: agent.id,
+              reason: "Performance below threshold",
+            },
+            timestamp: Date.now(),
+          });
+        }
+      }
+
+      broadcastToClients({
+        type: "selfHealing",
+        data: { 
+          action: "healthCheckComplete",
+          summary: selfHealingEngine.getSystemHealthSummary(),
+        },
+        timestamp: Date.now(),
+      });
+    } catch (err) {
+      console.error("Self-healing health check failed:", err);
+    }
+  });
+
+  selfHealingEngine.on("lineageRecorded", (lineage) => {
+    broadcastToClients({
+      type: "selfHealing",
+      data: { action: "lineageRecorded", lineage },
+      timestamp: Date.now(),
+    });
+  });
+
+  // Start self-healing monitoring
+  selfHealingEngine.startMonitoring(60000);
 
   // Trigger initial negotiation cycle for demo
   setTimeout(async () => {
