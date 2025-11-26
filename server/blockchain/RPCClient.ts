@@ -1,6 +1,136 @@
 import { createPublicClient, http, formatEther, parseAbi } from "viem";
 import { mainnet, base, fraxtal } from "viem/chains";
 
+/**
+ * Retry configuration for RPC calls
+ */
+interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+  backoffMultiplier: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,
+  maxDelayMs: 10000,
+  backoffMultiplier: 2,
+};
+
+/**
+ * Sleep utility for delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Calculate delay with exponential backoff and jitter
+ */
+function calculateBackoffDelay(
+  attempt: number,
+  config: RetryConfig = DEFAULT_RETRY_CONFIG
+): number {
+  // Exponential backoff: baseDelay * (multiplier ^ attempt)
+  const exponentialDelay = config.baseDelayMs * Math.pow(config.backoffMultiplier, attempt);
+  
+  // Add jitter (0-25% random variation) to prevent thundering herd
+  const jitter = exponentialDelay * 0.25 * Math.random();
+  
+  // Clamp to max delay
+  return Math.min(exponentialDelay + jitter, config.maxDelayMs);
+}
+
+/**
+ * Execute a function with exponential backoff retry
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  operationName: string,
+  config: RetryConfig = DEFAULT_RETRY_CONFIG
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Check if error is retryable
+      const isRetryable = isRetryableError(lastError);
+      
+      if (!isRetryable || attempt === config.maxRetries) {
+        console.error(
+          `[RPC] ${operationName} failed after ${attempt + 1} attempts:`,
+          lastError.message
+        );
+        throw lastError;
+      }
+      
+      const delay = calculateBackoffDelay(attempt, config);
+      console.warn(
+        `[RPC] ${operationName} attempt ${attempt + 1} failed, retrying in ${Math.round(delay)}ms:`,
+        lastError.message
+      );
+      
+      await sleep(delay);
+    }
+  }
+  
+  // This should never be reached, but TypeScript needs it
+  throw lastError || new Error(`${operationName} failed with unknown error`);
+}
+
+/**
+ * Determine if an error is retryable
+ */
+function isRetryableError(error: Error): boolean {
+  const message = error.message.toLowerCase();
+  
+  // Network-related errors (retryable)
+  const retryablePatterns = [
+    "timeout",
+    "econnreset",
+    "econnrefused",
+    "socket hang up",
+    "network",
+    "rate limit",
+    "429",
+    "503",
+    "502",
+    "504",
+    "too many requests",
+    "temporarily unavailable",
+    "service unavailable",
+  ];
+  
+  // Non-retryable errors
+  const nonRetryablePatterns = [
+    "invalid",
+    "not found",
+    "revert",
+    "execution reverted",
+    "insufficient",
+    "nonce",
+    "already known",
+  ];
+  
+  // Check if it's explicitly non-retryable
+  if (nonRetryablePatterns.some((pattern) => message.includes(pattern))) {
+    return false;
+  }
+  
+  // Check if it's explicitly retryable
+  if (retryablePatterns.some((pattern) => message.includes(pattern))) {
+    return true;
+  }
+  
+  // Default: retry unknown errors (they might be transient)
+  return true;
+}
+
 // Uniswap V3 Pool ABI (minimal for slot0 and liquidity)
 const UNISWAP_V3_POOL_ABI = parseAbi([
   "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
@@ -101,7 +231,7 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Fetch wallet balance across all chains
+   * Fetch wallet balance across all chains with retry logic
    */
   async getWalletBalance(address?: `0x${string}`): Promise<bigint> {
     if (!address) {
@@ -114,10 +244,14 @@ export class BlockchainRPCClient {
     const clientEntries = Array.from(this.clients.entries());
     for (const [chainId, client] of clientEntries) {
       try {
-        const balance = await client.getBalance({ address });
+        const balance = await withRetry(
+          () => client.getBalance({ address }),
+          `getBalance(chain=${chainId})`
+        );
         totalBalance += balance;
       } catch (error) {
         console.error(`Failed to fetch balance on chain ${chainId}:`, error);
+        // Continue with other chains even if one fails
       }
     }
 
@@ -125,7 +259,7 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Get TVL from major liquidity pools (Uniswap V3 ETH/USDC example)
+   * Get TVL from major liquidity pools (Uniswap V3 ETH/USDC example) with retry logic
    */
   async getTotalValueLocked(): Promise<bigint> {
     const client = this.clients.get(mainnet.id);
@@ -135,17 +269,23 @@ export class BlockchainRPCClient {
     const POOL_ADDRESS = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640";
 
     try {
-      const liquidity = await client.readContract({
-        address: POOL_ADDRESS,
-        abi: UNISWAP_V3_POOL_ABI,
-        functionName: "liquidity",
-      });
+      const liquidity = await withRetry(
+        () => client.readContract({
+          address: POOL_ADDRESS,
+          abi: UNISWAP_V3_POOL_ABI,
+          functionName: "liquidity",
+        }),
+        "getTVL.liquidity"
+      );
 
-      const slot0 = await client.readContract({
-        address: POOL_ADDRESS,
-        abi: UNISWAP_V3_POOL_ABI,
-        functionName: "slot0",
-      });
+      const slot0 = await withRetry(
+        () => client.readContract({
+          address: POOL_ADDRESS,
+          abi: UNISWAP_V3_POOL_ABI,
+          functionName: "slot0",
+        }),
+        "getTVL.slot0"
+      );
 
       // Simplified TVL calculation (liquidity * sqrt price)
       // In production, this would need proper math for accurate TVL
@@ -162,7 +302,7 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Get current gas prices across chains
+   * Get current gas prices across chains with retry logic
    */
   async getGasPrices(): Promise<Map<number, bigint>> {
     const gasPrices = new Map<number, bigint>();
@@ -170,10 +310,14 @@ export class BlockchainRPCClient {
     const clientEntries = Array.from(this.clients.entries());
     for (const [chainId, client] of clientEntries) {
       try {
-        const gasPrice = await client.getGasPrice();
+        const gasPrice = await withRetry(
+          () => client.getGasPrice(),
+          `getGasPrice(chain=${chainId})`
+        );
         gasPrices.set(chainId, gasPrice);
       } catch (error) {
         console.error(`Failed to fetch gas price on chain ${chainId}:`, error);
+        // Continue with other chains even if one fails
       }
     }
 
