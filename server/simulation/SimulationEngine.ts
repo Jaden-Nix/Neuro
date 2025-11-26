@@ -42,9 +42,17 @@ export class SimulationEngine extends EventEmitter {
       branches.push(branch);
     }
 
-    // Calculate EV scores for all branches
+    // Calculate EV scores for all branches (rounded to integers for database persistence)
     branches.forEach((branch) => {
-      branch.evScore = this.calculateEV(branch);
+      const rawEV = this.calculateEV(branch);
+      // Round to integer for database column compatibility (integer type)
+      branch.evScore = Math.round(rawEV);
+      
+      // Validate evScore is finite
+      if (!Number.isFinite(branch.evScore)) {
+        console.warn(`Invalid evScore detected for branch ${branch.id}, defaulting to 0`);
+        branch.evScore = 0;
+      }
     });
 
     // Sort by EV score
@@ -162,11 +170,26 @@ export class SimulationEngine extends EventEmitter {
 
   /**
    * Box-Muller transform for generating standard normal random numbers
+   * Uses (1 - Math.random()) to avoid u1=0 which would cause Math.log(0) = -Infinity
    */
   private boxMullerTransform(): number {
-    const u1 = Math.random();
+    // Ensure u1 is never 0 by using 1 - Math.random() (range becomes (0, 1])
+    // This prevents Math.log(0) = -Infinity which would corrupt price paths
+    const u1 = 1 - Math.random();
     const u2 = Math.random();
-    return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    
+    // Additional safety: clamp u1 to ensure it's never exactly 0
+    const safeU1 = Math.max(u1, Number.EPSILON);
+    
+    const z = Math.sqrt(-2 * Math.log(safeU1)) * Math.cos(2 * Math.PI * u2);
+    
+    // Validate output is finite (defense in depth)
+    if (!Number.isFinite(z)) {
+      console.warn("Box-Muller produced non-finite value, returning 0");
+      return 0;
+    }
+    
+    return z;
   }
 
   /**
