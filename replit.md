@@ -98,6 +98,31 @@ Preferred communication style: Simple, everyday language.
 - Real-time broadcasting through WebSocket for state synchronization
 - Database migration support via Drizzle Kit (prepared for PostgreSQL)
 
+## Recent Changes & Fixes (November 26, 2025)
+
+### SimulationEngine Enhancements
+- **Box-Muller Transform Fix**: Added guard against edge case where NaN/Infinity could be generated in random number generation
+- **EV Score Persistence**: All EV scores now rounded to integers with `Math.round()` before database insertion for proper compatibility with integer column type
+- **Prediction Value Validation**: EV values bounded to [-1000, 1000] range with validation for NaN/Infinity cases
+- **Advanced Monte Carlo Simulation**: Completely rewrote with Welford's online algorithm for numerically stable mean/variance calculation
+  - Convergence detection based on standard error of mean and mean stabilization
+  - Comprehensive distribution metrics: percentiles (p5-p95), Value at Risk (VaR), Conditional VaR (CVaR)
+  - Higher moment calculations: skewness and excess kurtosis
+  - Support for 95% and 99% confidence intervals
+  - Event emissions for progress tracking and completion
+  - Batch Monte Carlo simulation support for scenario comparison
+
+### RPC Reliability Improvements
+- **Exponential Backoff with Jitter**: All RPC calls now use configurable retry logic (3 retries, 1-10s delays)
+- **Smart Error Classification**: Distinguishes between retryable (network, rate limit) and non-retryable errors (contract revert)
+- **Methods Enhanced**:
+  - `getWalletBalance()` - Multi-chain balance fetching with per-chain retry
+  - `getTotalValueLocked()` - Uniswap V3 pool queries with independent retries
+  - `getGasPrices()` - Cross-chain gas price fetching with fallback
+  - `getAaveV3APY()` - Real yield source with retry on transient failures
+  - `getETHUSDPrice()` - Chainlink oracle access with retry
+  - `getGasPriceGwei()` - Per-chain gas conversion with retry logic
+
 ## External Dependencies
 
 ### AI Services
@@ -152,3 +177,31 @@ Preferred communication style: Simple, everyday language.
 - **zod**: Runtime type validation and schema definition
 - **class-variance-authority**: CSS variant utilities
 - **clsx** + **tailwind-merge**: Conditional class name merging
+
+## Current Project Status
+
+### Completed Tasks
+1. ✅ PostgreSQL database provisioned with schema deployed
+2. ✅ Anthropic API integration fixed (using direct API key)
+3. ✅ All four agents operational and autonomous mode functional
+4. ✅ Box-Muller transform edge case fixed
+5. ✅ EV score persistence bug fixed (integer rounding)
+6. ✅ Monte Carlo simulation completely rewritten with advanced statistics
+7. ✅ RPC retry logic with exponential backoff implemented
+
+### Known Issues
+- **RPCClient.ts** has 3 pre-existing TypeScript type errors related to viem's bigint exponentiation syntax (lines 88-91, 96-99, 208) - these don't block functionality as they relate to type checking only, not runtime behavior
+
+### Remaining Work
+1. Solana/Helius RPC integration (blockchain support extension)
+2. Advanced simulation parameter tuning
+3. Performance optimization for large-scale Monte Carlo runs
+4. Extended testing suite for agent negotiation edge cases
+5. Frontend dashboard enhancements for Monte Carlo result visualization
+
+### Development Notes
+- **API Key Configuration**: All agents use `ANTHROPIC_API_KEY` environment variable directly
+- **Database**: Uses PostgreSQL via Neon with Drizzle ORM for type safety
+- **Error Handling**: Network errors automatically retry with smart backoff; contract errors fail immediately
+- **Simulation**: Monte Carlo now converges automatically based on statistical metrics rather than fixed iterations
+- **Architecture**: Event-driven with WebSocket real-time updates for all state changes
