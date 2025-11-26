@@ -21,6 +21,12 @@ const AAVE_V3_POOL_ABI = parseAbi([
   "function getReserveData(address asset) external view returns (uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt)",
 ]);
 
+// Chainlink Price Feed ABI
+const CHAINLINK_AGGREGATOR_V3_ABI = parseAbi([
+  "function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
+  "function decimals() external view returns (uint8)",
+]);
+
 export interface ChainConfig {
   chainId: number;
   name: string;
@@ -225,6 +231,50 @@ export class BlockchainRPCClient {
     } catch (error) {
       console.error("Failed to calculate APY:", error);
       return 0;
+    }
+  }
+
+  /**
+   * Fetch ETH/USD price from Chainlink Price Feed
+   */
+  async getETHUSDPrice(): Promise<number> {
+    const client = this.clients.get(mainnet.id);
+    if (!client) return 0;
+
+    // Chainlink ETH/USD Price Feed on Ethereum mainnet
+    const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419";
+
+    try {
+      const [, answer, , ,] = await client.readContract({
+        address: ETH_USD_FEED,
+        abi: CHAINLINK_AGGREGATOR_V3_ABI,
+        functionName: "latestRoundData",
+      });
+
+      // Chainlink ETH/USD has 8 decimals
+      const price = Number(answer) / 1e8;
+      return price;
+    } catch (error) {
+      console.error("Failed to fetch Chainlink ETH/USD price:", error);
+      // Fallback price - would use a secondary oracle in production
+      return 2000;
+    }
+  }
+
+  /**
+   * Get gas price in Gwei (proper units for simulation)
+   */
+  async getGasPriceGwei(chainId: number = mainnet.id): Promise<number> {
+    const client = this.clients.get(chainId);
+    if (!client) return 20;
+
+    try {
+      const gasPrice = await client.getGasPrice();
+      // Convert wei to gwei (1 gwei = 1e9 wei)
+      return Number(gasPrice) / 1e9;
+    } catch (error) {
+      console.error(`Failed to fetch gas price in gwei on chain ${chainId}:`, error);
+      return 20; // Fallback to typical mainnet gas
     }
   }
 

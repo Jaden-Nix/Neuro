@@ -366,6 +366,7 @@ export class DatabaseStorage implements IStorage {
       .insert(simulations)
       .values({
         ...simulation,
+        evScore: Math.round(simulation.evScore), // Round to integer for DB
         timestamp: new Date(),
       })
       .returning();

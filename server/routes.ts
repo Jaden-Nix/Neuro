@@ -290,6 +290,32 @@ export async function registerRoutes(
     }
   });
 
+  // Synchronous simulation run - returns results directly
+  // Note: Simulation persistence is handled by simulationCompleted event handler
+  app.post("/api/simulations/run", async (req, res) => {
+    try {
+      const config = {
+        timeHorizon: req.body.timeHorizon || 60,
+        branchCount: req.body.branchCount || 5,
+        predictionInterval: req.body.predictionInterval || 10,
+      };
+
+      const branches = await simulationEngine.runSimulation(config, req.body.marketData);
+      const bestBranch = simulationEngine.selectBestBranch(branches);
+
+      res.json({
+        simulationId: branches[0]?.id?.split('-branch-')[0] || `sim-${Date.now()}`,
+        status: "completed",
+        branches,
+        bestBranch,
+        marketSnapshot: simulationEngine.getLastMarketSnapshot(),
+      });
+    } catch (error) {
+      console.error("Simulation failed:", error);
+      res.status(500).json({ error: "Failed to run simulation" });
+    }
+  });
+
   // Replay Events
   app.get("/api/replay/events", async (req, res) => {
     try {
