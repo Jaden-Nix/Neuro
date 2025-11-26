@@ -60,7 +60,11 @@ export class SimulationEngine extends EventEmitter {
   private async fetchRealMarketData(existingData?: any): Promise<MarketSnapshot> {
     try {
       // Fetch live on-chain metrics
-      const onChainMetrics = await rpcClient.getOnChainMetrics();
+      const [onChainMetrics, ethPrice, gasPriceGwei] = await Promise.all([
+        rpcClient.getOnChainMetrics(),
+        rpcClient.getETHUSDPrice(),
+        rpcClient.getGasPriceGwei(),
+      ]);
       
       // Convert TVL from ETH string to number
       const tvlEth = parseFloat(onChainMetrics.totalTVL) || 1000000;
@@ -69,10 +73,10 @@ export class SimulationEngine extends EventEmitter {
       const calculatedVolatility = this.calculateHistoricalVolatility();
       
       const snapshot: MarketSnapshot = {
-        price: existingData?.currentPrice || await this.getETHPrice(),
+        price: existingData?.currentPrice || ethPrice || 2000,
         tvl: tvlEth,
         yield: onChainMetrics.currentAPY || 3.5,
-        gasPrice: parseFloat(onChainMetrics.gasPrice) * 1e9 || 20, // Convert to Gwei
+        gasPrice: gasPriceGwei || 20, // Already in Gwei
         volatility: calculatedVolatility || 0.25,
         timestamp: Date.now(),
       };
@@ -93,20 +97,6 @@ export class SimulationEngine extends EventEmitter {
         volatility: 0.25,
         timestamp: Date.now(),
       };
-    }
-  }
-
-  /**
-   * Get ETH price from Uniswap V3 pool sqrtPriceX96
-   */
-  private async getETHPrice(): Promise<number> {
-    try {
-      // Chainlink ETH/USD price feed on Ethereum mainnet
-      // In production, we'd call the oracle directly
-      // For now, estimate from TVL ratio or use a fallback
-      return 2000; // Fallback price - would integrate Chainlink here
-    } catch {
-      return 2000;
     }
   }
 
