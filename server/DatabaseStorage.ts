@@ -207,7 +207,7 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Failed to fetch on-chain metrics:", error);
       
-      // Fallback to mock data if RPC fails
+      // Fallback to safe defaults if RPC fails
       return {
         walletBalance: "0",
         totalTVL: "0",
@@ -215,6 +215,7 @@ export class DatabaseStorage implements IStorage {
         riskLevel: 50,
         activeOpportunities: 0,
         pendingTransactions: 0,
+        gasPrice: "0",
         timestamp: now,
       };
     }

@@ -110,7 +110,7 @@ export async function registerRoutes(
   // WebSocket Setup
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
-  wss.on("connection", (ws: WebSocket) => {
+  wss.on("connection", async (ws: WebSocket) => {
     wsClients.add(ws);
 
     ws.on("close", () => {
@@ -118,10 +118,11 @@ export async function registerRoutes(
     });
 
     // Send initial data
+    const metrics = await storage.getMetrics();
     ws.send(
       JSON.stringify({
         type: "metrics",
-        data: storage.getMetrics(),
+        data: metrics,
         timestamp: Date.now(),
       })
     );

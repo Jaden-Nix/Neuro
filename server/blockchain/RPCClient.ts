@@ -16,6 +16,11 @@ const ERC20_ABI = parseAbi([
   "function balanceOf(address) external view returns (uint256)",
 ]);
 
+// Aave V3 Pool ABI for reserve data
+const AAVE_V3_POOL_ABI = parseAbi([
+  "function getReserveData(address asset) external view returns (uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt)",
+]);
+
 export interface ChainConfig {
   chainId: number;
   name: string;
@@ -170,16 +175,57 @@ export class BlockchainRPCClient {
   }
 
   /**
-   * Calculate approximate APY based on recent yield data
-   * This is a simplified calculation - in production would integrate with
-   * specific yield protocol APIs (Aave, Compound, etc.)
+   * Fetch real APY from Aave V3 protocol
+   */
+  async getAaveV3APY(): Promise<number> {
+    const client = this.clients.get(mainnet.id);
+    if (!client) return 0;
+
+    // Aave V3 Pool address on Ethereum mainnet
+    const AAVE_V3_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2";
+    // USDC address on Ethereum
+    const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+
+    try {
+      const reserveData = await client.readContract({
+        address: AAVE_V3_POOL,
+        abi: AAVE_V3_POOL_ABI,
+        functionName: "getReserveData",
+        args: [USDC_ADDRESS],
+      });
+
+      // currentLiquidityRate is at index 2 (uint128)
+      const liquidityRate = reserveData[2];
+      
+      // Aave rates are in Ray units (1e27)
+      // Convert to APY: (rate / 1e27) * 100
+      const RAY = BigInt(10) ** BigInt(27);
+      const apyDecimal = Number(liquidityRate) / Number(RAY);
+      const apy = apyDecimal * 100;
+
+      return apy;
+    } catch (error) {
+      console.error("Failed to fetch Aave V3 APY:", error);
+      // Fallback to 0 if fetch fails
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate aggregate APY from multiple yield sources
    */
   async calculateAPY(): Promise<number> {
-    // Placeholder: In production, query actual yield protocols
-    // For now, return estimated APY from mock calculation
-    const baseAPY = 5.5;
-    const variation = (Math.random() - 0.5) * 2; // -1 to +1
-    return Math.max(0, baseAPY + variation);
+    try {
+      // Fetch real APY from Aave V3
+      const aaveAPY = await this.getAaveV3APY();
+      
+      // In production, would aggregate from multiple protocols (Compound, Yearn, etc.)
+      // For now, return Aave APY as primary source
+      return aaveAPY;
+    } catch (error) {
+      console.error("Failed to calculate APY:", error);
+      return 0;
+    }
   }
 
   /**
