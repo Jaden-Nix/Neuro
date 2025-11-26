@@ -102,9 +102,9 @@ Preferred communication style: Simple, everyday language.
 
 ### AI Services
 - **Anthropic Claude API**: Primary AI engine for all agent decision-making
-  - Accessed through Replit AI Integrations (`AI_INTEGRATIONS_ANTHROPIC_API_KEY`, `AI_INTEGRATIONS_ANTHROPIC_BASE_URL`)
+  - Accessed via `ANTHROPIC_API_KEY` environment variable
   - Used by Meta, Scout, Risk, and Execution agents for natural language reasoning
-  - Requires API key configuration through environment variables
+  - Model: claude-sonnet-4-5 for optimal performance
 
 ### Blockchain Integration
 - **RainbowKit**: Wallet connection UI and management
