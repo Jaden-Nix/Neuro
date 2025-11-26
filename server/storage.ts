@@ -261,4 +261,9 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Use DatabaseStorage for persistent PostgreSQL storage with real blockchain data
+import { DatabaseStorage } from "./DatabaseStorage";
+export const storage = new DatabaseStorage();
+
+// Keep MemStorage for fallback/testing if needed
+// export const storage = new MemStorage();

@@ -70,9 +70,10 @@ export abstract class BaseAgent extends EventEmitter {
     this.creditScore += amount;
     this.emit("creditChange", {
       agentId: this.id,
+      agentType: this.type,
       amount,
       reason,
-      newTotal: this.creditScore,
+      timestamp: Date.now(),
     });
   }
 
