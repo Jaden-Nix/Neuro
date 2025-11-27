@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { OnboardingWizard, useOnboarding } from "@/components/OnboardingWizard";
 
 import Dashboard from "@/pages/Dashboard";
 import MLInsights from "@/pages/MLInsights";
@@ -63,25 +64,35 @@ function AppLayout() {
     "--sidebar-width-icon": "3rem",
   } as React.CSSProperties;
 
+  const { showOnboarding, hasChecked, completeOnboarding } = useOnboarding();
+
   return (
-    <SidebarProvider style={style}>
-      <div className="flex h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-col flex-1">
-          <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
-            <div className="flex items-center gap-2">
-              <ThemeToggle />
-            </div>
-          </header>
-          <main className="flex-1 overflow-auto bg-background">
-            <div className="p-6">
-              <Router />
-            </div>
-          </main>
+    <>
+      {hasChecked && showOnboarding && (
+        <OnboardingWizard 
+          onComplete={completeOnboarding} 
+          onSkip={completeOnboarding} 
+        />
+      )}
+      <SidebarProvider style={style}>
+        <div className="flex h-screen w-full">
+          <AppSidebar />
+          <div className="flex flex-col flex-1">
+            <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+              </div>
+            </header>
+            <main className="flex-1 overflow-auto bg-background">
+              <div className="p-6">
+                <Router />
+              </div>
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </>
   );
 }
 

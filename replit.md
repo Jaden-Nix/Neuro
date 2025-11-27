@@ -67,7 +67,40 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ## Recent Changes
 
-### November 27, 2025
+### November 27, 2025 (AGENT ARENA Hackathon Compliance)
+- **ADK-TS Integration**: IQ AI Agent Development Kit for TypeScript
+  - `server/adk/ADKIntegration.ts`: Full ADK-TS wrapper with multi-agent support
+  - Integrates with `@iqai/adk` package for hackathon compliance
+  - Pre-configured agents: Scout, Risk, Execution, Meta with personality traits
+  - API routes: `/api/adk/*` for status, agents, queries, and workflows
+
+- **ATP (Agent Tokenization Platform) Integration**:
+  - `server/atp/ATPClient.ts`: Agent registration, tokenization, and evolution
+  - ATP Points system for user engagement rewards
+  - Agent link generation for ATP platform compatibility
+  - Fraxtal network contracts configuration
+  - API routes: `/api/atp/*` for agents, tokenization, points
+
+- **IQ Token & Airdrop Support**:
+  - `server/iq/IQTokenService.ts`: Staking, rewards, and airdrop management
+  - HiIQ staking with voting power calculation
+  - Agent participation airdrops (staking, governance, usage)
+  - IQ token metrics and contract addresses
+  - API routes: `/api/iq/*` for staking, airdrops, metrics
+
+- **Smart Contracts (Fraxtal-ready)**:
+  - `contracts/MemoryVault.sol`: On-chain strategy storage with agent authorization
+  - `contracts/AgentRegistry.sol`: Agent lifecycle and ATP compatibility
+  - Features: credit economy, evolution tracking, tokenization support
+
+- **Onboarding Wizard** (Judge-friendly):
+  - `client/src/components/OnboardingWizard.tsx`: 5-step guided tour
+  - Steps: Welcome, Meet Agents, Features, ATP Integration, Connect Wallet
+  - Animated transitions with Framer Motion
+  - Persistent state via localStorage
+
+- **Hackathon Status Endpoint**: `/api/hackathon/status` for compliance verification
+
 - **Alert System**: Email and webhook notifications for critical system events
   - `server/alerts/AlertService.ts`: Alert configuration management with severity thresholds
   - Supports email (SendGrid), webhook, and in-app notifications

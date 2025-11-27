@@ -2499,6 +2499,376 @@ export async function registerRoutes(
     }
   });
 
+  // ==========================================
+  // ADK-TS Integration Routes
+  // ==========================================
+  
+  app.get("/api/adk/status", async (_req, res) => {
+    try {
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      res.json(adkIntegration.getStatus());
+    } catch (error) {
+      console.error("Failed to get ADK status:", error);
+      res.status(500).json({ error: "Failed to get ADK status" });
+    }
+  });
+
+  app.get("/api/adk/agents", async (_req, res) => {
+    try {
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      res.json(adkIntegration.getAllAgents());
+    } catch (error) {
+      console.error("Failed to get ADK agents:", error);
+      res.status(500).json({ error: "Failed to get ADK agents" });
+    }
+  });
+
+  app.post("/api/adk/query", writeLimiter, async (req, res) => {
+    try {
+      const { agentName, prompt, context } = req.body;
+      if (!agentName || !prompt) {
+        return res.status(400).json({ error: "agentName and prompt are required" });
+      }
+      
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      const decision = await adkIntegration.queryAgent(agentName, prompt, context);
+      res.json(decision);
+    } catch (error) {
+      console.error("Failed to query ADK agent:", error);
+      res.status(500).json({ error: "Failed to query ADK agent" });
+    }
+  });
+
+  app.post("/api/adk/workflow", writeLimiter, async (req, res) => {
+    try {
+      const { input } = req.body;
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      const decisions = await adkIntegration.runMultiAgentWorkflow(input || {});
+      res.json(decisions);
+    } catch (error) {
+      console.error("Failed to run ADK workflow:", error);
+      res.status(500).json({ error: "Failed to run ADK workflow" });
+    }
+  });
+
+  // ==========================================
+  // ATP (Agent Tokenization Platform) Routes
+  // ==========================================
+  
+  app.get("/api/atp/status", async (_req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      res.json(atpClient.getStatus());
+    } catch (error) {
+      console.error("Failed to get ATP status:", error);
+      res.status(500).json({ error: "Failed to get ATP status" });
+    }
+  });
+
+  app.get("/api/atp/contracts", async (_req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      res.json(atpClient.getContracts());
+    } catch (error) {
+      console.error("Failed to get ATP contracts:", error);
+      res.status(500).json({ error: "Failed to get ATP contracts" });
+    }
+  });
+
+  app.get("/api/atp/agents", async (_req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      res.json(atpClient.getAllAgents());
+    } catch (error) {
+      console.error("Failed to get ATP agents:", error);
+      res.status(500).json({ error: "Failed to get ATP agents" });
+    }
+  });
+
+  app.get("/api/atp/agents/:id", async (req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const agent = atpClient.getAgent(req.params.id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      res.json(agent);
+    } catch (error) {
+      console.error("Failed to get ATP agent:", error);
+      res.status(500).json({ error: "Failed to get ATP agent" });
+    }
+  });
+
+  app.get("/api/atp/agents/:id/link", async (req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const link = await atpClient.getAgentLink(req.params.id);
+      res.json({ link });
+    } catch (error) {
+      console.error("Failed to get ATP agent link:", error);
+      res.status(500).json({ error: "Failed to get ATP agent link" });
+    }
+  });
+
+  app.post("/api/atp/register", writeLimiter, async (req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const agentId = await atpClient.registerAgent(req.body);
+      res.json({ agentId, success: true });
+    } catch (error) {
+      console.error("Failed to register ATP agent:", error);
+      res.status(500).json({ error: "Failed to register ATP agent" });
+    }
+  });
+
+  app.post("/api/atp/tokenize", writeLimiter, async (req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const tokenPair = await atpClient.tokenizeAgent(req.body);
+      res.json(tokenPair);
+    } catch (error) {
+      console.error("Failed to tokenize ATP agent:", error);
+      res.status(500).json({ error: "Failed to tokenize ATP agent" });
+    }
+  });
+
+  app.post("/api/atp/evolve", writeLimiter, async (req, res) => {
+    try {
+      const { agentId, improvements, deprecationReason } = req.body;
+      const { atpClient } = await import("./atp/ATPClient");
+      const newAgentId = await atpClient.evolveAgent(agentId, improvements, deprecationReason);
+      res.json({ newAgentId, success: true });
+    } catch (error) {
+      console.error("Failed to evolve ATP agent:", error);
+      res.status(500).json({ error: "Failed to evolve ATP agent" });
+    }
+  });
+
+  app.get("/api/atp/points/:walletAddress", async (req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const balance = await atpClient.getATPPoints(req.params.walletAddress);
+      res.json(balance);
+    } catch (error) {
+      console.error("Failed to get ATP points:", error);
+      res.status(500).json({ error: "Failed to get ATP points" });
+    }
+  });
+
+  app.post("/api/atp/points/earn", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress, points, source } = req.body;
+      const { atpClient } = await import("./atp/ATPClient");
+      const balance = await atpClient.earnATPPoints(walletAddress, points, source);
+      res.json(balance);
+    } catch (error) {
+      console.error("Failed to earn ATP points:", error);
+      res.status(500).json({ error: "Failed to earn ATP points" });
+    }
+  });
+
+  // ==========================================
+  // IQ Token & Airdrop Routes
+  // ==========================================
+  
+  app.get("/api/iq/status", async (_req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      res.json(iqTokenService.getStatus());
+    } catch (error) {
+      console.error("Failed to get IQ status:", error);
+      res.status(500).json({ error: "Failed to get IQ status" });
+    }
+  });
+
+  app.get("/api/iq/metrics", async (_req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      res.json(iqTokenService.getMetrics());
+    } catch (error) {
+      console.error("Failed to get IQ metrics:", error);
+      res.status(500).json({ error: "Failed to get IQ metrics" });
+    }
+  });
+
+  app.get("/api/iq/contracts", async (_req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      res.json(iqTokenService.getContracts());
+    } catch (error) {
+      console.error("Failed to get IQ contracts:", error);
+      res.status(500).json({ error: "Failed to get IQ contracts" });
+    }
+  });
+
+  app.get("/api/iq/staking/:walletAddress", async (req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const position = await iqTokenService.getStakingPosition(req.params.walletAddress);
+      res.json(position);
+    } catch (error) {
+      console.error("Failed to get staking position:", error);
+      res.status(500).json({ error: "Failed to get staking position" });
+    }
+  });
+
+  app.post("/api/iq/stake", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress, amount, lockDays } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const position = await iqTokenService.createStakingPosition(walletAddress, amount, lockDays);
+      res.json(position);
+    } catch (error) {
+      console.error("Failed to create staking position:", error);
+      res.status(500).json({ error: "Failed to create staking position" });
+    }
+  });
+
+  app.post("/api/iq/unstake", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const result = await iqTokenService.unstake(walletAddress);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to unstake:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to unstake" });
+    }
+  });
+
+  app.post("/api/iq/claim-rewards", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const rewards = await iqTokenService.claimRewards(walletAddress);
+      res.json({ rewards });
+    } catch (error) {
+      console.error("Failed to claim rewards:", error);
+      res.status(500).json({ error: "Failed to claim rewards" });
+    }
+  });
+
+  app.get("/api/iq/airdrops/:walletAddress", async (req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const airdrops = await iqTokenService.getAirdrops(req.params.walletAddress);
+      res.json(airdrops);
+    } catch (error) {
+      console.error("Failed to get airdrops:", error);
+      res.status(500).json({ error: "Failed to get airdrops" });
+    }
+  });
+
+  app.get("/api/iq/airdrops/:walletAddress/pending", async (req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const airdrops = await iqTokenService.getPendingAirdrops(req.params.walletAddress);
+      res.json(airdrops);
+    } catch (error) {
+      console.error("Failed to get pending airdrops:", error);
+      res.status(500).json({ error: "Failed to get pending airdrops" });
+    }
+  });
+
+  app.post("/api/iq/airdrop/create", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress, amount, reason, expiresInDays } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const claim = await iqTokenService.createAirdrop(walletAddress, amount, reason, expiresInDays);
+      res.json(claim);
+    } catch (error) {
+      console.error("Failed to create airdrop:", error);
+      res.status(500).json({ error: "Failed to create airdrop" });
+    }
+  });
+
+  app.post("/api/iq/airdrop/claim", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress, claimId } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const claim = await iqTokenService.claimAirdrop(walletAddress, claimId);
+      res.json(claim);
+    } catch (error) {
+      console.error("Failed to claim airdrop:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to claim airdrop" });
+    }
+  });
+
+  app.post("/api/iq/airdrop/participation", writeLimiter, async (req, res) => {
+    try {
+      const { walletAddress, agentId, participationType } = req.body;
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const claim = await iqTokenService.createAgentParticipationAirdrop(
+        walletAddress, 
+        agentId, 
+        participationType
+      );
+      res.json(claim);
+    } catch (error) {
+      console.error("Failed to create participation airdrop:", error);
+      res.status(500).json({ error: "Failed to create participation airdrop" });
+    }
+  });
+
+  // ==========================================
+  // Hackathon Status Route
+  // ==========================================
+  
+  app.get("/api/hackathon/status", async (_req, res) => {
+    try {
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      const { atpClient } = await import("./atp/ATPClient");
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      
+      res.json({
+        hackathon: "AGENT ARENA",
+        project: "NeuroNet Governor",
+        compliance: {
+          adkTs: {
+            installed: true,
+            status: adkIntegration.getStatus(),
+          },
+          atp: {
+            ready: true,
+            status: atpClient.getStatus(),
+          },
+          iqToken: {
+            compatible: true,
+            status: iqTokenService.getStatus(),
+          },
+          smartContracts: {
+            memoryVault: "contracts/MemoryVault.sol",
+            agentRegistry: "contracts/AgentRegistry.sol",
+            network: "fraxtal",
+          },
+          onboarding: {
+            implemented: true,
+            component: "OnboardingWizard",
+          },
+        },
+        features: [
+          "Multi-agent AI architecture",
+          "ML pattern recognition",
+          "Monte Carlo simulation",
+          "Self-healing agents",
+          "MEV protection",
+          "Multi-chain support",
+          "Multi-sig governance",
+          "Agent marketplace",
+          "24/7 sentinel monitoring",
+          "Command center UI",
+          "Alert system",
+          "Strategy backtesting",
+          "Multi-wallet support",
+          "ADK-TS integration",
+        ],
+      });
+    } catch (error) {
+      console.error("Failed to get hackathon status:", error);
+      res.status(500).json({ error: "Failed to get hackathon status" });
+    }
+  });
+
   // Setup self-healing event listeners
   selfHealingEngine.on("healthCheckStarted", async () => {
     try {
