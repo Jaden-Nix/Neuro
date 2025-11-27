@@ -19,6 +19,10 @@ localPort = 24678
 externalPort = 3001
 
 [[ports]]
+localPort = 41405
+externalPort = 3002
+
+[[ports]]
 localPort = 46873
 externalPort = 3000
 
@@ -41,13 +45,13 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [agent]
 integrations = ["javascript_anthropic_ai_integrations:1.0.0", "javascript_database:1.0.0", "javascript_anthropic:1.0.0"]
