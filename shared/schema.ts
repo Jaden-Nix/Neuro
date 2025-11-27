@@ -344,3 +344,26 @@ export const chainTransactions = pgTable("chain_transactions", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
+// Solana Wallet Tracking
+export interface SolanaWallet {
+  id: string;
+  address: string;
+  provider: "phantom" | "solflare" | "other";
+  connected: boolean;
+  balanceSol: number;
+  totalValueUsd: number;
+  connectedAt: number;
+  lastUpdated: number;
+}
+
+export const solanaWallets = pgTable("solana_wallets", {
+  id: varchar("id").primaryKey(),
+  address: varchar("address").notNull().unique(),
+  provider: varchar("provider").$type<"phantom" | "solflare" | "other">().notNull(),
+  connected: boolean("connected").notNull().default(true),
+  balanceSol: integer("balance_sol").notNull().default(0),
+  totalValueUsd: integer("total_value_usd").notNull().default(0),
+  connectedAt: timestamp("connected_at").notNull().defaultNow(),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+});
+
