@@ -11,7 +11,9 @@ import { ReplayEngine } from "./replay/ReplayEngine";
 import { AutonomousCycleManager } from "./autonomous/AutonomousCycleManager";
 import { transactionManager } from "./execution/TransactionManager";
 import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
-import type { WSMessage, LogEntry } from "@shared/schema";
+import { mlPatternRecognition } from "./ml/MLPatternRecognition";
+import { governanceSystem } from "./governance/GovernanceSystem";
+import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
 import { anthropicCircuitBreaker } from "./utils/circuitBreaker";
@@ -556,6 +558,458 @@ export async function registerRoutes(
       res.json({ success: true, message: "Health check completed" });
     } catch (error) {
       res.status(500).json({ error: "Failed to run health check" });
+    }
+  });
+
+  // ==========================================
+  // ML Pattern Recognition Endpoints
+  // ==========================================
+
+  app.get("/api/ml/metrics", async (_req, res) => {
+    try {
+      const metrics = mlPatternRecognition.getModelMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Failed to get ML metrics:", error);
+      res.status(500).json({ error: "Failed to get ML metrics" });
+    }
+  });
+
+  app.get("/api/ml/clusters", async (_req, res) => {
+    try {
+      const clusters = mlPatternRecognition.getClusters();
+      res.json(clusters);
+    } catch (error) {
+      console.error("Failed to get clusters:", error);
+      res.status(500).json({ error: "Failed to get clusters" });
+    }
+  });
+
+  app.get("/api/ml/weights", async (_req, res) => {
+    try {
+      const weights = mlPatternRecognition.getModelWeights();
+      res.json(weights);
+    } catch (error) {
+      console.error("Failed to get model weights:", error);
+      res.status(500).json({ error: "Failed to get model weights" });
+    }
+  });
+
+  app.post("/api/ml/predict", requireWriteAuth, async (req, res) => {
+    try {
+      const { opportunityId, marketData } = req.body;
+      
+      if (!opportunityId) {
+        return res.status(400).json({ error: "opportunityId is required" });
+      }
+
+      const memoryEntries = await storage.getMemoryEntries({});
+      const creditTransactions = await storage.getCreditTransactions(undefined, 100);
+
+      const features = mlPatternRecognition.extractFeatures(
+        memoryEntries,
+        creditTransactions,
+        marketData
+      );
+
+      const prediction = mlPatternRecognition.predictSuccessProbability(
+        opportunityId,
+        features
+      );
+
+      res.json(prediction);
+    } catch (error) {
+      console.error("Failed to make prediction:", error);
+      res.status(500).json({ error: "Failed to make prediction" });
+    }
+  });
+
+  app.post("/api/ml/train", requireWriteAuth, writeLimiter, async (req, res) => {
+    try {
+      const { dataPoints } = req.body;
+      
+      if (!Array.isArray(dataPoints) || dataPoints.length === 0) {
+        return res.status(400).json({ error: "dataPoints array is required" });
+      }
+
+      mlPatternRecognition.train(dataPoints as TrainingDataPoint[]);
+      const metrics = mlPatternRecognition.getModelMetrics();
+
+      res.json({
+        success: true,
+        message: `Model trained with ${dataPoints.length} data points`,
+        metrics,
+      });
+    } catch (error) {
+      console.error("Failed to train model:", error);
+      res.status(500).json({ error: "Failed to train model" });
+    }
+  });
+
+  app.post("/api/ml/cluster", requireWriteAuth, writeLimiter, async (req, res) => {
+    try {
+      const { k = 5, maxIterations = 100, tolerance = 0.001 } = req.body;
+      
+      const memoryEntries = await storage.getMemoryEntries({});
+      const creditTransactions = await storage.getCreditTransactions(undefined, 500);
+
+      const featureVectors = memoryEntries.map(entry => 
+        mlPatternRecognition.extractFeatures(
+          [entry],
+          creditTransactions,
+          undefined
+        )
+      );
+
+      if (featureVectors.length < k) {
+        return res.status(400).json({ 
+          error: `Not enough data points. Need at least ${k}, have ${featureVectors.length}` 
+        });
+      }
+
+      const clusters = mlPatternRecognition.performKMeansClustering(
+        featureVectors,
+        { k, maxIterations, tolerance }
+      );
+
+      res.json({
+        success: true,
+        clusters,
+        message: `Created ${clusters.length} clusters from ${featureVectors.length} data points`,
+      });
+    } catch (error) {
+      console.error("Failed to perform clustering:", error);
+      res.status(500).json({ error: "Failed to perform clustering" });
+    }
+  });
+
+  app.post("/api/ml/outcome", requireWriteAuth, async (req, res) => {
+    try {
+      const { opportunityId, outcome, actualReturn } = req.body;
+      
+      if (!opportunityId || !outcome) {
+        return res.status(400).json({ error: "opportunityId and outcome are required" });
+      }
+
+      if (!["success", "failure"].includes(outcome)) {
+        return res.status(400).json({ error: "outcome must be 'success' or 'failure'" });
+      }
+
+      mlPatternRecognition.recordOutcome(opportunityId, outcome, actualReturn || 0);
+
+      res.json({
+        success: true,
+        message: "Outcome recorded successfully",
+      });
+    } catch (error) {
+      console.error("Failed to record outcome:", error);
+      res.status(500).json({ error: "Failed to record outcome" });
+    }
+  });
+
+  // ==========================================
+  // Multi-Signature Governance Endpoints
+  // ==========================================
+
+  app.get("/api/governance/proposals", async (req, res) => {
+    try {
+      const { status, proposer, signer } = req.query;
+      
+      let proposals = governanceSystem.getAllProposals();
+      
+      if (status) {
+        proposals = proposals.filter(p => p.status === status);
+      }
+      
+      if (proposer) {
+        proposals = governanceSystem.getProposalsByProposer(proposer as string);
+      }
+      
+      if (signer) {
+        proposals = governanceSystem.getProposalsBySigner(signer as string);
+      }
+
+      res.json(proposals);
+    } catch (error) {
+      console.error("Failed to get proposals:", error);
+      res.status(500).json({ error: "Failed to get proposals" });
+    }
+  });
+
+  app.get("/api/governance/proposals/:id", async (req, res) => {
+    try {
+      const proposal = governanceSystem.getProposal(req.params.id);
+      
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const votes = governanceSystem.getProposalVotes(req.params.id);
+      const voteSummary = governanceSystem.getVoteSummary(req.params.id);
+
+      res.json({
+        ...proposal,
+        votes,
+        voteSummary,
+      });
+    } catch (error) {
+      console.error("Failed to get proposal:", error);
+      res.status(500).json({ error: "Failed to get proposal" });
+    }
+  });
+
+  app.post("/api/governance/proposals", requireWriteAuth, writeLimiter, async (req, res) => {
+    try {
+      const {
+        title,
+        description,
+        proposer,
+        transactionValue,
+        transactionTo,
+        transactionData,
+        chain,
+        threshold,
+        signers,
+        safeAddress,
+      } = req.body;
+
+      if (!title || !description || !proposer || !transactionTo || !threshold || !signers) {
+        return res.status(400).json({ 
+          error: "Missing required fields: title, description, proposer, transactionTo, threshold, signers" 
+        });
+      }
+
+      if (!["2-of-3", "3-of-5", "4-of-7"].includes(threshold)) {
+        return res.status(400).json({ error: "Invalid threshold. Use: 2-of-3, 3-of-5, or 4-of-7" });
+      }
+
+      const proposal = governanceSystem.createProposal({
+        title,
+        description,
+        proposer,
+        transactionValue: transactionValue || 0,
+        transactionTo,
+        transactionData: transactionData || "0x",
+        chain: chain || "ethereum",
+        threshold,
+        signers,
+        safeAddress,
+      });
+
+      broadcastToClients({
+        type: "alert",
+        data: { 
+          alertType: "governance",
+          severity: transactionValue > 50000 ? "high" : "medium",
+          message: `New governance proposal created: ${title}`,
+          proposal,
+        },
+        timestamp: Date.now(),
+      });
+
+      res.json(proposal);
+    } catch (error: any) {
+      console.error("Failed to create proposal:", error);
+      res.status(400).json({ error: error.message || "Failed to create proposal" });
+    }
+  });
+
+  app.post("/api/governance/proposals/:id/sign", requireWriteAuth, strictLimiter, async (req, res) => {
+    try {
+      const { signerAddress, signature } = req.body;
+
+      if (!signerAddress || !signature) {
+        return res.status(400).json({ error: "signerAddress and signature are required" });
+      }
+
+      const proposal = governanceSystem.signProposal(
+        req.params.id,
+        signerAddress,
+        signature
+      );
+
+      broadcastToClients({
+        type: "alert",
+        data: { 
+          alertType: "governance",
+          severity: "medium",
+          message: `Proposal signed: ${proposal.title} (${proposal.currentSignatures}/${proposal.requiredSignatures})`,
+          proposal,
+        },
+        timestamp: Date.now(),
+      });
+
+      res.json(proposal);
+    } catch (error: any) {
+      console.error("Failed to sign proposal:", error);
+      res.status(400).json({ error: error.message || "Failed to sign proposal" });
+    }
+  });
+
+  app.post("/api/governance/proposals/:id/vote", requireWriteAuth, async (req, res) => {
+    try {
+      const { voter, vote, reason } = req.body;
+
+      if (!voter || !vote) {
+        return res.status(400).json({ error: "voter and vote are required" });
+      }
+
+      if (!["approve", "reject", "abstain"].includes(vote)) {
+        return res.status(400).json({ error: "vote must be 'approve', 'reject', or 'abstain'" });
+      }
+
+      const voteRecord = governanceSystem.castVote(
+        req.params.id,
+        voter,
+        vote,
+        reason
+      );
+
+      res.json(voteRecord);
+    } catch (error: any) {
+      console.error("Failed to cast vote:", error);
+      res.status(400).json({ error: error.message || "Failed to cast vote" });
+    }
+  });
+
+  app.post("/api/governance/proposals/:id/execute", requireWriteAuth, strictLimiter, async (req, res) => {
+    try {
+      const proposal = governanceSystem.executeProposal(req.params.id);
+
+      broadcastToClients({
+        type: "alert",
+        data: { 
+          alertType: "governance",
+          severity: "high",
+          message: `Proposal executed: ${proposal.title}`,
+          proposal,
+        },
+        timestamp: Date.now(),
+      });
+
+      res.json(proposal);
+    } catch (error: any) {
+      console.error("Failed to execute proposal:", error);
+      res.status(400).json({ error: error.message || "Failed to execute proposal" });
+    }
+  });
+
+  app.post("/api/governance/proposals/:id/reject", requireWriteAuth, async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const proposal = governanceSystem.rejectProposal(req.params.id, reason);
+
+      res.json(proposal);
+    } catch (error: any) {
+      console.error("Failed to reject proposal:", error);
+      res.status(400).json({ error: error.message || "Failed to reject proposal" });
+    }
+  });
+
+  app.get("/api/governance/stats", async (_req, res) => {
+    try {
+      const stats = governanceSystem.getProposalStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get governance stats:", error);
+      res.status(500).json({ error: "Failed to get governance stats" });
+    }
+  });
+
+  app.get("/api/governance/pending/:signer", async (req, res) => {
+    try {
+      const pendingProposals = governanceSystem.getSignerPendingProposals(req.params.signer);
+      res.json(pendingProposals);
+    } catch (error) {
+      console.error("Failed to get pending proposals:", error);
+      res.status(500).json({ error: "Failed to get pending proposals" });
+    }
+  });
+
+  app.get("/api/governance/executable", async (_req, res) => {
+    try {
+      const executableProposals = governanceSystem.getExecutableProposals();
+      res.json(executableProposals);
+    } catch (error) {
+      console.error("Failed to get executable proposals:", error);
+      res.status(500).json({ error: "Failed to get executable proposals" });
+    }
+  });
+
+  app.get("/api/governance/timelock", async (_req, res) => {
+    try {
+      const config = governanceSystem.getTimelockConfig();
+      res.json(config);
+    } catch (error) {
+      console.error("Failed to get timelock config:", error);
+      res.status(500).json({ error: "Failed to get timelock config" });
+    }
+  });
+
+  app.post("/api/governance/timelock", requireWriteAuth, async (req, res) => {
+    try {
+      const { minimumDelayHours, maximumDelayHours, highValueThreshold } = req.body;
+      
+      const config = governanceSystem.updateTimelockConfig({
+        minimumDelayHours,
+        maximumDelayHours,
+        highValueThreshold,
+      });
+
+      res.json(config);
+    } catch (error) {
+      console.error("Failed to update timelock config:", error);
+      res.status(500).json({ error: "Failed to update timelock config" });
+    }
+  });
+
+  app.get("/api/governance/safe-configs", async (_req, res) => {
+    try {
+      const configs = governanceSystem.getAllSafeConfigs();
+      res.json(configs);
+    } catch (error) {
+      console.error("Failed to get Safe configs:", error);
+      res.status(500).json({ error: "Failed to get Safe configs" });
+    }
+  });
+
+  app.post("/api/governance/safe-configs", requireWriteAuth, async (req, res) => {
+    try {
+      const { safeAddress, chain, owners, threshold } = req.body;
+
+      if (!safeAddress || !chain || !owners || !threshold) {
+        return res.status(400).json({ 
+          error: "Missing required fields: safeAddress, chain, owners, threshold" 
+        });
+      }
+
+      const config = governanceSystem.registerSafeConfig({
+        safeAddress,
+        chain,
+        owners,
+        threshold,
+      });
+
+      res.json(config);
+    } catch (error) {
+      console.error("Failed to register Safe config:", error);
+      res.status(500).json({ error: "Failed to register Safe config" });
+    }
+  });
+
+  app.get("/api/governance/proposals/:id/safe-tx", async (req, res) => {
+    try {
+      const proposal = governanceSystem.getProposal(req.params.id);
+      
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const safeTx = governanceSystem.buildSafeTransaction(proposal);
+      res.json(safeTx);
+    } catch (error) {
+      console.error("Failed to build Safe transaction:", error);
+      res.status(500).json({ error: "Failed to build Safe transaction" });
     }
   });
 

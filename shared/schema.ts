@@ -367,3 +367,237 @@ export const solanaWallets = pgTable("solana_wallets", {
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 });
 
+// ==========================================
+// Task 9: ML Pattern Recognition Types
+// ==========================================
+
+export interface MLFeatureVector {
+  priceVolatility: number;
+  tvlChange: number;
+  gasPrice: number;
+  agentPerformance: number;
+  marketSentiment: number;
+  liquidityDepth: number;
+  volumeChange: number;
+  timestamp: number;
+}
+
+export interface MarketCluster {
+  id: string;
+  centroid: MLFeatureVector;
+  members: string[];
+  label: "bullish" | "bearish" | "sideways" | "volatile" | "stable";
+  confidence: number;
+  timestamp: number;
+}
+
+export interface MLPrediction {
+  id: string;
+  opportunityId: string;
+  successProbability: number;
+  expectedReturn: number;
+  riskAdjustedScore: number;
+  features: MLFeatureVector;
+  clusterLabel: MarketCluster["label"];
+  modelVersion: string;
+  timestamp: number;
+}
+
+export interface MLModelMetrics {
+  modelId: string;
+  version: string;
+  accuracy: number;
+  precision: number;
+  recall: number;
+  f1Score: number;
+  totalPredictions: number;
+  correctPredictions: number;
+  lastTrainedAt: number;
+  trainingDataPoints: number;
+}
+
+export interface TrainingDataPoint {
+  id: string;
+  features: MLFeatureVector;
+  outcome: "success" | "failure";
+  actualReturn: number;
+  opportunityType: string;
+  timestamp: number;
+}
+
+export const mlPredictions = pgTable("ml_predictions", {
+  id: varchar("id").primaryKey(),
+  opportunityId: varchar("opportunity_id").notNull(),
+  successProbability: integer("success_probability").notNull(),
+  expectedReturn: integer("expected_return").notNull(),
+  riskAdjustedScore: integer("risk_adjusted_score").notNull(),
+  features: jsonb("features").$type<MLFeatureVector>().notNull(),
+  clusterLabel: varchar("cluster_label").$type<MarketCluster["label"]>().notNull(),
+  modelVersion: varchar("model_version").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const marketClusters = pgTable("market_clusters", {
+  id: varchar("id").primaryKey(),
+  centroid: jsonb("centroid").$type<MLFeatureVector>().notNull(),
+  members: jsonb("members").$type<string[]>().notNull(),
+  label: varchar("label").$type<MarketCluster["label"]>().notNull(),
+  confidence: integer("confidence").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const trainingData = pgTable("training_data", {
+  id: varchar("id").primaryKey(),
+  features: jsonb("features").$type<MLFeatureVector>().notNull(),
+  outcome: varchar("outcome").$type<"success" | "failure">().notNull(),
+  actualReturn: integer("actual_return").notNull(),
+  opportunityType: varchar("opportunity_type").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const mlModels = pgTable("ml_models", {
+  id: varchar("id").primaryKey(),
+  version: varchar("version").notNull(),
+  accuracy: integer("accuracy").notNull().default(0),
+  precision: integer("precision").notNull().default(0),
+  recall: integer("recall").notNull().default(0),
+  f1Score: integer("f1_score").notNull().default(0),
+  totalPredictions: integer("total_predictions").notNull().default(0),
+  correctPredictions: integer("correct_predictions").notNull().default(0),
+  lastTrainedAt: timestamp("last_trained_at").notNull().defaultNow(),
+  trainingDataPoints: integer("training_data_points").notNull().default(0),
+});
+
+// ==========================================
+// Task 10: Multi-Signature Governance Types
+// ==========================================
+
+export type MultiSigThreshold = "2-of-3" | "3-of-5" | "4-of-7";
+
+export interface GovernanceProposal {
+  id: string;
+  title: string;
+  description: string;
+  proposer: string;
+  transactionValue: number;
+  transactionTo: string;
+  transactionData: string;
+  chain: "ethereum" | "base" | "fraxtal" | "solana";
+  threshold: MultiSigThreshold;
+  requiredSignatures: number;
+  currentSignatures: number;
+  signers: GovernanceSigner[];
+  status: "pending" | "approved" | "rejected" | "executed" | "expired";
+  timelockEnd: number;
+  createdAt: number;
+  updatedAt: number;
+  executedAt?: number;
+  safeAddress?: string;
+  safeTxHash?: string;
+}
+
+export interface GovernanceSigner {
+  address: string;
+  name?: string;
+  signedAt?: number;
+  signature?: string;
+  approved: boolean;
+}
+
+export interface GovernanceVote {
+  id: string;
+  proposalId: string;
+  voter: string;
+  vote: "approve" | "reject" | "abstain";
+  reason?: string;
+  timestamp: number;
+}
+
+export interface SafeConfig {
+  safeAddress: string;
+  chain: "ethereum" | "base" | "fraxtal";
+  owners: string[];
+  threshold: number;
+  nonce: number;
+  createdAt: number;
+}
+
+export interface TimelockConfig {
+  minimumDelayHours: number;
+  maximumDelayHours: number;
+  highValueThreshold: number;
+}
+
+export const governanceProposals = pgTable("governance_proposals", {
+  id: varchar("id").primaryKey(),
+  title: varchar("title").notNull(),
+  description: text("description").notNull(),
+  proposer: varchar("proposer").notNull(),
+  transactionValue: integer("transaction_value").notNull(),
+  transactionTo: varchar("transaction_to").notNull(),
+  transactionData: text("transaction_data").notNull(),
+  chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal" | "solana">().notNull(),
+  threshold: varchar("threshold").$type<MultiSigThreshold>().notNull(),
+  requiredSignatures: integer("required_signatures").notNull(),
+  currentSignatures: integer("current_signatures").notNull().default(0),
+  signers: jsonb("signers").$type<GovernanceSigner[]>().notNull(),
+  status: varchar("status").$type<"pending" | "approved" | "rejected" | "executed" | "expired">().notNull().default("pending"),
+  timelockEnd: timestamp("timelock_end").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  executedAt: timestamp("executed_at"),
+  safeAddress: varchar("safe_address"),
+  safeTxHash: varchar("safe_tx_hash"),
+});
+
+export const governanceVotes = pgTable("governance_votes", {
+  id: varchar("id").primaryKey(),
+  proposalId: varchar("proposal_id").notNull(),
+  voter: varchar("voter").notNull(),
+  vote: varchar("vote").$type<"approve" | "reject" | "abstain">().notNull(),
+  reason: text("reason"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const safeConfigs = pgTable("safe_configs", {
+  id: varchar("id").primaryKey(),
+  safeAddress: varchar("safe_address").notNull().unique(),
+  chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal">().notNull(),
+  owners: jsonb("owners").$type<string[]>().notNull(),
+  threshold: integer("threshold").notNull(),
+  nonce: integer("nonce").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Insert schemas for new tables
+export const insertMLPredictionSchema = createInsertSchema(mlPredictions).omit({ timestamp: true });
+export const insertMarketClusterSchema = createInsertSchema(marketClusters).omit({ timestamp: true });
+export const insertTrainingDataSchema = createInsertSchema(trainingData).omit({ timestamp: true });
+export const insertMLModelSchema = createInsertSchema(mlModels).omit({ lastTrainedAt: true });
+export const insertGovernanceProposalSchema = createInsertSchema(governanceProposals).omit({ 
+  createdAt: true, 
+  updatedAt: true,
+  currentSignatures: true,
+  status: true 
+});
+export const insertGovernanceVoteSchema = createInsertSchema(governanceVotes).omit({ timestamp: true });
+export const insertSafeConfigSchema = createInsertSchema(safeConfigs).omit({ createdAt: true, nonce: true });
+
+// Types for inserts
+export type InsertMLPrediction = z.infer<typeof insertMLPredictionSchema>;
+export type InsertMarketCluster = z.infer<typeof insertMarketClusterSchema>;
+export type InsertTrainingData = z.infer<typeof insertTrainingDataSchema>;
+export type InsertMLModel = z.infer<typeof insertMLModelSchema>;
+export type InsertGovernanceProposal = z.infer<typeof insertGovernanceProposalSchema>;
+export type InsertGovernanceVote = z.infer<typeof insertGovernanceVoteSchema>;
+export type InsertSafeConfig = z.infer<typeof insertSafeConfigSchema>;
+
+// Select types
+export type SelectMLPrediction = typeof mlPredictions.$inferSelect;
+export type SelectMarketCluster = typeof marketClusters.$inferSelect;
+export type SelectTrainingData = typeof trainingData.$inferSelect;
+export type SelectMLModel = typeof mlModels.$inferSelect;
+export type SelectGovernanceProposal = typeof governanceProposals.$inferSelect;
+export type SelectGovernanceVote = typeof governanceVotes.$inferSelect;
+export type SelectSafeConfig = typeof safeConfigs.$inferSelect;
+
