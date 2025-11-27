@@ -19,6 +19,9 @@ import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
 import { anthropicCircuitBreaker } from "./utils/circuitBreaker";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
+import { alertService } from "./alerts/AlertService";
+import { backtestingEngine } from "./backtesting/BacktestingEngine";
+import { walletManager } from "./wallets/WalletManager";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -2070,6 +2073,424 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to get balance:", error);
       res.status(500).json({ error: "Failed to get balance" });
+    }
+  });
+
+  // ==========================================
+  // Alert System Routes
+  // ==========================================
+
+  // Get all alert configurations
+  app.get("/api/alerts/configurations", async (req, res) => {
+    try {
+      const configurations = alertService.getConfigurations();
+      res.json(configurations);
+    } catch (error) {
+      console.error("Failed to get alert configurations:", error);
+      res.status(500).json({ error: "Failed to get alert configurations" });
+    }
+  });
+
+  // Create alert configuration
+  app.post("/api/alerts/configurations", async (req, res) => {
+    try {
+      const config = await alertService.createConfiguration(req.body);
+      res.status(201).json(config);
+    } catch (error) {
+      console.error("Failed to create alert configuration:", error);
+      res.status(500).json({ error: "Failed to create alert configuration" });
+    }
+  });
+
+  // Update alert configuration
+  app.patch("/api/alerts/configurations/:id", async (req, res) => {
+    try {
+      const updated = await alertService.updateConfiguration(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update alert configuration:", error);
+      res.status(500).json({ error: "Failed to update alert configuration" });
+    }
+  });
+
+  // Delete alert configuration
+  app.delete("/api/alerts/configurations/:id", async (req, res) => {
+    try {
+      const deleted = await alertService.deleteConfiguration(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Configuration not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete alert configuration:", error);
+      res.status(500).json({ error: "Failed to delete alert configuration" });
+    }
+  });
+
+  // Test alert configuration
+  app.post("/api/alerts/configurations/:id/test", async (req, res) => {
+    try {
+      const result = await alertService.testConfiguration(req.params.id);
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to test alert configuration:", error);
+      res.status(500).json({ error: "Failed to test alert configuration" });
+    }
+  });
+
+  // Get alert notifications history
+  app.get("/api/alerts/notifications", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const notifications = alertService.getNotifications(limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Failed to get notifications:", error);
+      res.status(500).json({ error: "Failed to get notifications" });
+    }
+  });
+
+  // Get alert stats
+  app.get("/api/alerts/stats", async (req, res) => {
+    try {
+      const stats = alertService.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get alert stats:", error);
+      res.status(500).json({ error: "Failed to get alert stats" });
+    }
+  });
+
+  // Hook into sentinel alerts
+  sentinelMonitor.on("alert", async (alert) => {
+    try {
+      const notifications = await alertService.processAlert(alert);
+      if (notifications.length > 0) {
+        broadcastToClients({
+          type: "alert",
+          data: { alert, notifications },
+          timestamp: Date.now(),
+        });
+      }
+    } catch (error) {
+      console.error("Failed to process alert notification:", error);
+    }
+  });
+
+  // ==========================================
+  // Strategy Backtesting Routes
+  // ==========================================
+
+  // Get all backtest scenarios
+  app.get("/api/backtesting/scenarios", async (req, res) => {
+    try {
+      const scenarios = backtestingEngine.getScenarios();
+      res.json(scenarios);
+    } catch (error) {
+      console.error("Failed to get scenarios:", error);
+      res.status(500).json({ error: "Failed to get scenarios" });
+    }
+  });
+
+  // Create backtest scenario
+  app.post("/api/backtesting/scenarios", async (req, res) => {
+    try {
+      const { name, description, chain, startDate, endDate } = req.body;
+      const scenario = await backtestingEngine.createScenario(
+        name,
+        description,
+        chain,
+        new Date(startDate),
+        new Date(endDate)
+      );
+      res.status(201).json(scenario);
+    } catch (error) {
+      console.error("Failed to create scenario:", error);
+      res.status(500).json({ error: "Failed to create scenario" });
+    }
+  });
+
+  // Get scenario by ID
+  app.get("/api/backtesting/scenarios/:id", async (req, res) => {
+    try {
+      const scenario = backtestingEngine.getScenario(req.params.id);
+      if (!scenario) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      res.json(scenario);
+    } catch (error) {
+      console.error("Failed to get scenario:", error);
+      res.status(500).json({ error: "Failed to get scenario" });
+    }
+  });
+
+  // Delete scenario
+  app.delete("/api/backtesting/scenarios/:id", async (req, res) => {
+    try {
+      const deleted = await backtestingEngine.deleteScenario(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Scenario not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete scenario:", error);
+      res.status(500).json({ error: "Failed to delete scenario" });
+    }
+  });
+
+  // Run backtest
+  app.post("/api/backtesting/runs", async (req, res) => {
+    try {
+      const { scenarioId, strategyConfig, initialBalance, agentId } = req.body;
+      const run = await backtestingEngine.runBacktest(
+        scenarioId,
+        strategyConfig,
+        initialBalance,
+        agentId
+      );
+      res.status(201).json(run);
+    } catch (error: any) {
+      console.error("Failed to run backtest:", error);
+      res.status(500).json({ error: error.message || "Failed to run backtest" });
+    }
+  });
+
+  // Get all backtest runs
+  app.get("/api/backtesting/runs", async (req, res) => {
+    try {
+      const scenarioId = req.query.scenarioId as string;
+      const runs = scenarioId
+        ? backtestingEngine.getRunsForScenario(scenarioId)
+        : backtestingEngine.getRuns();
+      res.json(runs);
+    } catch (error) {
+      console.error("Failed to get runs:", error);
+      res.status(500).json({ error: "Failed to get runs" });
+    }
+  });
+
+  // Get backtest run by ID
+  app.get("/api/backtesting/runs/:id", async (req, res) => {
+    try {
+      const run = backtestingEngine.getRun(req.params.id);
+      if (!run) {
+        return res.status(404).json({ error: "Run not found" });
+      }
+      res.json(run);
+    } catch (error) {
+      console.error("Failed to get run:", error);
+      res.status(500).json({ error: "Failed to get run" });
+    }
+  });
+
+  // Compare backtest runs
+  app.post("/api/backtesting/compare", async (req, res) => {
+    try {
+      const { runIds } = req.body;
+      if (!runIds || runIds.length < 2) {
+        return res.status(400).json({ error: "Need at least 2 run IDs to compare" });
+      }
+      const comparison = await backtestingEngine.compareRuns(runIds);
+      res.json(comparison);
+    } catch (error: any) {
+      console.error("Failed to compare runs:", error);
+      res.status(500).json({ error: error.message || "Failed to compare runs" });
+    }
+  });
+
+  // Get backtest comparisons
+  app.get("/api/backtesting/comparisons", async (req, res) => {
+    try {
+      const comparisons = backtestingEngine.getComparisons();
+      res.json(comparisons);
+    } catch (error) {
+      console.error("Failed to get comparisons:", error);
+      res.status(500).json({ error: "Failed to get comparisons" });
+    }
+  });
+
+  // Get backtest stats
+  app.get("/api/backtesting/stats", async (req, res) => {
+    try {
+      const stats = backtestingEngine.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get backtest stats:", error);
+      res.status(500).json({ error: "Failed to get backtest stats" });
+    }
+  });
+
+  // ==========================================
+  // Multi-Wallet Management Routes
+  // ==========================================
+
+  // Get all wallets
+  app.get("/api/wallets", async (req, res) => {
+    try {
+      const chain = req.query.chain as string;
+      const wallets = chain
+        ? walletManager.getWalletsByChain(chain as any)
+        : walletManager.getWallets();
+      res.json(wallets);
+    } catch (error) {
+      console.error("Failed to get wallets:", error);
+      res.status(500).json({ error: "Failed to get wallets" });
+    }
+  });
+
+  // Add wallet
+  app.post("/api/wallets", async (req, res) => {
+    try {
+      const { address, label, chain, provider, isPrimary } = req.body;
+      const wallet = await walletManager.addWallet(address, label, chain, provider, isPrimary);
+      res.status(201).json(wallet);
+    } catch (error: any) {
+      console.error("Failed to add wallet:", error);
+      res.status(400).json({ error: error.message || "Failed to add wallet" });
+    }
+  });
+
+  // Get wallet by ID
+  app.get("/api/wallets/:id", async (req, res) => {
+    try {
+      const wallet = walletManager.getWallet(req.params.id);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to get wallet:", error);
+      res.status(500).json({ error: "Failed to get wallet" });
+    }
+  });
+
+  // Update wallet
+  app.patch("/api/wallets/:id", async (req, res) => {
+    try {
+      const wallet = await walletManager.updateWallet(req.params.id, req.body);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to update wallet:", error);
+      res.status(500).json({ error: "Failed to update wallet" });
+    }
+  });
+
+  // Remove wallet
+  app.delete("/api/wallets/:id", async (req, res) => {
+    try {
+      const deleted = await walletManager.removeWallet(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to remove wallet:", error);
+      res.status(500).json({ error: "Failed to remove wallet" });
+    }
+  });
+
+  // Sync wallet
+  app.post("/api/wallets/:id/sync", async (req, res) => {
+    try {
+      const wallet = await walletManager.syncWallet(req.params.id);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to sync wallet:", error);
+      res.status(500).json({ error: "Failed to sync wallet" });
+    }
+  });
+
+  // Connect wallet
+  app.post("/api/wallets/:id/connect", async (req, res) => {
+    try {
+      const wallet = await walletManager.connectWallet(req.params.id);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to connect wallet:", error);
+      res.status(500).json({ error: "Failed to connect wallet" });
+    }
+  });
+
+  // Disconnect wallet
+  app.post("/api/wallets/:id/disconnect", async (req, res) => {
+    try {
+      const wallet = await walletManager.disconnectWallet(req.params.id);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to disconnect wallet:", error);
+      res.status(500).json({ error: "Failed to disconnect wallet" });
+    }
+  });
+
+  // Sync all wallets
+  app.post("/api/wallets/sync-all", async (req, res) => {
+    try {
+      const wallets = await walletManager.syncAllWallets();
+      res.json(wallets);
+    } catch (error) {
+      console.error("Failed to sync all wallets:", error);
+      res.status(500).json({ error: "Failed to sync all wallets" });
+    }
+  });
+
+  // Get wallet aggregate
+  app.get("/api/wallets/aggregate", async (req, res) => {
+    try {
+      const aggregate = walletManager.getAggregate();
+      res.json(aggregate);
+    } catch (error) {
+      console.error("Failed to get wallet aggregate:", error);
+      res.status(500).json({ error: "Failed to get wallet aggregate" });
+    }
+  });
+
+  // Get wallet transactions
+  app.get("/api/wallets/:id/transactions", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const transactions = walletManager.getTransactions(req.params.id, limit);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to get wallet transactions:", error);
+      res.status(500).json({ error: "Failed to get wallet transactions" });
+    }
+  });
+
+  // Get all transactions across wallets
+  app.get("/api/wallets-transactions", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const transactions = walletManager.getAllTransactions(limit);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to get all transactions:", error);
+      res.status(500).json({ error: "Failed to get all transactions" });
+    }
+  });
+
+  // Get wallet stats
+  app.get("/api/wallets/stats", async (req, res) => {
+    try {
+      const stats = walletManager.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get wallet stats:", error);
+      res.status(500).json({ error: "Failed to get wallet stats" });
     }
   });
 
