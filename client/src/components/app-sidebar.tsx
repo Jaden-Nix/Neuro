@@ -14,8 +14,10 @@ import {
   Brain, 
   Shield, 
   LayoutDashboard,
-  Menu,
-  Store
+  Store,
+  Bell,
+  FlaskConical,
+  Wallet
 } from "lucide-react";
 
 const menuItems = [
@@ -42,6 +44,24 @@ const menuItems = [
     url: "/marketplace",
     icon: Store,
     testId: "nav-marketplace",
+  },
+  {
+    title: "Alerts",
+    url: "/alerts",
+    icon: Bell,
+    testId: "nav-alerts",
+  },
+  {
+    title: "Backtesting",
+    url: "/backtesting",
+    icon: FlaskConical,
+    testId: "nav-backtesting",
+  },
+  {
+    title: "Wallets",
+    url: "/wallets",
+    icon: Wallet,
+    testId: "nav-wallets",
   },
 ];
 

@@ -17,6 +17,9 @@ import Dashboard from "@/pages/Dashboard";
 import MLInsights from "@/pages/MLInsights";
 import Governance from "@/pages/Governance";
 import Marketplace from "@/pages/Marketplace";
+import Alerts from "@/pages/Alerts";
+import Backtesting from "@/pages/Backtesting";
+import Wallets from "@/pages/Wallets";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +29,9 @@ function Router() {
       <Route path="/ml" component={MLInsights} />
       <Route path="/governance" component={Governance} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/alerts" component={Alerts} />
+      <Route path="/backtesting" component={Backtesting} />
+      <Route path="/wallets" component={Wallets} />
       <Route component={NotFound} />
     </Switch>
   );
