@@ -1,8 +1,26 @@
 import { Activity, Code } from "lucide-react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ThemeToggle } from "./ThemeToggle";
+import { SolanaWalletButton } from "./SolanaWalletButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+
+// Add Phantom/Solflare type declarations
+declare global {
+  interface Window {
+    phantom?: {
+      solana?: {
+        isPhantom?: boolean;
+        connect: () => Promise<{ publicKey: { toString: () => string } }>;
+        disconnect: () => Promise<void>;
+      };
+    };
+    solflare?: {
+      connect: () => Promise<{ publicKey: { toString: () => string } }>;
+      disconnect: () => Promise<void>;
+    };
+  }
+}
 
 interface HeaderProps {
   systemHealth: number;
@@ -83,6 +101,8 @@ export function Header({ systemHealth, activeAgents, chainStatus, onOpenDevPanel
             </Button>
 
             <ThemeToggle />
+
+            <SolanaWalletButton />
 
             <ConnectButton
               showBalance={false}

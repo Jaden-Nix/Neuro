@@ -10,6 +10,7 @@ import type {
   SentinelAlert,
   SystemState,
   ChainTransaction,
+  SolanaWallet,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -56,6 +57,13 @@ export interface IStorage {
   getChainTransactions(filters?: any): Promise<ChainTransaction[]>;
   addChainTransaction(tx: ChainTransaction): Promise<ChainTransaction>;
   updateChainTransaction(id: string, updates: Partial<ChainTransaction>): Promise<ChainTransaction | undefined>;
+
+  // Solana Wallets
+  getSolanaWallets(): Promise<SolanaWallet[]>;
+  getSolanaWallet(address: string): Promise<SolanaWallet | undefined>;
+  addSolanaWallet(wallet: SolanaWallet): Promise<SolanaWallet>;
+  updateSolanaWallet(address: string, updates: Partial<SolanaWallet>): Promise<SolanaWallet | undefined>;
+  removeSolanaWallet(address: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -70,6 +78,7 @@ export class MemStorage implements IStorage {
   private replayEvents: ReplayEvent[];
   private alerts: SentinelAlert[];
   private chainTransactions: Map<string, ChainTransaction>;
+  private solanaWallets: Map<string, SolanaWallet>;
 
   constructor() {
     this.systemState = {
@@ -90,6 +99,7 @@ export class MemStorage implements IStorage {
     this.replayEvents = [];
     this.alerts = [];
     this.chainTransactions = new Map();
+    this.solanaWallets = new Map();
 
     this.metrics = {
       walletBalance: "1250000",
@@ -294,6 +304,32 @@ export class MemStorage implements IStorage {
     const updated = { ...existing, ...updates };
     this.chainTransactions.set(id, updated);
     return updated;
+  }
+
+  async getSolanaWallets(): Promise<SolanaWallet[]> {
+    return Array.from(this.solanaWallets.values());
+  }
+
+  async getSolanaWallet(address: string): Promise<SolanaWallet | undefined> {
+    return this.solanaWallets.get(address);
+  }
+
+  async addSolanaWallet(wallet: SolanaWallet): Promise<SolanaWallet> {
+    this.solanaWallets.set(wallet.address, wallet);
+    return wallet;
+  }
+
+  async updateSolanaWallet(address: string, updates: Partial<SolanaWallet>): Promise<SolanaWallet | undefined> {
+    const existing = this.solanaWallets.get(address);
+    if (!existing) return undefined;
+    
+    const updated = { ...existing, ...updates, lastUpdated: Date.now() };
+    this.solanaWallets.set(address, updated);
+    return updated;
+  }
+
+  async removeSolanaWallet(address: string): Promise<boolean> {
+    return this.solanaWallets.delete(address);
   }
 }
 

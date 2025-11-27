@@ -735,6 +735,122 @@ export async function registerRoutes(
     }
   });
 
+  // Solana Wallet Management
+  app.get("/api/solana/wallets", async (_req, res) => {
+    try {
+      const wallets = await storage.getSolanaWallets();
+      res.json(wallets);
+    } catch (error) {
+      console.error("Failed to get Solana wallets:", error);
+      res.status(500).json({ error: "Failed to get Solana wallets" });
+    }
+  });
+
+  app.post("/api/solana/wallet/connect", async (req, res) => {
+    try {
+      const { PublicKey } = await import("@solana/web3.js");
+      const { address, provider } = req.body;
+
+      if (!address || !provider) {
+        return res.status(400).json({ error: "Missing address or provider" });
+      }
+
+      try {
+        new PublicKey(address);
+      } catch {
+        return res.status(400).json({ error: "Invalid Solana wallet address" });
+      }
+
+      const existing = await storage.getSolanaWallet(address);
+      if (existing) {
+        const updated = await storage.updateSolanaWallet(address, {
+          connected: true,
+          provider: provider as "phantom" | "solflare" | "other",
+        });
+        return res.json(updated);
+      }
+
+      const wallet = await storage.addSolanaWallet({
+        id: `wallet-${Date.now()}`,
+        address,
+        provider: provider as "phantom" | "solflare" | "other",
+        connected: true,
+        balanceSol: 0,
+        totalValueUsd: 0,
+        connectedAt: Date.now(),
+        lastUpdated: Date.now(),
+      });
+
+      broadcastToClients({
+        type: "agent_update",
+        data: { event: "solana_wallet_connected", wallet },
+        timestamp: Date.now(),
+      });
+
+      res.json(wallet);
+    } catch (error) {
+      console.error("Failed to connect Solana wallet:", error);
+      res.status(500).json({ error: "Failed to connect wallet" });
+    }
+  });
+
+  app.post("/api/solana/wallet/disconnect", async (req, res) => {
+    try {
+      const { address } = req.body;
+
+      if (!address) {
+        return res.status(400).json({ error: "Missing wallet address" });
+      }
+
+      const success = await storage.removeSolanaWallet(address);
+
+      if (success) {
+        broadcastToClients({
+          type: "agent_update",
+          data: { event: "solana_wallet_disconnected", address },
+          timestamp: Date.now(),
+        });
+
+        return res.json({ success: true, message: "Wallet disconnected" });
+      }
+
+      res.status(404).json({ error: "Wallet not found" });
+    } catch (error) {
+      console.error("Failed to disconnect Solana wallet:", error);
+      res.status(500).json({ error: "Failed to disconnect wallet" });
+    }
+  });
+
+  app.post("/api/solana/wallet/update-balance", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const { PublicKey } = await import("@solana/web3.js");
+      const { address } = req.body;
+
+      if (!address) {
+        return res.status(400).json({ error: "Missing wallet address" });
+      }
+
+      try {
+        new PublicKey(address);
+      } catch {
+        return res.status(400).json({ error: "Invalid Solana wallet address" });
+      }
+
+      const metrics = await solanaRpcClient.getWalletMetrics(address);
+      const updated = await storage.updateSolanaWallet(address, {
+        balanceSol: metrics.walletBalanceSol,
+        totalValueUsd: metrics.totalValueUsd,
+        lastUpdated: Date.now(),
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update wallet balance:", error);
+      res.status(500).json({ error: "Failed to update wallet balance" });
+    }
+  });
+
   // Setup transaction event listeners
   transactionManager.on("transactionCreated", (tx) => {
     broadcastToClients({
