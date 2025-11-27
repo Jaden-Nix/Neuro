@@ -68,6 +68,32 @@ Frontend state is managed using React Query for server state and caching, with a
 ## Recent Changes
 
 ### November 27, 2025
+- **Alert System**: Email and webhook notifications for critical system events
+  - `server/alerts/AlertService.ts`: Alert configuration management with severity thresholds
+  - Supports email (SendGrid), webhook, and in-app notifications
+  - Cooldown periods to prevent alert flooding
+  - Notification history and statistics tracking
+  - API routes: `/api/alerts/*` for CRUD and testing
+
+- **Strategy Backtesting**: Historical replay through agent decision-making cycles
+  - `server/backtesting/BacktestingEngine.ts`: Scenario creation and run execution
+  - Strategy configuration (risk tolerance, position sizing, stop-loss/take-profit)
+  - Performance metrics: returns, Sharpe ratio, max drawdown, win rate
+  - Strategy comparison and scenario management
+  - API routes: `/api/backtesting/*` for scenarios, runs, and stats
+
+- **Multi-Wallet Support**: Track wallets across Ethereum, Base, Fraxtal, and Solana
+  - `server/wallets/WalletManager.ts`: Wallet tracking and balance sync
+  - Token holdings and transaction history per wallet
+  - Aggregate portfolio view across all chains
+  - Support for multiple wallet providers (rainbow, metamask, phantom, solflare)
+  - API routes: `/api/wallets/*` for wallet management and syncing
+
+- **UI Pages Added**:
+  - `client/src/pages/Alerts.tsx`: Alert configuration and history
+  - `client/src/pages/Backtesting.tsx`: Scenario management and run visualization
+  - `client/src/pages/Wallets.tsx`: Multi-wallet dashboard with chain breakdown
+
 - **Stripe Connect Seller Onboarding**: Added marketplace revenue splitting between platform and agent creators
   - `shared/schema.ts`: Added `sellerProfiles` table for Stripe Connect account tracking
   - `server/storage.ts`: Added IStorage interface and MemStorage implementation for seller profiles
