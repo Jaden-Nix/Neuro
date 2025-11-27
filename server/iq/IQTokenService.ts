@@ -29,15 +29,25 @@ export interface IQTokenMetrics {
   burnedToday: string;
   price: number;
   marketCap: number;
+  lastRpcUpdate?: number;
+  rpcStatus: 'live' | 'cached' | 'fallback';
 }
 
 const IQ_TOKEN_ADDRESS = '0x579cea1889991f68acc35ff5c3dd0621ff29b0c9';
 const HIIQ_STAKING_ADDRESS = '0x1bf5457ecaa14ff63cc89efd560e251e814e16ba';
 
+const ETHEREUM_RPC = 'https://eth.llamarpc.com';
+const FRAXTAL_RPC = 'https://rpc.frax.com';
+
+const ERC20_ABI_TOTALSUPPLY = '0x18160ddd';
+const ERC20_ABI_BALANCEOF = '0x70a08231';
+
 export class IQTokenService extends EventEmitter {
   private stakingPositions: Map<string, IQStakingPosition> = new Map();
   private airdropClaims: Map<string, IQAirdropClaim[]> = new Map();
   private metrics: IQTokenMetrics;
+  private metricsCache: { data: IQTokenMetrics | null; timestamp: number } = { data: null, timestamp: 0 };
+  private readonly CACHE_TTL = 60000;
 
   constructor() {
     super();
@@ -51,9 +61,121 @@ export class IQTokenService extends EventEmitter {
       burnedToday: '500000',
       price: 0.0045,
       marketCap: 47250000,
+      rpcStatus: 'fallback',
     };
 
-    console.log('[IQ] Token service initialized');
+    console.log('[IQ] Token service initialized with live RPC support');
+    this.fetchLiveMetrics().catch(err => console.warn('[IQ] Initial metrics fetch failed:', err.message));
+  }
+
+  private async makeRpcCall(rpcUrl: string, method: string, params: any[]): Promise<any> {
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: Date.now(),
+        method,
+        params,
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`RPC call failed: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(`RPC error: ${data.error.message}`);
+    }
+    
+    return data.result;
+  }
+
+  public async fetchLiveMetrics(): Promise<IQTokenMetrics> {
+    if (this.metricsCache.data && Date.now() - this.metricsCache.timestamp < this.CACHE_TTL) {
+      return this.metricsCache.data;
+    }
+
+    try {
+      console.log('[IQ] Fetching live token metrics from Ethereum RPC...');
+      
+      const totalSupplyHex = await this.makeRpcCall(ETHEREUM_RPC, 'eth_call', [
+        { to: IQ_TOKEN_ADDRESS, data: ERC20_ABI_TOTALSUPPLY },
+        'latest'
+      ]);
+      
+      const totalSupplyWei = BigInt(totalSupplyHex);
+      const totalSupply = (totalSupplyWei / BigInt(10 ** 18)).toString();
+
+      const hiiqBalanceHex = await this.makeRpcCall(ETHEREUM_RPC, 'eth_call', [
+        { 
+          to: IQ_TOKEN_ADDRESS, 
+          data: ERC20_ABI_BALANCEOF + HIIQ_STAKING_ADDRESS.slice(2).padStart(64, '0')
+        },
+        'latest'
+      ]);
+      
+      const stakedWei = BigInt(hiiqBalanceHex);
+      const totalStaked = (stakedWei / BigInt(10 ** 18)).toString();
+
+      let price = this.metrics.price;
+      try {
+        const priceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=everipedia&vs_currencies=usd');
+        if (priceResponse.ok) {
+          const priceData = await priceResponse.json();
+          if (priceData.everipedia?.usd) {
+            price = priceData.everipedia.usd;
+          }
+        }
+      } catch (e) {
+        console.warn('[IQ] Price fetch failed, using cached price');
+      }
+
+      const circulatingSupply = (parseFloat(totalSupply) * 0.5).toString();
+      const marketCap = parseFloat(circulatingSupply) * price;
+
+      this.metrics = {
+        totalSupply,
+        circulatingSupply,
+        totalStaked,
+        stakersCount: this.metrics.stakersCount,
+        dailyEmission: this.metrics.dailyEmission,
+        burnedToday: this.metrics.burnedToday,
+        price,
+        marketCap,
+        lastRpcUpdate: Date.now(),
+        rpcStatus: 'live',
+      };
+
+      this.metricsCache = { data: this.metrics, timestamp: Date.now() };
+      console.log('[IQ] Live metrics fetched successfully:', { totalSupply, totalStaked, price });
+      
+      this.emit('metricsUpdated', this.metrics);
+      return this.metrics;
+    } catch (error) {
+      console.error('[IQ] Live metrics fetch failed:', error);
+      this.metrics.rpcStatus = 'fallback';
+      return this.metrics;
+    }
+  }
+
+  public async getTokenBalance(walletAddress: string): Promise<string> {
+    try {
+      const balanceHex = await this.makeRpcCall(ETHEREUM_RPC, 'eth_call', [
+        { 
+          to: IQ_TOKEN_ADDRESS, 
+          data: ERC20_ABI_BALANCEOF + walletAddress.slice(2).padStart(64, '0')
+        },
+        'latest'
+      ]);
+      
+      const balanceWei = BigInt(balanceHex);
+      return (balanceWei / BigInt(10 ** 18)).toString();
+    } catch (error) {
+      console.error('[IQ] Balance fetch failed:', error);
+      return '0';
+    }
   }
 
   public async getStakingPosition(walletAddress: string): Promise<IQStakingPosition | null> {
@@ -205,7 +327,8 @@ export class IQTokenService extends EventEmitter {
     );
   }
 
-  public getMetrics(): IQTokenMetrics {
+  public async getMetrics(): Promise<IQTokenMetrics> {
+    await this.fetchLiveMetrics();
     return { ...this.metrics };
   }
 

@@ -2,6 +2,8 @@ import { AgentBuilder } from '@iqai/adk';
 import { EventEmitter } from 'events';
 import type { Agent, AgentType, LogEntry } from '@shared/schema';
 
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+
 export interface ADKAgentConfig {
   name: string;
   type: AgentType;
@@ -120,16 +122,25 @@ Respond with JSON containing: approved, confidence (0-100), reasoning, modificat
       throw new Error(`Agent not found: ${agentName}`);
     }
 
+    if (!GOOGLE_API_KEY) {
+      console.warn(`[ADK] No GOOGLE_API_KEY - using fallback for ${agentName}`);
+      return this.createFallbackDecision(agentName, config, context, new Error('No API key'));
+    }
+
     try {
       const fullPrompt = this.buildPrompt(config, prompt, context);
+      
+      console.log(`[ADK] Querying agent ${agentName} with live Gemini API...`);
       
       const response = await AgentBuilder
         .withModel(config.model as any)
         .ask(fullPrompt);
 
+      console.log(`[ADK] Live response received from ${agentName}`);
+
       const decision: ADKDecision = {
         agentId: agentName,
-        action: 'analysis',
+        action: 'live_analysis',
         confidence: this.extractConfidence(response),
         reasoning: response,
         data: this.parseResponse(response),

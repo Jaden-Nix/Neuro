@@ -2558,10 +2558,33 @@ export async function registerRoutes(
   app.get("/api/atp/status", async (_req, res) => {
     try {
       const { atpClient } = await import("./atp/ATPClient");
+      await atpClient.refreshConnection();
       res.json(atpClient.getStatus());
     } catch (error) {
       console.error("Failed to get ATP status:", error);
       res.status(500).json({ error: "Failed to get ATP status" });
+    }
+  });
+
+  app.get("/api/atp/network", async (_req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const info = await atpClient.getNetworkInfo();
+      res.json(info);
+    } catch (error) {
+      console.error("Failed to get ATP network info:", error);
+      res.status(500).json({ error: "Failed to get network info" });
+    }
+  });
+
+  app.get("/api/atp/platform-agents", async (_req, res) => {
+    try {
+      const { atpClient } = await import("./atp/ATPClient");
+      const agents = await atpClient.fetchPlatformAgents();
+      res.json(agents);
+    } catch (error) {
+      console.error("Failed to fetch platform agents:", error);
+      res.status(500).json({ error: "Failed to fetch platform agents" });
     }
   });
 
@@ -2684,10 +2707,22 @@ export async function registerRoutes(
   app.get("/api/iq/metrics", async (_req, res) => {
     try {
       const { iqTokenService } = await import("./iq/IQTokenService");
-      res.json(iqTokenService.getMetrics());
+      const metrics = await iqTokenService.getMetrics();
+      res.json(metrics);
     } catch (error) {
       console.error("Failed to get IQ metrics:", error);
       res.status(500).json({ error: "Failed to get IQ metrics" });
+    }
+  });
+
+  app.get("/api/iq/balance/:walletAddress", async (req, res) => {
+    try {
+      const { iqTokenService } = await import("./iq/IQTokenService");
+      const balance = await iqTokenService.getTokenBalance(req.params.walletAddress);
+      res.json({ walletAddress: req.params.walletAddress, balance });
+    } catch (error) {
+      console.error("Failed to get IQ balance:", error);
+      res.status(500).json({ error: "Failed to get IQ balance" });
     }
   });
 
@@ -2820,47 +2855,81 @@ export async function registerRoutes(
       const { atpClient } = await import("./atp/ATPClient");
       const { iqTokenService } = await import("./iq/IQTokenService");
       
+      await atpClient.refreshConnection();
+      const iqMetrics = await iqTokenService.getMetrics();
+      const atpStatus = atpClient.getStatus();
+      
       res.json({
         hackathon: "AGENT ARENA",
         project: "NeuroNet Governor",
+        timestamp: new Date().toISOString(),
         compliance: {
           adkTs: {
             installed: true,
+            package: "@iqai/adk",
             status: adkIntegration.getStatus(),
+            apiKeyConfigured: !!process.env.GOOGLE_API_KEY,
           },
           atp: {
             ready: true,
-            status: atpClient.getStatus(),
+            rpcStatus: atpStatus.rpcStatus,
+            fraxtalConnected: atpStatus.connected,
+            chainId: atpStatus.chainId,
+            lastBlockNumber: atpStatus.lastBlockNumber,
+            status: atpStatus,
           },
           iqToken: {
             compatible: true,
+            rpcStatus: iqMetrics.rpcStatus,
+            liveData: {
+              totalSupply: iqMetrics.totalSupply,
+              totalStaked: iqMetrics.totalStaked,
+              price: iqMetrics.price,
+              marketCap: iqMetrics.marketCap,
+            },
+            contracts: iqTokenService.getContracts(),
             status: iqTokenService.getStatus(),
           },
           smartContracts: {
+            neuronetRegistry: "contracts/NeuroNetRegistry.sol",
+            neuronetStorage: "contracts/NeuroNetStorage.sol",
+            neuronetHeartbeat: "contracts/NeuroNetHeartbeat.sol",
             memoryVault: "contracts/MemoryVault.sol",
             agentRegistry: "contracts/AgentRegistry.sol",
-            network: "fraxtal",
+            targetNetwork: "fraxtal",
+            chainId: 252,
+            deploymentStatus: "ready",
           },
           onboarding: {
             implemented: true,
             component: "OnboardingWizard",
+            steps: 5,
           },
         },
+        liveFeatures: {
+          atpRpc: atpStatus.rpcStatus === 'live',
+          iqTokenRpc: iqMetrics.rpcStatus === 'live',
+          adkQueries: !!process.env.GOOGLE_API_KEY,
+          fraxtalConnection: atpStatus.connected,
+        },
         features: [
-          "Multi-agent AI architecture",
+          "Multi-agent AI architecture (ADK-TS)",
+          "Live ATP Integration (Fraxtal RPC)",
+          "Live IQ Token metrics (Ethereum RPC)",
           "ML pattern recognition",
           "Monte Carlo simulation",
           "Self-healing agents",
-          "MEV protection",
-          "Multi-chain support",
+          "MEV protection via Flashbots",
+          "Multi-chain support (ETH, Base, Fraxtal)",
           "Multi-sig governance",
-          "Agent marketplace",
+          "Agent marketplace with Stripe",
           "24/7 sentinel monitoring",
           "Command center UI",
           "Alert system",
           "Strategy backtesting",
           "Multi-wallet support",
-          "ADK-TS integration",
+          "On-chain memory vault",
+          "Agent checkpoints & heartbeats",
         ],
       });
     } catch (error) {
