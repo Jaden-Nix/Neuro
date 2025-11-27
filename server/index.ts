@@ -9,8 +9,8 @@ import { securityHeaders } from './middleware/auth';
 
 const app = express();
 
-// Apply security headers to all responses
-app.use(securityHeaders);
+// Apply security headers only to API routes (not frontend)
+app.use('/api', securityHeaders);
 const httpServer = createServer(app);
 
 declare module "http" {
