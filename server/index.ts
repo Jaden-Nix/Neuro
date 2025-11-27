@@ -5,8 +5,12 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from './stripeClient';
 import { WebhookHandlers } from './webhookHandlers';
+import { securityHeaders } from './middleware/auth';
 
 const app = express();
+
+// Apply security headers to all responses
+app.use(securityHeaders);
 const httpServer = createServer(app);
 
 declare module "http" {
