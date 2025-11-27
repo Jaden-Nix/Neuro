@@ -24,7 +24,8 @@ export abstract class BaseAgent extends EventEmitter {
 
   constructor(config: AgentConfig) {
     super();
-    this.id = `${config.type}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    // Use fixed IDs for core agents to prevent accumulation on restarts
+    this.id = `${config.type}-core`;
     this.type = config.type;
     this.status = AgentStatus.IDLE;
     this.personality = config.personality;

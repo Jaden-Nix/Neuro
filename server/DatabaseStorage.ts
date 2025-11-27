@@ -169,6 +169,10 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async clearAgents(): Promise<void> {
+    await db.delete(agents);
+  }
+
   // Logs
   async getLogs(limit: number = 100): Promise<LogEntry[]> {
     const results = await db

@@ -165,7 +165,8 @@ export async function registerRoutes(
   app.use("/api", preventInjection);
   app.use("/api", validateContentType);
 
-  // Initialize agents in storage
+  // Clear old agents and initialize fresh core agents
+  await storage.clearAgents();
   const agents = orchestrator.getAllAgents();
   for (const agent of agents) {
     await storage.upsertAgent(agent);

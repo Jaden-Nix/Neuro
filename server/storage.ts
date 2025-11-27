@@ -34,6 +34,7 @@ export interface IStorage {
   getAgents(): Promise<Agent[]>;
   getAgent(id: string): Promise<Agent | undefined>;
   upsertAgent(agent: Agent): Promise<Agent>;
+  clearAgents(): Promise<void>;
 
   // Logs
   getLogs(limit?: number): Promise<LogEntry[]>;
@@ -176,6 +177,10 @@ export class MemStorage implements IStorage {
   async upsertAgent(agent: Agent): Promise<Agent> {
     this.agents.set(agent.id, agent);
     return agent;
+  }
+
+  async clearAgents(): Promise<void> {
+    this.agents.clear();
   }
 
   async getLogs(limit: number = 100): Promise<LogEntry[]> {
