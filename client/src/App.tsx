@@ -9,14 +9,21 @@ import { config } from "./lib/wagmi";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 import Dashboard from "@/pages/Dashboard";
+import MLInsights from "@/pages/MLInsights";
+import Governance from "@/pages/Governance";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/ml" component={MLInsights} />
+      <Route path="/governance" component={Governance} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -42,11 +49,39 @@ function AppProviders({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AppLayout() {
+  const style = {
+    "--sidebar-width": "14rem",
+    "--sidebar-width-icon": "3rem",
+  } as React.CSSProperties;
+
+  return (
+    <SidebarProvider style={style}>
+      <div className="flex h-screen w-full">
+        <AppSidebar />
+        <div className="flex flex-col flex-1">
+          <header className="flex items-center justify-between gap-4 border-b bg-background px-4 py-3">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
+          </header>
+          <main className="flex-1 overflow-auto bg-background">
+            <div className="p-6">
+              <Router />
+            </div>
+          </main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
 export default function App() {
   return (
     <ThemeProvider>
       <AppProviders>
-        <Router />
+        <AppLayout />
       </AppProviders>
     </ThemeProvider>
   );

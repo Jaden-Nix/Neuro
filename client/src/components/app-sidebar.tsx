@@ -1,0 +1,74 @@
+import { useLocation } from "wouter";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { 
+  Zap, 
+  Brain, 
+  Shield, 
+  LayoutDashboard,
+  Menu
+} from "lucide-react";
+
+const menuItems = [
+  {
+    title: "Command Center",
+    url: "/",
+    icon: LayoutDashboard,
+    testId: "nav-dashboard",
+  },
+  {
+    title: "ML Insights",
+    url: "/ml",
+    icon: Brain,
+    testId: "nav-ml",
+  },
+  {
+    title: "Governance",
+    url: "/governance",
+    icon: Shield,
+    testId: "nav-governance",
+  },
+];
+
+export function AppSidebar() {
+  const [location] = useLocation();
+
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            NeuroNet Governor
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    data-testid={item.testId}
+                    className={location === item.url ? "bg-sidebar-accent" : ""}
+                  >
+                    <a href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  );
+}
