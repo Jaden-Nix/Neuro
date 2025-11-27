@@ -290,6 +290,8 @@ export class BlockchainRPCClient {
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as `0x${string}`;
 
     try {
+      // Aave V3 getReserveData returns a struct with position 6 as uint128 (number in JS)
+      // Format: [config, liquidityIndex, currentLiquidityRate, variableBorrowIndex, currentVariableBorrowRate, currentStableBorrowRate, lastUpdateTimestamp, id, ...]
       const reserveData = await withRetry(
         () => client.readContract({
           address: AAVE_V3_POOL,
@@ -298,7 +300,7 @@ export class BlockchainRPCClient {
           args: [USDC_ADDRESS],
         }),
         "getAaveV3APY.getReserveData"
-      ) as readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, number, `0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`, bigint, bigint, bigint];
+      ) as readonly [bigint, bigint, bigint, bigint, bigint, bigint, number, number, `0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`, bigint, bigint, bigint];
 
       const liquidityRate = reserveData[2];
       const RAY = BigInt(10) ** BigInt(27);

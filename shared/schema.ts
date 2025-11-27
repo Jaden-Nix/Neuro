@@ -126,11 +126,16 @@ export interface ReplayEvent {
 export interface ChainTransaction {
   id: string;
   hash: string;
+  chainId: number;
   chain: "ethereum" | "base" | "fraxtal" | "solana";
-  type: "swap" | "rebalance" | "loan" | "stake";
+  type: "swap" | "rebalance" | "loan" | "stake" | "unstake" | "deposit" | "withdraw" | "transfer";
   status: "pending" | "confirmed" | "failed";
+  fromAddress?: string;
+  toAddress?: string;
   gasUsed?: string;
   value: string;
+  blockNumber?: number;
+  agentId?: string;
   timestamp: number;
 }
 
@@ -215,14 +220,16 @@ export interface SystemState {
   lastUpdated: number;
 }
 
-// Live Metrics
+// Live Metrics (aligned with OnChainMetrics from RPCClient)
 export interface LiveMetrics {
-  walletBalance: string;
-  totalTVL: string;
+  walletBalanceEth: number;
+  tvlUsd: number;
   currentAPY: number;
   riskLevel: number;
   activeOpportunities: number;
   pendingTransactions: number;
+  gasPriceGwei: number;
+  ethPriceUsd: number;
   timestamp: number;
 }
 
@@ -336,11 +343,16 @@ export const systemState = pgTable("system_state", {
 export const chainTransactions = pgTable("chain_transactions", {
   id: varchar("id").primaryKey(),
   hash: varchar("hash").notNull(),
+  chainId: integer("chain_id").notNull().default(1),
   chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal" | "solana">().notNull(),
-  type: varchar("type").$type<"swap" | "rebalance" | "loan" | "stake">().notNull(),
+  type: varchar("type").$type<"swap" | "rebalance" | "loan" | "stake" | "unstake" | "deposit" | "withdraw" | "transfer">().notNull(),
   status: varchar("status").$type<"pending" | "confirmed" | "failed">().notNull(),
+  fromAddress: varchar("from_address"),
+  toAddress: varchar("to_address"),
   gasUsed: varchar("gas_used"),
   value: varchar("value").notNull(),
+  blockNumber: integer("block_number"),
+  agentId: varchar("agent_id"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 

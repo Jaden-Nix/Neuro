@@ -228,13 +228,14 @@ export class DatabaseStorage implements IStorage {
       
       // Fallback to safe defaults if RPC fails
       return {
-        walletBalance: "0",
-        totalTVL: "0",
+        walletBalanceEth: 0,
+        tvlUsd: 0,
         currentAPY: 0,
         riskLevel: 50,
         activeOpportunities: 0,
         pendingTransactions: 0,
-        gasPrice: "0",
+        gasPriceGwei: 20,
+        ethPriceUsd: 2000,
         timestamp: now,
       };
     }

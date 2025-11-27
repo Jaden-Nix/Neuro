@@ -29,7 +29,7 @@ export type ExecutionPlan = z.infer<typeof ExecutionPlanSchema>;
 
 export interface TransactionRequest {
   id: string;
-  type: "swap" | "stake" | "unstake" | "deposit" | "withdraw" | "transfer";
+  type: "swap" | "rebalance" | "loan" | "stake" | "unstake" | "deposit" | "withdraw" | "transfer";
   chainId: number;
   fromToken?: string;
   toToken?: string;
