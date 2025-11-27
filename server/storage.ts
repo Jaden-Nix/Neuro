@@ -11,6 +11,15 @@ import type {
   SystemState,
   ChainTransaction,
   SolanaWallet,
+  AgentTemplate,
+  MarketplaceListing,
+  AgentRental,
+  AgentNFT,
+  LeaderboardEntry,
+  InsertAgentTemplate,
+  InsertMarketplaceListing,
+  InsertAgentRental,
+  InsertAgentNFT,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -64,6 +73,33 @@ export interface IStorage {
   addSolanaWallet(wallet: SolanaWallet): Promise<SolanaWallet>;
   updateSolanaWallet(address: string, updates: Partial<SolanaWallet>): Promise<SolanaWallet | undefined>;
   removeSolanaWallet(address: string): Promise<boolean>;
+
+  // Marketplace - Agent Templates
+  getAgentTemplates(filters?: { strategyType?: string; riskTolerance?: string; featured?: boolean }): Promise<AgentTemplate[]>;
+  getAgentTemplate(id: string): Promise<AgentTemplate | undefined>;
+  createAgentTemplate(template: InsertAgentTemplate): Promise<AgentTemplate>;
+  updateAgentTemplate(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | undefined>;
+
+  // Marketplace - Listings
+  getMarketplaceListings(filters?: { status?: string; chain?: string; sellerId?: string }): Promise<MarketplaceListing[]>;
+  getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined>;
+  createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing>;
+  updateMarketplaceListing(id: string, updates: Partial<MarketplaceListing>): Promise<MarketplaceListing | undefined>;
+
+  // Marketplace - Rentals
+  getAgentRentals(filters?: { renterId?: string; ownerId?: string; status?: string }): Promise<AgentRental[]>;
+  getAgentRental(id: string): Promise<AgentRental | undefined>;
+  createAgentRental(rental: InsertAgentRental): Promise<AgentRental>;
+  updateAgentRental(id: string, updates: Partial<AgentRental>): Promise<AgentRental | undefined>;
+
+  // Marketplace - NFTs
+  getAgentNFTs(filters?: { ownerAddress?: string; chain?: string }): Promise<AgentNFT[]>;
+  getAgentNFT(id: string): Promise<AgentNFT | undefined>;
+  createAgentNFT(nft: InsertAgentNFT): Promise<AgentNFT>;
+
+  // Leaderboard
+  getLeaderboard(period?: "daily" | "weekly" | "monthly" | "all_time"): Promise<LeaderboardEntry[]>;
+  updateLeaderboard(entries: LeaderboardEntry[]): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -330,6 +366,142 @@ export class MemStorage implements IStorage {
 
   async removeSolanaWallet(address: string): Promise<boolean> {
     return this.solanaWallets.delete(address);
+  }
+
+  // Marketplace - Agent Templates (stub implementations for MemStorage)
+  private agentTemplates: Map<string, AgentTemplate> = new Map();
+  private marketplaceListings: Map<string, MarketplaceListing> = new Map();
+  private agentRentals: Map<string, AgentRental> = new Map();
+  private agentNFTs: Map<string, AgentNFT> = new Map();
+  private leaderboardEntries: LeaderboardEntry[] = [];
+
+  async getAgentTemplates(filters?: { strategyType?: string; riskTolerance?: string; featured?: boolean }): Promise<AgentTemplate[]> {
+    let results = Array.from(this.agentTemplates.values());
+    if (filters?.strategyType) results = results.filter(t => t.strategyType === filters.strategyType);
+    if (filters?.riskTolerance) results = results.filter(t => t.riskTolerance === filters.riskTolerance);
+    if (filters?.featured !== undefined) results = results.filter(t => t.featured === filters.featured);
+    return results;
+  }
+
+  async getAgentTemplate(id: string): Promise<AgentTemplate | undefined> {
+    return this.agentTemplates.get(id);
+  }
+
+  async createAgentTemplate(template: InsertAgentTemplate): Promise<AgentTemplate> {
+    const fullTemplate: AgentTemplate = {
+      ...template,
+      id: template.id || randomUUID(),
+      performanceScore: 0,
+      totalDeployments: 0,
+      createdAt: Date.now(),
+    };
+    this.agentTemplates.set(fullTemplate.id, fullTemplate);
+    return fullTemplate;
+  }
+
+  async updateAgentTemplate(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | undefined> {
+    const existing = this.agentTemplates.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.agentTemplates.set(id, updated);
+    return updated;
+  }
+
+  async getMarketplaceListings(filters?: { status?: string; chain?: string; sellerId?: string }): Promise<MarketplaceListing[]> {
+    let results = Array.from(this.marketplaceListings.values());
+    if (filters?.status) results = results.filter(l => l.status === filters.status);
+    if (filters?.chain) results = results.filter(l => l.chain === filters.chain);
+    if (filters?.sellerId) results = results.filter(l => l.sellerId === filters.sellerId);
+    return results;
+  }
+
+  async getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined> {
+    return this.marketplaceListings.get(id);
+  }
+
+  async createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing> {
+    const fullListing: MarketplaceListing = {
+      ...listing,
+      id: listing.id || randomUUID(),
+      status: "active" as any,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.marketplaceListings.set(fullListing.id, fullListing);
+    return fullListing;
+  }
+
+  async updateMarketplaceListing(id: string, updates: Partial<MarketplaceListing>): Promise<MarketplaceListing | undefined> {
+    const existing = this.marketplaceListings.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates, updatedAt: Date.now() };
+    this.marketplaceListings.set(id, updated);
+    return updated;
+  }
+
+  async getAgentRentals(filters?: { renterId?: string; ownerId?: string; status?: string }): Promise<AgentRental[]> {
+    let results = Array.from(this.agentRentals.values());
+    if (filters?.renterId) results = results.filter(r => r.renterId === filters.renterId);
+    if (filters?.ownerId) results = results.filter(r => r.ownerId === filters.ownerId);
+    if (filters?.status) results = results.filter(r => r.status === filters.status);
+    return results;
+  }
+
+  async getAgentRental(id: string): Promise<AgentRental | undefined> {
+    return this.agentRentals.get(id);
+  }
+
+  async createAgentRental(rental: InsertAgentRental): Promise<AgentRental> {
+    const fullRental: AgentRental = {
+      ...rental,
+      id: rental.id || randomUUID(),
+      status: "active",
+      totalPaid: 0,
+      yieldEarned: 0,
+      createdAt: Date.now(),
+    };
+    this.agentRentals.set(fullRental.id, fullRental);
+    return fullRental;
+  }
+
+  async updateAgentRental(id: string, updates: Partial<AgentRental>): Promise<AgentRental | undefined> {
+    const existing = this.agentRentals.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.agentRentals.set(id, updated);
+    return updated;
+  }
+
+  async getAgentNFTs(filters?: { ownerAddress?: string; chain?: string }): Promise<AgentNFT[]> {
+    let results = Array.from(this.agentNFTs.values());
+    if (filters?.ownerAddress) results = results.filter(n => n.ownerAddress === filters.ownerAddress);
+    if (filters?.chain) results = results.filter(n => n.chain === filters.chain);
+    return results;
+  }
+
+  async getAgentNFT(id: string): Promise<AgentNFT | undefined> {
+    return this.agentNFTs.get(id);
+  }
+
+  async createAgentNFT(nft: InsertAgentNFT): Promise<AgentNFT> {
+    const fullNFT: AgentNFT = {
+      ...nft,
+      id: nft.id || randomUUID(),
+      mintedAt: Date.now(),
+    };
+    this.agentNFTs.set(fullNFT.id, fullNFT);
+    return fullNFT;
+  }
+
+  async getLeaderboard(period?: "daily" | "weekly" | "monthly" | "all_time"): Promise<LeaderboardEntry[]> {
+    if (period) {
+      return this.leaderboardEntries.filter(e => e.period === period).sort((a, b) => a.rank - b.rank);
+    }
+    return this.leaderboardEntries.sort((a, b) => a.rank - b.rank);
+  }
+
+  async updateLeaderboard(entries: LeaderboardEntry[]): Promise<void> {
+    this.leaderboardEntries = entries;
   }
 }
 

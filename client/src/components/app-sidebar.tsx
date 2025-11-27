@@ -14,7 +14,8 @@ import {
   Brain, 
   Shield, 
   LayoutDashboard,
-  Menu
+  Menu,
+  Store
 } from "lucide-react";
 
 const menuItems = [
@@ -35,6 +36,12 @@ const menuItems = [
     url: "/governance",
     icon: Shield,
     testId: "nav-governance",
+  },
+  {
+    title: "Marketplace",
+    url: "/marketplace",
+    icon: Store,
+    testId: "nav-marketplace",
   },
 ];
 

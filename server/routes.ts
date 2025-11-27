@@ -1406,6 +1406,268 @@ export async function registerRoutes(
     });
   });
 
+  // ==========================================
+  // Agent Marketplace Endpoints
+  // ==========================================
+
+  // Agent Templates
+  app.get("/api/marketplace/templates", async (req, res) => {
+    try {
+      const filters = {
+        strategyType: req.query.strategyType as string | undefined,
+        riskTolerance: req.query.riskTolerance as string | undefined,
+        featured: req.query.featured === "true" ? true : req.query.featured === "false" ? false : undefined,
+      };
+      const templates = await storage.getAgentTemplates(filters);
+      res.json(templates);
+    } catch (error) {
+      console.error("Failed to get templates:", error);
+      res.status(500).json({ error: "Failed to get agent templates" });
+    }
+  });
+
+  app.get("/api/marketplace/templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getAgentTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Failed to get template:", error);
+      res.status(500).json({ error: "Failed to get template" });
+    }
+  });
+
+  app.post("/api/marketplace/templates", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertAgentTemplateSchema } = await import("@shared/schema");
+      const parsed = insertAgentTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid template data", details: parsed.error.flatten() });
+      }
+      const template = await storage.createAgentTemplate(parsed.data);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Failed to create template:", error);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/marketplace/templates/:id", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertAgentTemplateSchema } = await import("@shared/schema");
+      const parsed = insertAgentTemplateSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
+      }
+      const template = await storage.updateAgentTemplate(req.params.id, parsed.data);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      res.json(template);
+    } catch (error) {
+      console.error("Failed to update template:", error);
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  // Marketplace Listings
+  app.get("/api/marketplace/listings", async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string | undefined,
+        chain: req.query.chain as string | undefined,
+        sellerId: req.query.sellerId as string | undefined,
+      };
+      const listings = await storage.getMarketplaceListings(filters);
+      res.json(listings);
+    } catch (error) {
+      console.error("Failed to get listings:", error);
+      res.status(500).json({ error: "Failed to get marketplace listings" });
+    }
+  });
+
+  app.get("/api/marketplace/listings/:id", async (req, res) => {
+    try {
+      const listing = await storage.getMarketplaceListing(req.params.id);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      res.json(listing);
+    } catch (error) {
+      console.error("Failed to get listing:", error);
+      res.status(500).json({ error: "Failed to get listing" });
+    }
+  });
+
+  app.post("/api/marketplace/listings", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertMarketplaceListingSchema } = await import("@shared/schema");
+      const parsed = insertMarketplaceListingSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid listing data", details: parsed.error.flatten() });
+      }
+      const listing = await storage.createMarketplaceListing(parsed.data);
+      res.status(201).json(listing);
+    } catch (error) {
+      console.error("Failed to create listing:", error);
+      res.status(500).json({ error: "Failed to create listing" });
+    }
+  });
+
+  app.patch("/api/marketplace/listings/:id", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertMarketplaceListingSchema } = await import("@shared/schema");
+      const parsed = insertMarketplaceListingSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
+      }
+      const listing = await storage.updateMarketplaceListing(req.params.id, parsed.data);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      res.json(listing);
+    } catch (error) {
+      console.error("Failed to update listing:", error);
+      res.status(500).json({ error: "Failed to update listing" });
+    }
+  });
+
+  // Agent Rentals
+  app.get("/api/marketplace/rentals", async (req, res) => {
+    try {
+      const filters = {
+        renterId: req.query.renterId as string | undefined,
+        ownerId: req.query.ownerId as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+      const rentals = await storage.getAgentRentals(filters);
+      res.json(rentals);
+    } catch (error) {
+      console.error("Failed to get rentals:", error);
+      res.status(500).json({ error: "Failed to get rentals" });
+    }
+  });
+
+  app.post("/api/marketplace/rentals", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertAgentRentalSchema } = await import("@shared/schema");
+      const parsed = insertAgentRentalSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid rental data", details: parsed.error.flatten() });
+      }
+      const rental = await storage.createAgentRental(parsed.data);
+      res.status(201).json(rental);
+    } catch (error) {
+      console.error("Failed to create rental:", error);
+      res.status(500).json({ error: "Failed to create rental" });
+    }
+  });
+
+  app.patch("/api/marketplace/rentals/:id", requireWriteAuth, async (req, res) => {
+    try {
+      const { insertAgentRentalSchema } = await import("@shared/schema");
+      const parsed = insertAgentRentalSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
+      }
+      const rental = await storage.updateAgentRental(req.params.id, parsed.data);
+      if (!rental) {
+        return res.status(404).json({ error: "Rental not found" });
+      }
+      res.json(rental);
+    } catch (error) {
+      console.error("Failed to update rental:", error);
+      res.status(500).json({ error: "Failed to update rental" });
+    }
+  });
+
+  // Agent NFTs
+  app.get("/api/marketplace/nfts", async (req, res) => {
+    try {
+      const filters = {
+        ownerAddress: req.query.ownerAddress as string | undefined,
+        chain: req.query.chain as string | undefined,
+      };
+      const nfts = await storage.getAgentNFTs(filters);
+      res.json(nfts);
+    } catch (error) {
+      console.error("Failed to get NFTs:", error);
+      res.status(500).json({ error: "Failed to get NFTs" });
+    }
+  });
+
+  app.post("/api/marketplace/nfts/mint", requireWriteAuth, strictLimiter, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const mintSchema = z.object({
+        templateId: z.string().min(1, "Template ID is required"),
+        ownerAddress: z.string().min(1, "Owner address is required"),
+        chain: z.enum(["ethereum", "solana"]),
+      });
+      const parsed = mintSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid mint data", details: parsed.error.flatten() });
+      }
+      const { templateId, ownerAddress, chain } = parsed.data;
+      
+      const template = await storage.getAgentTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+
+      // Generate mock NFT data (in production this would interact with blockchain)
+      const tokenId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const contractAddress = chain === "solana" 
+        ? "AgentNFT" + Math.random().toString(36).substring(7)
+        : "0x" + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+
+      const nft = await storage.createAgentNFT({
+        id: `nft-${tokenId}`,
+        templateId,
+        tokenId,
+        contractAddress,
+        chain,
+        ownerAddress,
+        metadata: {
+          name: template.name,
+          description: template.description,
+          image: template.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${template.id}`,
+          attributes: [
+            { trait_type: "Agent Type", value: template.agentType },
+            { trait_type: "Strategy", value: template.strategyType },
+            { trait_type: "Risk Tolerance", value: template.riskTolerance },
+            { trait_type: "Performance Score", value: template.performanceScore },
+            { trait_type: "Success Rate", value: `${template.successRate}%` },
+          ],
+        },
+      });
+
+      // Update template deployment count
+      await storage.updateAgentTemplate(templateId, {
+        totalDeployments: template.totalDeployments + 1,
+      });
+
+      res.status(201).json(nft);
+    } catch (error) {
+      console.error("Failed to mint NFT:", error);
+      res.status(500).json({ error: "Failed to mint NFT" });
+    }
+  });
+
+  // Leaderboard
+  app.get("/api/marketplace/leaderboard", async (req, res) => {
+    try {
+      const period = req.query.period as "daily" | "weekly" | "monthly" | "all_time" | undefined;
+      const entries = await storage.getLeaderboard(period);
+      res.json(entries);
+    } catch (error) {
+      console.error("Failed to get leaderboard:", error);
+      res.status(500).json({ error: "Failed to get leaderboard" });
+    }
+  });
+
   // Setup self-healing event listeners
   selfHealingEngine.on("healthCheckStarted", async () => {
     try {

@@ -11,6 +11,12 @@ import {
   alerts,
   systemState,
   chainTransactions,
+  agentTemplates,
+  marketplaceListings,
+  agentRentals,
+  agentNFTs,
+  leaderboard,
+  solanaWallets,
   type Agent,
   type LogEntry,
   type LiveMetrics,
@@ -22,7 +28,18 @@ import {
   type SentinelAlert,
   type SystemState,
   type ChainTransaction,
+  type AgentTemplate,
+  type MarketplaceListing,
+  type AgentRental,
+  type AgentNFT,
+  type LeaderboardEntry,
+  type SolanaWallet,
+  type InsertAgentTemplate,
+  type InsertMarketplaceListing,
+  type InsertAgentRental,
+  type InsertAgentNFT,
   AgentType,
+  ListingStatus,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import type { IStorage } from "./storage";
@@ -422,7 +439,12 @@ export class DatabaseStorage implements IStorage {
         ...event,
         timestamp: eventDate,
       })
+      .onConflictDoNothing()
       .returning();
+
+    if (!result) {
+      return event;
+    }
 
     return {
       ...result,
@@ -551,5 +573,357 @@ export class DatabaseStorage implements IStorage {
       timestamp: result.timestamp.getTime(),
       blockNumber: result.blockNumber || undefined,
     };
+  }
+
+  // Solana Wallets
+  async getSolanaWallets(): Promise<SolanaWallet[]> {
+    const results = await db.select().from(solanaWallets).where(eq(solanaWallets.connected, true));
+    return results.map((w) => ({
+      ...w,
+      connectedAt: w.connectedAt.getTime(),
+      lastUpdated: w.lastUpdated.getTime(),
+    }));
+  }
+
+  async getSolanaWallet(address: string): Promise<SolanaWallet | undefined> {
+    const [wallet] = await db.select().from(solanaWallets).where(eq(solanaWallets.address, address));
+    if (!wallet) return undefined;
+    return {
+      ...wallet,
+      connectedAt: wallet.connectedAt.getTime(),
+      lastUpdated: wallet.lastUpdated.getTime(),
+    };
+  }
+
+  async addSolanaWallet(wallet: SolanaWallet): Promise<SolanaWallet> {
+    const [result] = await db
+      .insert(solanaWallets)
+      .values({
+        ...wallet,
+        connectedAt: new Date(wallet.connectedAt),
+        lastUpdated: new Date(wallet.lastUpdated),
+      })
+      .onConflictDoUpdate({
+        target: solanaWallets.address,
+        set: { connected: true, lastUpdated: new Date() },
+      })
+      .returning();
+    return {
+      ...result,
+      connectedAt: result.connectedAt.getTime(),
+      lastUpdated: result.lastUpdated.getTime(),
+    };
+  }
+
+  async updateSolanaWallet(address: string, updates: Partial<SolanaWallet>): Promise<SolanaWallet | undefined> {
+    const [result] = await db
+      .update(solanaWallets)
+      .set({ ...updates, lastUpdated: new Date() })
+      .where(eq(solanaWallets.address, address))
+      .returning();
+    if (!result) return undefined;
+    return {
+      ...result,
+      connectedAt: result.connectedAt.getTime(),
+      lastUpdated: result.lastUpdated.getTime(),
+    };
+  }
+
+  async removeSolanaWallet(address: string): Promise<boolean> {
+    const result = await db.update(solanaWallets).set({ connected: false }).where(eq(solanaWallets.address, address));
+    return true;
+  }
+
+  // ==========================================
+  // Marketplace - Agent Templates
+  // ==========================================
+
+  async getAgentTemplates(filters?: { strategyType?: string; riskTolerance?: string; featured?: boolean }): Promise<AgentTemplate[]> {
+    const conditions = [];
+    if (filters?.strategyType) conditions.push(eq(agentTemplates.strategyType, filters.strategyType as any));
+    if (filters?.riskTolerance) conditions.push(eq(agentTemplates.riskTolerance, filters.riskTolerance as any));
+    if (filters?.featured !== undefined) conditions.push(eq(agentTemplates.featured, filters.featured));
+
+    const results = conditions.length > 0
+      ? await db.select().from(agentTemplates).where(and(...conditions)).orderBy(desc(agentTemplates.performanceScore))
+      : await db.select().from(agentTemplates).orderBy(desc(agentTemplates.performanceScore));
+
+    return results.map((t) => ({
+      ...t,
+      imageUrl: t.imageUrl || undefined,
+      createdAt: t.createdAt.getTime(),
+    }));
+  }
+
+  async getAgentTemplate(id: string): Promise<AgentTemplate | undefined> {
+    const [template] = await db.select().from(agentTemplates).where(eq(agentTemplates.id, id));
+    if (!template) return undefined;
+    return {
+      ...template,
+      imageUrl: template.imageUrl || undefined,
+      createdAt: template.createdAt.getTime(),
+    };
+  }
+
+  async createAgentTemplate(template: InsertAgentTemplate): Promise<AgentTemplate> {
+    const [result] = await db
+      .insert(agentTemplates)
+      .values({
+        ...template,
+        id: template.id || randomUUID(),
+      })
+      .returning();
+    return {
+      ...result,
+      imageUrl: result.imageUrl || undefined,
+      createdAt: result.createdAt.getTime(),
+    };
+  }
+
+  async updateAgentTemplate(id: string, updates: Partial<AgentTemplate>): Promise<AgentTemplate | undefined> {
+    const cleanedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    if (Object.keys(cleanedUpdates).length === 0) {
+      return this.getAgentTemplate(id);
+    }
+    const [result] = await db.update(agentTemplates).set(cleanedUpdates).where(eq(agentTemplates.id, id)).returning();
+    if (!result) return undefined;
+    return {
+      ...result,
+      imageUrl: result.imageUrl || undefined,
+      createdAt: result.createdAt.getTime(),
+    };
+  }
+
+  // ==========================================
+  // Marketplace - Listings
+  // ==========================================
+
+  async getMarketplaceListings(filters?: { status?: string; chain?: string; sellerId?: string }): Promise<MarketplaceListing[]> {
+    const conditions = [];
+    if (filters?.status) conditions.push(eq(marketplaceListings.status, filters.status as ListingStatus));
+    if (filters?.chain) conditions.push(eq(marketplaceListings.chain, filters.chain as any));
+    if (filters?.sellerId) conditions.push(eq(marketplaceListings.sellerId, filters.sellerId));
+
+    const results = conditions.length > 0
+      ? await db.select().from(marketplaceListings).where(and(...conditions)).orderBy(desc(marketplaceListings.createdAt))
+      : await db.select().from(marketplaceListings).orderBy(desc(marketplaceListings.createdAt));
+
+    return results.map((l) => ({
+      ...l,
+      nftTokenId: l.nftTokenId || undefined,
+      nftContractAddress: l.nftContractAddress || undefined,
+      buyerId: l.buyerId || undefined,
+      createdAt: l.createdAt.getTime(),
+      updatedAt: l.updatedAt.getTime(),
+      soldAt: l.soldAt?.getTime(),
+    }));
+  }
+
+  async getMarketplaceListing(id: string): Promise<MarketplaceListing | undefined> {
+    const [listing] = await db.select().from(marketplaceListings).where(eq(marketplaceListings.id, id));
+    if (!listing) return undefined;
+    return {
+      ...listing,
+      nftTokenId: listing.nftTokenId || undefined,
+      nftContractAddress: listing.nftContractAddress || undefined,
+      buyerId: listing.buyerId || undefined,
+      createdAt: listing.createdAt.getTime(),
+      updatedAt: listing.updatedAt.getTime(),
+      soldAt: listing.soldAt?.getTime(),
+    };
+  }
+
+  async createMarketplaceListing(listing: InsertMarketplaceListing): Promise<MarketplaceListing> {
+    const [result] = await db
+      .insert(marketplaceListings)
+      .values({
+        ...listing,
+        id: listing.id || randomUUID(),
+        status: ListingStatus.ACTIVE,
+      })
+      .returning();
+    return {
+      ...result,
+      nftTokenId: result.nftTokenId || undefined,
+      nftContractAddress: result.nftContractAddress || undefined,
+      buyerId: result.buyerId || undefined,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+      soldAt: result.soldAt?.getTime(),
+    };
+  }
+
+  async updateMarketplaceListing(id: string, updates: Partial<MarketplaceListing>): Promise<MarketplaceListing | undefined> {
+    const cleanedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    if (Object.keys(cleanedUpdates).length === 0) {
+      return this.getMarketplaceListing(id);
+    }
+    const [result] = await db
+      .update(marketplaceListings)
+      .set({ ...cleanedUpdates, updatedAt: new Date() })
+      .where(eq(marketplaceListings.id, id))
+      .returning();
+    if (!result) return undefined;
+    return {
+      ...result,
+      nftTokenId: result.nftTokenId || undefined,
+      nftContractAddress: result.nftContractAddress || undefined,
+      buyerId: result.buyerId || undefined,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+      soldAt: result.soldAt?.getTime(),
+    };
+  }
+
+  // ==========================================
+  // Marketplace - Rentals
+  // ==========================================
+
+  async getAgentRentals(filters?: { renterId?: string; ownerId?: string; status?: string }): Promise<AgentRental[]> {
+    const conditions = [];
+    if (filters?.renterId) conditions.push(eq(agentRentals.renterId, filters.renterId));
+    if (filters?.ownerId) conditions.push(eq(agentRentals.ownerId, filters.ownerId));
+    if (filters?.status) conditions.push(eq(agentRentals.status, filters.status as any));
+
+    const results = conditions.length > 0
+      ? await db.select().from(agentRentals).where(and(...conditions)).orderBy(desc(agentRentals.createdAt))
+      : await db.select().from(agentRentals).orderBy(desc(agentRentals.createdAt));
+
+    return results.map((r) => ({
+      ...r,
+      startDate: r.startDate.getTime(),
+      endDate: r.endDate.getTime(),
+      createdAt: r.createdAt.getTime(),
+    }));
+  }
+
+  async getAgentRental(id: string): Promise<AgentRental | undefined> {
+    const [rental] = await db.select().from(agentRentals).where(eq(agentRentals.id, id));
+    if (!rental) return undefined;
+    return {
+      ...rental,
+      startDate: rental.startDate.getTime(),
+      endDate: rental.endDate.getTime(),
+      createdAt: rental.createdAt.getTime(),
+    };
+  }
+
+  async createAgentRental(rental: InsertAgentRental): Promise<AgentRental> {
+    const [result] = await db
+      .insert(agentRentals)
+      .values({
+        ...rental,
+        id: rental.id || randomUUID(),
+        startDate: new Date(rental.startDate),
+        endDate: new Date(rental.endDate),
+      })
+      .returning();
+    return {
+      ...result,
+      startDate: result.startDate.getTime(),
+      endDate: result.endDate.getTime(),
+      createdAt: result.createdAt.getTime(),
+    };
+  }
+
+  async updateAgentRental(id: string, updates: Partial<AgentRental>): Promise<AgentRental | undefined> {
+    const cleanedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    if (Object.keys(cleanedUpdates).length === 0) {
+      return this.getAgentRental(id);
+    }
+    const [result] = await db.update(agentRentals).set(cleanedUpdates).where(eq(agentRentals.id, id)).returning();
+    if (!result) return undefined;
+    return {
+      ...result,
+      startDate: result.startDate.getTime(),
+      endDate: result.endDate.getTime(),
+      createdAt: result.createdAt.getTime(),
+    };
+  }
+
+  // ==========================================
+  // Marketplace - NFTs
+  // ==========================================
+
+  async getAgentNFTs(filters?: { ownerAddress?: string; chain?: string }): Promise<AgentNFT[]> {
+    const conditions = [];
+    if (filters?.ownerAddress) conditions.push(eq(agentNFTs.ownerAddress, filters.ownerAddress));
+    if (filters?.chain) conditions.push(eq(agentNFTs.chain, filters.chain as any));
+
+    const results = conditions.length > 0
+      ? await db.select().from(agentNFTs).where(and(...conditions)).orderBy(desc(agentNFTs.mintedAt))
+      : await db.select().from(agentNFTs).orderBy(desc(agentNFTs.mintedAt));
+
+    return results.map((n) => ({
+      ...n,
+      mintedAt: n.mintedAt.getTime(),
+    }));
+  }
+
+  async getAgentNFT(id: string): Promise<AgentNFT | undefined> {
+    const [nft] = await db.select().from(agentNFTs).where(eq(agentNFTs.id, id));
+    if (!nft) return undefined;
+    return {
+      ...nft,
+      mintedAt: nft.mintedAt.getTime(),
+    };
+  }
+
+  async createAgentNFT(nft: InsertAgentNFT): Promise<AgentNFT> {
+    const [result] = await db
+      .insert(agentNFTs)
+      .values({
+        ...nft,
+        id: nft.id || randomUUID(),
+      })
+      .returning();
+    return {
+      ...result,
+      mintedAt: result.mintedAt.getTime(),
+    };
+  }
+
+  // ==========================================
+  // Leaderboard
+  // ==========================================
+
+  async getLeaderboard(period?: "daily" | "weekly" | "monthly" | "all_time"): Promise<LeaderboardEntry[]> {
+    const results = period
+      ? await db.select().from(leaderboard).where(eq(leaderboard.period, period)).orderBy(leaderboard.rank)
+      : await db.select().from(leaderboard).orderBy(leaderboard.rank);
+
+    return results.map((e) => ({
+      agentId: e.agentId,
+      templateId: e.templateId,
+      rank: e.rank,
+      performanceScore: e.performanceScore,
+      totalReturn: e.totalReturn,
+      successRate: e.successRate,
+      totalTrades: e.totalTrades,
+      avgTradeSize: e.avgTradeSize,
+      riskAdjustedReturn: e.riskAdjustedReturn,
+      period: e.period,
+    }));
+  }
+
+  async updateLeaderboard(entries: LeaderboardEntry[]): Promise<void> {
+    for (const entry of entries) {
+      await db
+        .insert(leaderboard)
+        .values({
+          id: `${entry.agentId}-${entry.period}`,
+          ...entry,
+        })
+        .onConflictDoUpdate({
+          target: leaderboard.id,
+          set: entry,
+        });
+    }
   }
 }

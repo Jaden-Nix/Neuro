@@ -569,6 +569,239 @@ export const safeConfigs = pgTable("safe_configs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ==========================================
+// Task 11: Agent Marketplace Types
+// ==========================================
+
+export enum RiskTolerance {
+  CONSERVATIVE = "conservative",
+  MODERATE = "moderate",
+  AGGRESSIVE = "aggressive"
+}
+
+export enum StrategyType {
+  ARBITRAGE = "arbitrage",
+  YIELD_FARMING = "yield_farming",
+  LIQUIDITY_PROVISION = "liquidity_provision",
+  MARKET_MAKING = "market_making",
+  TREND_FOLLOWING = "trend_following"
+}
+
+export enum ListingStatus {
+  ACTIVE = "active",
+  SOLD = "sold",
+  RENTED = "rented",
+  DELISTED = "delisted"
+}
+
+export interface AgentTemplate {
+  id: string;
+  name: string;
+  description: string;
+  agentType: AgentType;
+  personality: PersonalityTrait[];
+  riskTolerance: RiskTolerance;
+  strategyType: StrategyType;
+  basePrice: number;
+  rentalPricePerDay: number;
+  yieldSharePercent: number;
+  performanceScore: number;
+  totalDeployments: number;
+  successRate: number;
+  avgReturn: number;
+  imageUrl?: string;
+  createdBy: string;
+  createdAt: number;
+  featured: boolean;
+}
+
+export interface MarketplaceListing {
+  id: string;
+  templateId: string;
+  sellerId: string;
+  nftTokenId?: string;
+  nftContractAddress?: string;
+  price: number;
+  rentalPricePerDay: number;
+  yieldSharePercent: number;
+  status: ListingStatus;
+  buyerId?: string;
+  chain: "ethereum" | "base" | "fraxtal" | "solana";
+  createdAt: number;
+  updatedAt: number;
+  soldAt?: number;
+}
+
+export interface AgentRental {
+  id: string;
+  listingId: string;
+  templateId: string;
+  renterId: string;
+  ownerId: string;
+  startDate: number;
+  endDate: number;
+  dailyRate: number;
+  yieldSharePercent: number;
+  totalPaid: number;
+  yieldEarned: number;
+  status: "active" | "completed" | "cancelled";
+  createdAt: number;
+}
+
+export interface AgentNFT {
+  id: string;
+  templateId: string;
+  tokenId: string;
+  contractAddress: string;
+  chain: "ethereum" | "base" | "fraxtal" | "solana";
+  ownerAddress: string;
+  mintedAt: number;
+  metadata: {
+    name: string;
+    description: string;
+    image: string;
+    attributes: Array<{ trait_type: string; value: string | number }>;
+  };
+}
+
+export interface LeaderboardEntry {
+  agentId: string;
+  templateId: string;
+  rank: number;
+  performanceScore: number;
+  totalReturn: number;
+  successRate: number;
+  totalTrades: number;
+  avgTradeSize: number;
+  riskAdjustedReturn: number;
+  period: "daily" | "weekly" | "monthly" | "all_time";
+}
+
+// Agent Templates Table
+export const agentTemplates = pgTable("agent_templates", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description").notNull(),
+  agentType: varchar("agent_type").$type<AgentType>().notNull(),
+  personality: jsonb("personality").$type<PersonalityTrait[]>().notNull(),
+  riskTolerance: varchar("risk_tolerance").$type<RiskTolerance>().notNull(),
+  strategyType: varchar("strategy_type").$type<StrategyType>().notNull(),
+  basePrice: integer("base_price").notNull().default(0),
+  rentalPricePerDay: integer("rental_price_per_day").notNull().default(0),
+  yieldSharePercent: integer("yield_share_percent").notNull().default(10),
+  performanceScore: integer("performance_score").notNull().default(0),
+  totalDeployments: integer("total_deployments").notNull().default(0),
+  successRate: integer("success_rate").notNull().default(0),
+  avgReturn: integer("avg_return").notNull().default(0),
+  imageUrl: varchar("image_url"),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  featured: boolean("featured").notNull().default(false),
+});
+
+// Marketplace Listings Table
+export const marketplaceListings = pgTable("marketplace_listings", {
+  id: varchar("id").primaryKey(),
+  templateId: varchar("template_id").notNull(),
+  sellerId: varchar("seller_id").notNull(),
+  nftTokenId: varchar("nft_token_id"),
+  nftContractAddress: varchar("nft_contract_address"),
+  price: integer("price").notNull(),
+  rentalPricePerDay: integer("rental_price_per_day").notNull(),
+  yieldSharePercent: integer("yield_share_percent").notNull().default(10),
+  status: varchar("status").$type<ListingStatus>().notNull(),
+  buyerId: varchar("buyer_id"),
+  chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal" | "solana">().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  soldAt: timestamp("sold_at"),
+});
+
+// Agent Rentals Table
+export const agentRentals = pgTable("agent_rentals", {
+  id: varchar("id").primaryKey(),
+  listingId: varchar("listing_id").notNull(),
+  templateId: varchar("template_id").notNull(),
+  renterId: varchar("renter_id").notNull(),
+  ownerId: varchar("owner_id").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  dailyRate: integer("daily_rate").notNull(),
+  yieldSharePercent: integer("yield_share_percent").notNull(),
+  totalPaid: integer("total_paid").notNull().default(0),
+  yieldEarned: integer("yield_earned").notNull().default(0),
+  status: varchar("status").$type<"active" | "completed" | "cancelled">().notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Agent NFTs Table
+export const agentNFTs = pgTable("agent_nfts", {
+  id: varchar("id").primaryKey(),
+  templateId: varchar("template_id").notNull(),
+  tokenId: varchar("token_id").notNull(),
+  contractAddress: varchar("contract_address").notNull(),
+  chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal" | "solana">().notNull(),
+  ownerAddress: varchar("owner_address").notNull(),
+  mintedAt: timestamp("minted_at").notNull().defaultNow(),
+  metadata: jsonb("metadata").$type<{
+    name: string;
+    description: string;
+    image: string;
+    attributes: Array<{ trait_type: string; value: string | number }>;
+  }>().notNull(),
+});
+
+// Leaderboard Table
+export const leaderboard = pgTable("leaderboard", {
+  id: varchar("id").primaryKey(),
+  agentId: varchar("agent_id").notNull(),
+  templateId: varchar("template_id").notNull(),
+  rank: integer("rank").notNull(),
+  performanceScore: integer("performance_score").notNull(),
+  totalReturn: integer("total_return").notNull(),
+  successRate: integer("success_rate").notNull(),
+  totalTrades: integer("total_trades").notNull(),
+  avgTradeSize: integer("avg_trade_size").notNull(),
+  riskAdjustedReturn: integer("risk_adjusted_return").notNull(),
+  period: varchar("period").$type<"daily" | "weekly" | "monthly" | "all_time">().notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Insert schemas for marketplace
+export const insertAgentTemplateSchema = createInsertSchema(agentTemplates).omit({ 
+  createdAt: true, 
+  totalDeployments: true,
+  performanceScore: true 
+});
+export const insertMarketplaceListingSchema = createInsertSchema(marketplaceListings).omit({ 
+  createdAt: true, 
+  updatedAt: true,
+  soldAt: true,
+  status: true 
+});
+export const insertAgentRentalSchema = createInsertSchema(agentRentals).omit({ 
+  createdAt: true,
+  totalPaid: true,
+  yieldEarned: true,
+  status: true 
+});
+export const insertAgentNFTSchema = createInsertSchema(agentNFTs).omit({ mintedAt: true });
+export const insertLeaderboardSchema = createInsertSchema(leaderboard).omit({ updatedAt: true });
+
+// Marketplace Types for inserts
+export type InsertAgentTemplate = z.infer<typeof insertAgentTemplateSchema>;
+export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSchema>;
+export type InsertAgentRental = z.infer<typeof insertAgentRentalSchema>;
+export type InsertAgentNFT = z.infer<typeof insertAgentNFTSchema>;
+export type InsertLeaderboard = z.infer<typeof insertLeaderboardSchema>;
+
+// Marketplace Select types
+export type SelectAgentTemplate = typeof agentTemplates.$inferSelect;
+export type SelectMarketplaceListing = typeof marketplaceListings.$inferSelect;
+export type SelectAgentRental = typeof agentRentals.$inferSelect;
+export type SelectAgentNFT = typeof agentNFTs.$inferSelect;
+export type SelectLeaderboard = typeof leaderboard.$inferSelect;
+
 // Insert schemas for new tables
 export const insertMLPredictionSchema = createInsertSchema(mlPredictions).omit({ timestamp: true });
 export const insertMarketClusterSchema = createInsertSchema(marketClusters).omit({ timestamp: true });

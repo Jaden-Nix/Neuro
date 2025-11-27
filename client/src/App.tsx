@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import Dashboard from "@/pages/Dashboard";
 import MLInsights from "@/pages/MLInsights";
 import Governance from "@/pages/Governance";
+import Marketplace from "@/pages/Marketplace";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/ml" component={MLInsights} />
       <Route path="/governance" component={Governance} />
+      <Route path="/marketplace" component={Marketplace} />
       <Route component={NotFound} />
     </Switch>
   );
