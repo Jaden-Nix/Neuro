@@ -1919,6 +1919,160 @@ export async function registerRoutes(
     }
   });
 
+  // =============================================
+  // STRIPE CONNECT - SELLER ONBOARDING
+  // =============================================
+
+  // Get seller profile
+  app.get("/api/sellers/:walletAddress", async (req, res) => {
+    try {
+      const profile = await storage.getSellerProfile(req.params.walletAddress);
+      if (!profile) {
+        return res.status(404).json({ error: "Seller profile not found" });
+      }
+      res.json(profile);
+    } catch (error) {
+      console.error("Failed to get seller profile:", error);
+      res.status(500).json({ error: "Failed to get seller profile" });
+    }
+  });
+
+  // Create or get seller profile and start Stripe Connect onboarding
+  app.post("/api/sellers/onboard", requireWriteAuth, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const schema = z.object({
+        walletAddress: z.string().min(1),
+        email: z.string().email(),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid data", details: parsed.error.flatten() });
+      }
+      
+      const { walletAddress, email } = parsed.data;
+      
+      // Check if profile exists
+      let profile = await storage.getSellerProfile(walletAddress);
+      
+      if (!profile) {
+        // Create new seller profile
+        profile = await storage.createSellerProfile({
+          id: `seller-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          walletAddress,
+          email,
+        });
+      }
+      
+      // If already has Stripe account and completed onboarding, return profile
+      if (profile.stripeAccountId && profile.stripeOnboardingComplete) {
+        return res.json({ profile, onboardingComplete: true });
+      }
+      
+      // Create or get Stripe Connect account
+      let stripeAccountId = profile.stripeAccountId;
+      
+      if (!stripeAccountId) {
+        const account = await stripeService.createConnectAccount(email, {
+          walletAddress,
+          profileId: profile.id,
+        });
+        stripeAccountId = account.id;
+        
+        // Update profile with Stripe account ID
+        await storage.updateSellerProfile(profile.id, { stripeAccountId });
+      }
+      
+      // Create onboarding link
+      const baseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+      const accountLink = await stripeService.createConnectAccountLink(
+        stripeAccountId,
+        `${baseUrl}/marketplace?onboarding=complete`,
+        `${baseUrl}/marketplace?onboarding=refresh`
+      );
+      
+      res.json({
+        profile: { ...profile, stripeAccountId },
+        onboardingUrl: accountLink.url,
+        onboardingComplete: false,
+      });
+    } catch (error) {
+      console.error("Failed to onboard seller:", error);
+      res.status(500).json({ error: "Failed to start seller onboarding" });
+    }
+  });
+
+  // Check seller onboarding status
+  app.get("/api/sellers/:walletAddress/status", async (req, res) => {
+    try {
+      const profile = await storage.getSellerProfile(req.params.walletAddress);
+      if (!profile) {
+        return res.status(404).json({ error: "Seller profile not found" });
+      }
+      
+      if (!profile.stripeAccountId) {
+        return res.json({ onboardingComplete: false, needsOnboarding: true });
+      }
+      
+      // Check Stripe account status
+      const account = await stripeService.getConnectAccount(profile.stripeAccountId);
+      const onboardingComplete = account.charges_enabled && account.payouts_enabled;
+      
+      // Update profile if status changed
+      if (onboardingComplete !== profile.stripeOnboardingComplete) {
+        await storage.updateSellerProfile(profile.id, { stripeOnboardingComplete: onboardingComplete });
+      }
+      
+      res.json({
+        onboardingComplete,
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        platformFeePercent: stripeService.getPlatformFeePercent(),
+      });
+    } catch (error) {
+      console.error("Failed to check seller status:", error);
+      res.status(500).json({ error: "Failed to check seller status" });
+    }
+  });
+
+  // Get seller dashboard link
+  app.get("/api/sellers/:walletAddress/dashboard", async (req, res) => {
+    try {
+      const profile = await storage.getSellerProfile(req.params.walletAddress);
+      if (!profile || !profile.stripeAccountId) {
+        return res.status(404).json({ error: "Seller not connected to Stripe" });
+      }
+      
+      const loginLink = await stripeService.createConnectLoginLink(profile.stripeAccountId);
+      res.json({ dashboardUrl: loginLink.url });
+    } catch (error) {
+      console.error("Failed to get dashboard link:", error);
+      res.status(500).json({ error: "Failed to get dashboard link" });
+    }
+  });
+
+  // Get seller balance
+  app.get("/api/sellers/:walletAddress/balance", async (req, res) => {
+    try {
+      const profile = await storage.getSellerProfile(req.params.walletAddress);
+      if (!profile || !profile.stripeAccountId) {
+        return res.status(404).json({ error: "Seller not connected to Stripe" });
+      }
+      
+      const balance = await stripeService.getAccountBalance(profile.stripeAccountId);
+      res.json({
+        available: balance.available,
+        pending: balance.pending,
+        totalEarnings: profile.totalEarnings,
+        totalSales: profile.totalSales,
+      });
+    } catch (error) {
+      console.error("Failed to get balance:", error);
+      res.status(500).json({ error: "Failed to get balance" });
+    }
+  });
+
   // Setup self-healing event listeners
   selfHealingEngine.on("healthCheckStarted", async () => {
     try {

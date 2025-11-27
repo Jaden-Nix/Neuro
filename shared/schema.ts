@@ -692,6 +692,18 @@ export interface LeaderboardEntry {
   period: "daily" | "weekly" | "monthly" | "all_time";
 }
 
+export interface SellerProfile {
+  id: string;
+  walletAddress: string;
+  email?: string;
+  stripeAccountId?: string;
+  stripeOnboardingComplete: boolean;
+  totalEarnings: number;
+  totalSales: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // Agent Templates Table
 export const agentTemplates = pgTable("agent_templates", {
   id: varchar("id").primaryKey(),
@@ -785,6 +797,19 @@ export const leaderboard = pgTable("leaderboard", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// Seller Profiles Table (for Stripe Connect)
+export const sellerProfiles = pgTable("seller_profiles", {
+  id: varchar("id").primaryKey(),
+  walletAddress: varchar("wallet_address").notNull().unique(),
+  email: varchar("email"),
+  stripeAccountId: varchar("stripe_account_id"),
+  stripeOnboardingComplete: boolean("stripe_onboarding_complete").notNull().default(false),
+  totalEarnings: integer("total_earnings").notNull().default(0),
+  totalSales: integer("total_sales").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 // Insert schemas for marketplace
 export const insertAgentTemplateSchema = createInsertSchema(agentTemplates).omit({ 
   createdAt: true, 
@@ -805,6 +830,13 @@ export const insertAgentRentalSchema = createInsertSchema(agentRentals).omit({
 });
 export const insertAgentNFTSchema = createInsertSchema(agentNFTs).omit({ mintedAt: true });
 export const insertLeaderboardSchema = createInsertSchema(leaderboard).omit({ updatedAt: true });
+export const insertSellerProfileSchema = createInsertSchema(sellerProfiles).omit({ 
+  createdAt: true, 
+  updatedAt: true,
+  totalEarnings: true,
+  totalSales: true,
+  stripeOnboardingComplete: true,
+});
 
 // Marketplace Types for inserts
 export type InsertAgentTemplate = z.infer<typeof insertAgentTemplateSchema>;
@@ -812,6 +844,7 @@ export type InsertMarketplaceListing = z.infer<typeof insertMarketplaceListingSc
 export type InsertAgentRental = z.infer<typeof insertAgentRentalSchema>;
 export type InsertAgentNFT = z.infer<typeof insertAgentNFTSchema>;
 export type InsertLeaderboard = z.infer<typeof insertLeaderboardSchema>;
+export type InsertSellerProfile = z.infer<typeof insertSellerProfileSchema>;
 
 // Marketplace Select types
 export type SelectAgentTemplate = typeof agentTemplates.$inferSelect;
@@ -819,6 +852,7 @@ export type SelectMarketplaceListing = typeof marketplaceListings.$inferSelect;
 export type SelectAgentRental = typeof agentRentals.$inferSelect;
 export type SelectAgentNFT = typeof agentNFTs.$inferSelect;
 export type SelectLeaderboard = typeof leaderboard.$inferSelect;
+export type SelectSellerProfile = typeof sellerProfiles.$inferSelect;
 
 // Insert schemas for new tables
 export const insertMLPredictionSchema = createInsertSchema(mlPredictions).omit({ timestamp: true });

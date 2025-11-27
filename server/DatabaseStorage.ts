@@ -17,6 +17,7 @@ import {
   agentNFTs,
   leaderboard,
   solanaWallets,
+  sellerProfiles,
   type Agent,
   type LogEntry,
   type LiveMetrics,
@@ -34,10 +35,12 @@ import {
   type AgentNFT,
   type LeaderboardEntry,
   type SolanaWallet,
+  type SellerProfile,
   type InsertAgentTemplate,
   type InsertMarketplaceListing,
   type InsertAgentRental,
   type InsertAgentNFT,
+  type InsertSellerProfile,
   AgentType,
   ListingStatus,
 } from "@shared/schema";
@@ -926,5 +929,105 @@ export class DatabaseStorage implements IStorage {
           set: entry,
         });
     }
+  }
+
+  // ==========================================
+  // Seller Profiles (Stripe Connect)
+  // ==========================================
+
+  async getSellerProfile(walletAddress: string): Promise<SellerProfile | undefined> {
+    const [result] = await db
+      .select()
+      .from(sellerProfiles)
+      .where(eq(sellerProfiles.walletAddress, walletAddress));
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      walletAddress: result.walletAddress,
+      email: result.email ?? undefined,
+      stripeAccountId: result.stripeAccountId ?? undefined,
+      stripeOnboardingComplete: result.stripeOnboardingComplete,
+      totalEarnings: result.totalEarnings,
+      totalSales: result.totalSales,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+    };
+  }
+
+  async getSellerProfileById(id: string): Promise<SellerProfile | undefined> {
+    const [result] = await db
+      .select()
+      .from(sellerProfiles)
+      .where(eq(sellerProfiles.id, id));
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      walletAddress: result.walletAddress,
+      email: result.email ?? undefined,
+      stripeAccountId: result.stripeAccountId ?? undefined,
+      stripeOnboardingComplete: result.stripeOnboardingComplete,
+      totalEarnings: result.totalEarnings,
+      totalSales: result.totalSales,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+    };
+  }
+
+  async createSellerProfile(profile: InsertSellerProfile): Promise<SellerProfile> {
+    const [result] = await db
+      .insert(sellerProfiles)
+      .values({
+        id: profile.id || randomUUID(),
+        walletAddress: profile.walletAddress,
+        email: profile.email,
+        stripeAccountId: profile.stripeAccountId,
+      })
+      .returning();
+    
+    return {
+      id: result.id,
+      walletAddress: result.walletAddress,
+      email: result.email ?? undefined,
+      stripeAccountId: result.stripeAccountId ?? undefined,
+      stripeOnboardingComplete: result.stripeOnboardingComplete,
+      totalEarnings: result.totalEarnings,
+      totalSales: result.totalSales,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+    };
+  }
+
+  async updateSellerProfile(id: string, updates: Partial<SellerProfile>): Promise<SellerProfile | undefined> {
+    const updateData: any = {};
+    if (updates.email !== undefined) updateData.email = updates.email;
+    if (updates.stripeAccountId !== undefined) updateData.stripeAccountId = updates.stripeAccountId;
+    if (updates.stripeOnboardingComplete !== undefined) updateData.stripeOnboardingComplete = updates.stripeOnboardingComplete;
+    if (updates.totalEarnings !== undefined) updateData.totalEarnings = updates.totalEarnings;
+    if (updates.totalSales !== undefined) updateData.totalSales = updates.totalSales;
+    updateData.updatedAt = new Date();
+
+    const [result] = await db
+      .update(sellerProfiles)
+      .set(updateData)
+      .where(eq(sellerProfiles.id, id))
+      .returning();
+    
+    if (!result) return undefined;
+    
+    return {
+      id: result.id,
+      walletAddress: result.walletAddress,
+      email: result.email ?? undefined,
+      stripeAccountId: result.stripeAccountId ?? undefined,
+      stripeOnboardingComplete: result.stripeOnboardingComplete,
+      totalEarnings: result.totalEarnings,
+      totalSales: result.totalSales,
+      createdAt: result.createdAt.getTime(),
+      updatedAt: result.updatedAt.getTime(),
+    };
   }
 }

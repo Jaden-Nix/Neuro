@@ -16,10 +16,12 @@ import type {
   AgentRental,
   AgentNFT,
   LeaderboardEntry,
+  SellerProfile,
   InsertAgentTemplate,
   InsertMarketplaceListing,
   InsertAgentRental,
   InsertAgentNFT,
+  InsertSellerProfile,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -100,6 +102,12 @@ export interface IStorage {
   // Leaderboard
   getLeaderboard(period?: "daily" | "weekly" | "monthly" | "all_time"): Promise<LeaderboardEntry[]>;
   updateLeaderboard(entries: LeaderboardEntry[]): Promise<void>;
+
+  // Seller Profiles (Stripe Connect)
+  getSellerProfile(walletAddress: string): Promise<SellerProfile | undefined>;
+  getSellerProfileById(id: string): Promise<SellerProfile | undefined>;
+  createSellerProfile(profile: InsertSellerProfile): Promise<SellerProfile>;
+  updateSellerProfile(id: string, updates: Partial<SellerProfile>): Promise<SellerProfile | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -502,6 +510,39 @@ export class MemStorage implements IStorage {
 
   async updateLeaderboard(entries: LeaderboardEntry[]): Promise<void> {
     this.leaderboardEntries = entries;
+  }
+
+  // Seller Profiles (Stripe Connect) - MemStorage stubs
+  private sellerProfiles: Map<string, SellerProfile> = new Map();
+
+  async getSellerProfile(walletAddress: string): Promise<SellerProfile | undefined> {
+    return Array.from(this.sellerProfiles.values()).find(p => p.walletAddress === walletAddress);
+  }
+
+  async getSellerProfileById(id: string): Promise<SellerProfile | undefined> {
+    return this.sellerProfiles.get(id);
+  }
+
+  async createSellerProfile(profile: InsertSellerProfile): Promise<SellerProfile> {
+    const fullProfile: SellerProfile = {
+      ...profile,
+      id: profile.id || randomUUID(),
+      stripeOnboardingComplete: false,
+      totalEarnings: 0,
+      totalSales: 0,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    this.sellerProfiles.set(fullProfile.id, fullProfile);
+    return fullProfile;
+  }
+
+  async updateSellerProfile(id: string, updates: Partial<SellerProfile>): Promise<SellerProfile | undefined> {
+    const existing = this.sellerProfiles.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates, updatedAt: Date.now() };
+    this.sellerProfiles.set(id, updated);
+    return updated;
   }
 }
 
