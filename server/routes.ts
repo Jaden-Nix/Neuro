@@ -16,6 +16,7 @@ import { governanceSystem } from "./governance/GovernanceSystem";
 import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
+import { preventInjection, validateContentType } from "./middleware/validation";
 import { anthropicCircuitBreaker } from "./utils/circuitBreaker";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
@@ -159,6 +160,10 @@ export async function registerRoutes(
 
   // Apply global rate limiting to all API routes
   app.use("/api", rateLimit);
+  
+  // Apply injection prevention and content-type validation to all API routes
+  app.use("/api", preventInjection);
+  app.use("/api", validateContentType);
 
   // Initialize agents in storage
   const agents = orchestrator.getAllAgents();

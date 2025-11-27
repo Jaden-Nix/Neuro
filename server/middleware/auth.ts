@@ -90,8 +90,16 @@ export function requireAuth(req: AuthenticatedRequest, res: Response, next: Next
     return;
   }
 
-  // In development mode without API_KEY, allow all requests
-  if (validApiKeys.size === 0 && !isProductionMode) {
+  // SECURITY: In production, API_KEY MUST be configured
+  if (validApiKeys.size === 0) {
+    if (isProductionMode) {
+      res.status(503).json({ 
+        error: "Service Unavailable", 
+        message: "API authentication not configured. Contact administrator." 
+      });
+      return;
+    }
+    // Only allow unauthenticated access in development
     next();
     return;
   }
@@ -152,8 +160,16 @@ export function requireWriteAuth(req: AuthenticatedRequest, res: Response, next:
     return;
   }
 
-  // In development mode without API_KEY, allow all requests
-  if (validApiKeys.size === 0 && !isProductionMode) {
+  // SECURITY: In production, API_KEY MUST be configured
+  if (validApiKeys.size === 0) {
+    if (isProductionMode) {
+      res.status(503).json({ 
+        error: "Service Unavailable", 
+        message: "API authentication not configured. Contact administrator." 
+      });
+      return;
+    }
+    // Only allow unauthenticated access in development
     next();
     return;
   }
@@ -180,7 +196,10 @@ export function requireWriteAuth(req: AuthenticatedRequest, res: Response, next:
 }
 
 // Security headers middleware
-export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
+export function securityHeaders(req: Request, res: Response, next: NextFunction): void {
+  // Skip restrictive headers for Stripe webhook endpoints
+  const isStripeWebhook = req.path.startsWith("/api/stripe/webhook");
+  
   // Prevent clickjacking
   res.setHeader("X-Frame-Options", "DENY");
   
@@ -193,11 +212,13 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
   // Referrer policy
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   
-  // Content Security Policy for API responses
-  res.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  // Content Security Policy for API responses (except webhooks)
+  if (!isStripeWebhook) {
+    res.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
+  }
   
   // Prevent caching of sensitive data
-  if (_req.path.startsWith("/api/")) {
+  if (req.path.startsWith("/api/") && !isStripeWebhook) {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     res.setHeader("Pragma", "no-cache");
     res.setHeader("Expires", "0");
