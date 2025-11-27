@@ -54,9 +54,30 @@ Frontend state is managed using React Query for server state and caching, with a
 - **express-session**: Session middleware.
 - **connect-pg-simple**: PostgreSQL session store.
 
+### Payment Processing
+- **Stripe**: Payment processing for marketplace agent rentals and NFT minting.
+- **stripe-replit-sync**: Automatic Stripe schema management and data synchronization.
+
 ### Utilities
 - **nanoid**: Unique ID generation.
 - **date-fns**: Date manipulation.
 - **zod**: Runtime type validation.
 - **class-variance-authority**: CSS variant utilities.
 - **clsx** + **tailwind-merge**: Conditional class name merging.
+
+## Recent Changes
+
+### November 27, 2025
+- **Stripe Payment Integration**: Added marketplace payment processing for agent rentals and NFT minting
+  - `server/index.ts`: Stripe initialization BEFORE express.json() middleware, webhook handlers
+  - `shared/schema.ts`: Added `stripePaymentIntentId` to AgentRental and AgentNFT tables
+  - `server/routes.ts`: New payment endpoints (`/api/stripe/rental-payment`, `/api/stripe/mint-payment`, `/api/stripe/confirm-rental`, `/api/stripe/confirm-mint`)
+  - `script/seed-stripe-products.ts`: Product seeding script for Stripe (run via `npx tsx script/seed-stripe-products.ts`)
+
+## Important Implementation Notes
+
+### Stripe Integration
+- Stripe webhook routes are registered BEFORE `express.json()` middleware to receive raw Buffer payloads
+- stripe-replit-sync manages the `stripe.*` schema automatically - never manually insert into those tables
+- Payment flow: Create payment intent → Frontend collects payment → Confirm endpoint creates rental/NFT record
+- Webhook UUID is stored in `process.env.STRIPE_WEBHOOK_UUID` for handler reference

@@ -658,6 +658,7 @@ export interface AgentRental {
   yieldEarned: number;
   status: "active" | "completed" | "cancelled";
   createdAt: number;
+  stripePaymentIntentId?: string;
 }
 
 export interface AgentNFT {
@@ -674,6 +675,8 @@ export interface AgentNFT {
     image: string;
     attributes: Array<{ trait_type: string; value: string | number }>;
   };
+  stripePaymentIntentId?: string;
+  mintFee?: number;
 }
 
 export interface LeaderboardEntry {
@@ -744,6 +747,7 @@ export const agentRentals = pgTable("agent_rentals", {
   yieldEarned: integer("yield_earned").notNull().default(0),
   status: varchar("status").$type<"active" | "completed" | "cancelled">().notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
 });
 
 // Agent NFTs Table
@@ -761,6 +765,8 @@ export const agentNFTs = pgTable("agent_nfts", {
     image: string;
     attributes: Array<{ trait_type: string; value: string | number }>;
   }>().notNull(),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id"),
+  mintFee: integer("mint_fee"),
 });
 
 // Leaderboard Table

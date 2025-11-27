@@ -17,6 +17,8 @@ import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
 import { anthropicCircuitBreaker } from "./utils/circuitBreaker";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey } from "./stripeClient";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -1665,6 +1667,255 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to get leaderboard:", error);
       res.status(500).json({ error: "Failed to get leaderboard" });
+    }
+  });
+
+  // =============================================
+  // STRIPE PAYMENT ENDPOINTS
+  // =============================================
+  
+  // Get Stripe publishable key for frontend
+  app.get("/api/stripe/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Failed to get Stripe config:", error);
+      res.status(500).json({ error: "Stripe not configured" });
+    }
+  });
+
+  // Create payment intent for agent rental
+  app.post("/api/stripe/rental-payment", requireWriteAuth, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const schema = z.object({
+        listingId: z.string().min(1),
+        templateId: z.string().min(1),
+        rentalDays: z.number().int().positive(),
+        renterId: z.string().min(1),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid payment data", details: parsed.error.flatten() });
+      }
+      
+      const { listingId, templateId, rentalDays, renterId } = parsed.data;
+      
+      // Get listing to calculate price
+      const listing = await storage.getMarketplaceListing(listingId);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      
+      // Calculate total (price in cents)
+      const totalAmount = listing.rentalPricePerDay * rentalDays * 100;
+      
+      // Create payment intent
+      const paymentIntent = await stripeService.createPaymentIntent(
+        totalAmount,
+        'usd',
+        {
+          type: 'agent_rental',
+          listingId,
+          templateId,
+          renterId,
+          rentalDays: String(rentalDays),
+        }
+      );
+      
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: totalAmount,
+        currency: 'usd',
+      });
+    } catch (error) {
+      console.error("Failed to create rental payment:", error);
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  // Create payment intent for NFT minting
+  app.post("/api/stripe/mint-payment", requireWriteAuth, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const schema = z.object({
+        templateId: z.string().min(1),
+        ownerAddress: z.string().min(1),
+        chain: z.enum(["ethereum", "solana"]),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid payment data", details: parsed.error.flatten() });
+      }
+      
+      const { templateId, ownerAddress, chain } = parsed.data;
+      
+      // Get template to calculate minting fee
+      const template = await storage.getAgentTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      // Minting fee: base price * 0.1 (10% of template price) or minimum $5
+      const mintFee = Math.max(template.basePrice * 10, 500); // in cents
+      
+      // Create payment intent
+      const paymentIntent = await stripeService.createPaymentIntent(
+        mintFee,
+        'usd',
+        {
+          type: 'nft_mint',
+          templateId,
+          ownerAddress,
+          chain,
+        }
+      );
+      
+      res.json({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount: mintFee,
+        currency: 'usd',
+      });
+    } catch (error) {
+      console.error("Failed to create mint payment:", error);
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  // Confirm rental payment and create rental
+  app.post("/api/stripe/confirm-rental", requireWriteAuth, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const schema = z.object({
+        paymentIntentId: z.string().min(1),
+        listingId: z.string().min(1),
+        templateId: z.string().min(1),
+        renterId: z.string().min(1),
+        ownerId: z.string().min(1),
+        rentalDays: z.number().int().positive(),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid confirmation data", details: parsed.error.flatten() });
+      }
+      
+      const { paymentIntentId, listingId, templateId, renterId, ownerId, rentalDays } = parsed.data;
+      
+      // Verify payment was successful
+      const paymentIntent = await stripeService.retrievePaymentIntent(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ error: "Payment not completed", status: paymentIntent.status });
+      }
+      
+      // Get listing for pricing
+      const listing = await storage.getMarketplaceListing(listingId);
+      if (!listing) {
+        return res.status(404).json({ error: "Listing not found" });
+      }
+      
+      // Create rental record
+      const startDate = Date.now();
+      const endDate = startDate + (rentalDays * 24 * 60 * 60 * 1000);
+      
+      const rental = await storage.createAgentRental({
+        id: `rental-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        listingId,
+        templateId,
+        renterId,
+        ownerId,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        dailyRate: listing.rentalPricePerDay,
+        yieldSharePercent: listing.yieldSharePercent,
+      });
+      
+      // Update with stripe payment intent ID
+      const updatedRental = await storage.updateAgentRental(rental.id, {
+        stripePaymentIntentId: paymentIntentId,
+        totalPaid: paymentIntent.amount,
+      });
+      
+      res.status(201).json(updatedRental || rental);
+    } catch (error) {
+      console.error("Failed to confirm rental:", error);
+      res.status(500).json({ error: "Failed to confirm rental" });
+    }
+  });
+
+  // Confirm mint payment and create NFT
+  app.post("/api/stripe/confirm-mint", requireWriteAuth, strictLimiter, async (req, res) => {
+    try {
+      const { z } = await import("zod");
+      const schema = z.object({
+        paymentIntentId: z.string().min(1),
+        templateId: z.string().min(1),
+        ownerAddress: z.string().min(1),
+        chain: z.enum(["ethereum", "solana"]),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid confirmation data", details: parsed.error.flatten() });
+      }
+      
+      const { paymentIntentId, templateId, ownerAddress, chain } = parsed.data;
+      
+      // Verify payment was successful
+      const paymentIntent = await stripeService.retrievePaymentIntent(paymentIntentId);
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ error: "Payment not completed", status: paymentIntent.status });
+      }
+      
+      // Get template
+      const template = await storage.getAgentTemplate(templateId);
+      if (!template) {
+        return res.status(404).json({ error: "Template not found" });
+      }
+      
+      // Generate NFT data
+      const tokenId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      const contractAddress = chain === "solana" 
+        ? "AgentNFT" + Math.random().toString(36).substring(7)
+        : "0x" + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join("");
+      
+      const nft = await storage.createAgentNFT({
+        id: `nft-${tokenId}`,
+        templateId,
+        tokenId,
+        contractAddress,
+        chain,
+        ownerAddress,
+        metadata: {
+          name: template.name,
+          description: template.description,
+          image: template.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${template.id}`,
+          attributes: [
+            { trait_type: "Agent Type", value: template.agentType },
+            { trait_type: "Strategy", value: template.strategyType },
+            { trait_type: "Risk Tolerance", value: template.riskTolerance },
+            { trait_type: "Performance Score", value: template.performanceScore },
+            { trait_type: "Success Rate", value: `${template.successRate}%` },
+          ],
+        },
+        stripePaymentIntentId: paymentIntentId,
+        mintFee: paymentIntent.amount,
+      });
+      
+      // Update template deployment count
+      await storage.updateAgentTemplate(templateId, {
+        totalDeployments: template.totalDeployments + 1,
+      });
+      
+      res.status(201).json(nft);
+    } catch (error) {
+      console.error("Failed to confirm mint:", error);
+      res.status(500).json({ error: "Failed to confirm mint" });
     }
   });
 
