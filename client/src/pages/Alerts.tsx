@@ -44,7 +44,7 @@ export default function Alerts() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/alerts/configurations", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/alerts/configurations", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/configurations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/stats"] });
@@ -55,7 +55,7 @@ export default function Alerts() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/alerts/configurations/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/alerts/configurations/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/configurations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/stats"] });
@@ -64,7 +64,10 @@ export default function Alerts() {
   });
 
   const testMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/alerts/configurations/${id}/test`, { method: "POST" }),
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/alerts/configurations/${id}/test`);
+      return res.json();
+    },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/notifications"] });
       toast({
@@ -77,7 +80,7 @@ export default function Alerts() {
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) =>
-      apiRequest(`/api/alerts/configurations/${id}`, { method: "PATCH", body: JSON.stringify({ enabled }) }),
+      apiRequest("PATCH", `/api/alerts/configurations/${id}`, { enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/alerts/configurations"] });
     },
@@ -385,7 +388,7 @@ export default function Alerts() {
                   </div>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {config.alertTypes.map((type) => (
-                      <Badge key={type} variant="secondary" size="sm">
+                      <Badge key={type} variant="secondary">
                         {type.replace(/_/g, " ")}
                       </Badge>
                     ))}

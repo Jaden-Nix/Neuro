@@ -70,7 +70,7 @@ export default function Backtesting() {
   });
 
   const createScenarioMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/backtesting/scenarios", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/backtesting/scenarios", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/scenarios"] });
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/stats"] });
@@ -80,7 +80,7 @@ export default function Backtesting() {
   });
 
   const deleteScenarioMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/backtesting/scenarios/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/backtesting/scenarios/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/scenarios"] });
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/runs"] });
@@ -90,7 +90,7 @@ export default function Backtesting() {
   });
 
   const runBacktestMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/backtesting/runs", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/backtesting/runs", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/runs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/backtesting/stats"] });
@@ -431,7 +431,7 @@ export default function Backtesting() {
                           <div className="space-y-1">
                             {run.decisions.slice(-5).map((decision, idx) => (
                               <div key={idx} className="flex items-center gap-2 text-xs">
-                                <Badge variant="outline" size="sm" className={decision.action === "buy" ? "text-green-500" : decision.action === "sell" ? "text-red-500" : ""}>
+                                <Badge variant="outline" className={decision.action === "buy" ? "text-green-500" : decision.action === "sell" ? "text-red-500" : ""}>
                                   {decision.action}
                                 </Badge>
                                 <span className="text-muted-foreground">{decision.reason}</span>

@@ -32,58 +32,54 @@ export function ControlPanel({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         <Button
-          size="lg"
-          className="h-14 font-display font-semibold"
+          className="h-12 text-sm font-display font-semibold"
           onClick={onRunSimulation}
           disabled={isSimulating}
           data-testid="button-run-simulation"
         >
-          <Play className="w-5 h-5 mr-2" />
-          {isSimulating ? "Simulating..." : "Run Simulation"}
+          <Play className="w-4 h-4 mr-1 flex-shrink-0" />
+          <span className="truncate">{isSimulating ? "Simulating..." : "Run Simulation"}</span>
         </Button>
 
         <Button
-          size="lg"
           variant={autonomousMode ? "destructive" : "default"}
-          className="h-14 font-display font-semibold"
+          className="h-12 text-sm font-display font-semibold"
           onClick={onToggleAutonomous}
           data-testid="button-toggle-autonomous"
         >
           {autonomousMode ? (
             <>
-              <Pause className="w-5 h-5 mr-2" />
-              Stop Autonomous
+              <Pause className="w-4 h-4 mr-1 flex-shrink-0" />
+              <span className="truncate">Stop Auto</span>
             </>
           ) : (
             <>
-              <Zap className="w-5 h-5 mr-2" />
-              Enter Autonomous Mode
+              <Zap className="w-4 h-4 mr-1 flex-shrink-0" />
+              <span className="truncate">Autonomous Mode</span>
             </>
           )}
         </Button>
 
         <Button
-          size="lg"
           variant="outline"
-          className="h-14 font-display font-semibold"
+          className="h-12 text-sm font-display font-semibold"
           onClick={onManualOverride}
           data-testid="button-manual-override"
         >
-          <Hand className="w-5 h-5 mr-2" />
-          Manual Override
+          <Hand className="w-4 h-4 mr-1 flex-shrink-0" />
+          <span className="truncate">Manual Override</span>
         </Button>
 
         <Button
-          size="lg"
           variant="outline"
-          className="h-14 font-display font-semibold"
+          className="h-12 text-sm font-display font-semibold"
           onClick={onReplay}
           data-testid="button-replay"
         >
-          <History className="w-5 h-5 mr-2" />
-          Replay Last Cycle
+          <History className="w-4 h-4 mr-1 flex-shrink-0" />
+          <span className="truncate">Replay Last Cycle</span>
         </Button>
       </div>
 

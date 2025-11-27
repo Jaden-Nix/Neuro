@@ -26,7 +26,7 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
   const subAgents = agents.filter((a) => a.type !== AgentType.META);
 
   return (
-    <div className="relative flex items-center justify-center min-h-[600px]" data-testid="neuronet-core">
+    <div className="relative flex items-center justify-center h-[400px] max-w-[500px] mx-auto" data-testid="neuronet-core">
       {/* Central Meta-Agent Node */}
       <motion.div
         className="relative z-10"
@@ -40,7 +40,7 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
         }}
       >
         <div
-          className="relative w-64 h-64 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-xl border border-primary/30 flex items-center justify-center"
+          className="relative w-40 h-40 md:w-48 md:h-48 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 backdrop-blur-xl border border-primary/30 flex items-center justify-center"
           data-testid="meta-agent-node"
         >
           {/* Pulsing Glow */}
@@ -63,10 +63,10 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
           <div className="absolute inset-8 rounded-full border border-primary/10" />
 
           {/* Icon */}
-          <div className="relative z-10 flex flex-col items-center gap-3">
-            <Brain className="w-20 h-20 text-primary" />
+          <div className="relative z-10 flex flex-col items-center gap-2">
+            <Brain className="w-12 h-12 md:w-16 md:h-16 text-primary" />
             <div className="text-center">
-              <p className="text-lg font-display font-bold text-primary">Meta-Agent</p>
+              <p className="text-sm md:text-base font-display font-bold text-primary">Meta-Agent</p>
               <p className="text-xs text-muted-foreground">
                 {metaAgent?.status || AgentStatus.IDLE}
               </p>
@@ -74,8 +74,8 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
           </div>
 
           {/* Health Indicator */}
-          <div className="absolute bottom-4 right-4 px-3 py-1 rounded-full bg-card/90 backdrop-blur-sm border border-border">
-            <p className="text-xs font-mono">
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-card/90 backdrop-blur-sm border border-border">
+            <p className="text-xs font-mono whitespace-nowrap">
               <span className="text-muted-foreground">Health:</span>{" "}
               <span className="text-primary font-semibold">{systemHealth}%</span>
             </p>
@@ -88,7 +88,7 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
         const Icon = agentIcons[agent.type];
         const colorClass = agentColors[agent.type];
         const angle = (index * 120) - 90; // 3 agents at 120 degrees apart, starting from top
-        const radius = 220;
+        const radius = 150;
         const x = Math.cos((angle * Math.PI) / 180) * radius;
         const y = Math.sin((angle * Math.PI) / 180) * radius;
 
@@ -144,17 +144,17 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
 
               {/* Agent Node */}
               <div
-                className={`relative w-32 h-32 rounded-full bg-gradient-to-br from-card to-card/50 backdrop-blur-lg border-2 ${colorClass} border-opacity-50 flex items-center justify-center hover-elevate cursor-pointer group`}
+                className={`relative w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-card to-card/50 backdrop-blur-lg border-2 ${colorClass} border-opacity-50 flex items-center justify-center hover-elevate cursor-pointer group`}
               >
                 <div className="absolute inset-0 rounded-full bg-gradient-to-br from-transparent to-black/5" />
                 
-                <div className="relative z-10 flex flex-col items-center gap-2">
-                  <Icon className={`w-10 h-10 ${colorClass}`} />
+                <div className="relative z-10 flex flex-col items-center gap-1">
+                  <Icon className={`w-6 h-6 md:w-8 md:h-8 ${colorClass}`} />
                   <div className="text-center">
-                    <p className={`text-sm font-display font-medium ${colorClass}`}>
+                    <p className={`text-xs md:text-sm font-display font-medium ${colorClass}`}>
                       {agent.type.charAt(0).toUpperCase() + agent.type.slice(1)}
                     </p>
-                    <p className="text-xs text-muted-foreground">{agent.status}</p>
+                    <p className="text-[10px] md:text-xs text-muted-foreground">{agent.status}</p>
                   </div>
                 </div>
 
