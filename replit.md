@@ -190,7 +190,8 @@ Preferred communication style: Simple, everyday language.
 7. ✅ RPC retry logic with exponential backoff implemented
 
 ### Known Issues
-- **RPCClient.ts** has 3 pre-existing TypeScript type errors related to viem's bigint exponentiation syntax (lines 88-91, 96-99, 208) - these don't block functionality as they relate to type checking only, not runtime behavior
+- **Anthropic API Credits**: Circuit breaker is active due to low API credits on the Anthropic account - agent decisions fall back to heuristic-based logic until credits are replenished
+- **API Authentication**: Endpoints are unauthenticated when `API_KEY` environment variable is not set (acceptable for development only)
 
 ### Recently Completed (November 27, 2025)
 1. ✅ Solana RPC integration with Helius endpoints
