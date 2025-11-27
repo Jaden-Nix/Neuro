@@ -810,6 +810,302 @@ export const sellerProfiles = pgTable("seller_profiles", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+// ==========================================
+// Alert System Types
+// ==========================================
+
+export type AlertChannel = "email" | "webhook" | "both";
+export type AlertSeverityThreshold = "low" | "medium" | "high" | "critical";
+
+export interface AlertConfiguration {
+  id: string;
+  name: string;
+  enabled: boolean;
+  channel: AlertChannel;
+  emailRecipients: string[];
+  webhookUrl?: string;
+  webhookSecret?: string;
+  severityThreshold: AlertSeverityThreshold;
+  alertTypes: SentinelAlert["alertType"][];
+  cooldownMinutes: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AlertNotification {
+  id: string;
+  configurationId: string;
+  alertId: string;
+  channel: AlertChannel;
+  recipient: string;
+  subject: string;
+  body: string;
+  status: "pending" | "sent" | "failed";
+  sentAt?: number;
+  errorMessage?: string;
+  createdAt: number;
+}
+
+export const alertConfigurations = pgTable("alert_configurations", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  channel: varchar("channel").$type<AlertChannel>().notNull(),
+  emailRecipients: jsonb("email_recipients").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  webhookUrl: varchar("webhook_url"),
+  webhookSecret: varchar("webhook_secret"),
+  severityThreshold: varchar("severity_threshold").$type<AlertSeverityThreshold>().notNull().default("medium"),
+  alertTypes: jsonb("alert_types").$type<SentinelAlert["alertType"][]>().notNull(),
+  cooldownMinutes: integer("cooldown_minutes").notNull().default(15),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const alertNotifications = pgTable("alert_notifications", {
+  id: varchar("id").primaryKey(),
+  configurationId: varchar("configuration_id").notNull(),
+  alertId: varchar("alert_id").notNull(),
+  channel: varchar("channel").$type<AlertChannel>().notNull(),
+  recipient: varchar("recipient").notNull(),
+  subject: varchar("subject").notNull(),
+  body: text("body").notNull(),
+  status: varchar("status").$type<"pending" | "sent" | "failed">().notNull().default("pending"),
+  sentAt: timestamp("sent_at"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ==========================================
+// Strategy Backtesting Types
+// ==========================================
+
+export interface HistoricalDataPoint {
+  timestamp: number;
+  price: number;
+  volume: number;
+  tvl: number;
+  gasPrice: number;
+  volatility: number;
+}
+
+export interface BacktestScenario {
+  id: string;
+  name: string;
+  description: string;
+  startTimestamp: number;
+  endTimestamp: number;
+  dataPoints: HistoricalDataPoint[];
+  chain: "ethereum" | "base" | "fraxtal" | "solana";
+  createdAt: number;
+}
+
+export interface BacktestRun {
+  id: string;
+  scenarioId: string;
+  agentId?: string;
+  strategyConfig: Record<string, any>;
+  status: "pending" | "running" | "completed" | "failed";
+  startedAt: number;
+  completedAt?: number;
+  initialBalance: number;
+  finalBalance: number;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  maxDrawdown: number;
+  sharpeRatio: number;
+  profitFactor: number;
+  decisions: BacktestDecision[];
+  errorMessage?: string;
+}
+
+export interface BacktestDecision {
+  timestamp: number;
+  action: "buy" | "sell" | "hold" | "rebalance";
+  amount: number;
+  price: number;
+  reason: string;
+  agentType: AgentType;
+  confidence: number;
+  pnl: number;
+}
+
+export interface BacktestComparison {
+  id: string;
+  runIds: string[];
+  bestPerformingRun: string;
+  metrics: {
+    runId: string;
+    totalReturn: number;
+    maxDrawdown: number;
+    sharpeRatio: number;
+    winRate: number;
+  }[];
+  createdAt: number;
+}
+
+export const backtestScenarios = pgTable("backtest_scenarios", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description").notNull(),
+  startTimestamp: timestamp("start_timestamp").notNull(),
+  endTimestamp: timestamp("end_timestamp").notNull(),
+  dataPoints: jsonb("data_points").$type<HistoricalDataPoint[]>().notNull(),
+  chain: varchar("chain").$type<"ethereum" | "base" | "fraxtal" | "solana">().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const backtestRuns = pgTable("backtest_runs", {
+  id: varchar("id").primaryKey(),
+  scenarioId: varchar("scenario_id").notNull(),
+  agentId: varchar("agent_id"),
+  strategyConfig: jsonb("strategy_config").$type<Record<string, any>>().notNull(),
+  status: varchar("status").$type<"pending" | "running" | "completed" | "failed">().notNull().default("pending"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  initialBalance: integer("initial_balance").notNull(),
+  finalBalance: integer("final_balance").notNull().default(0),
+  totalTrades: integer("total_trades").notNull().default(0),
+  winningTrades: integer("winning_trades").notNull().default(0),
+  losingTrades: integer("losing_trades").notNull().default(0),
+  maxDrawdown: integer("max_drawdown").notNull().default(0),
+  sharpeRatio: integer("sharpe_ratio").notNull().default(0),
+  profitFactor: integer("profit_factor").notNull().default(0),
+  decisions: jsonb("decisions").$type<BacktestDecision[]>().notNull().default(sql`'[]'::jsonb`),
+  errorMessage: text("error_message"),
+});
+
+// ==========================================
+// Multi-Wallet Support Types
+// ==========================================
+
+export type WalletChain = "ethereum" | "base" | "fraxtal" | "solana";
+export type WalletProvider = "metamask" | "walletconnect" | "coinbase" | "phantom" | "solflare" | "ledger" | "manual";
+
+export interface TrackedWallet {
+  id: string;
+  address: string;
+  label: string;
+  chain: WalletChain;
+  provider: WalletProvider;
+  isConnected: boolean;
+  isPrimary: boolean;
+  balanceNative: string;
+  balanceUsd: number;
+  tokenBalances: WalletTokenBalance[];
+  lastSyncedAt: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface WalletTokenBalance {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  balance: string;
+  balanceUsd: number;
+  logoUrl?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  hash: string;
+  chain: WalletChain;
+  type: "send" | "receive" | "swap" | "approve" | "stake" | "unstake" | "contract";
+  from: string;
+  to: string;
+  value: string;
+  valueUsd: number;
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  gasUsed?: string;
+  gasPriceGwei?: string;
+  status: "pending" | "confirmed" | "failed";
+  blockNumber?: number;
+  timestamp: number;
+}
+
+export interface WalletAggregate {
+  totalWallets: number;
+  totalBalanceUsd: number;
+  balanceByChain: Record<WalletChain, number>;
+  topTokens: { symbol: string; totalUsd: number; percentage: number }[];
+  lastUpdated: number;
+}
+
+export const trackedWallets = pgTable("tracked_wallets", {
+  id: varchar("id").primaryKey(),
+  address: varchar("address").notNull(),
+  label: varchar("label").notNull(),
+  chain: varchar("chain").$type<WalletChain>().notNull(),
+  provider: varchar("provider").$type<WalletProvider>().notNull(),
+  isConnected: boolean("is_connected").notNull().default(false),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  balanceNative: varchar("balance_native").notNull().default("0"),
+  balanceUsd: integer("balance_usd").notNull().default(0),
+  tokenBalances: jsonb("token_balances").$type<WalletTokenBalance[]>().notNull().default(sql`'[]'::jsonb`),
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: varchar("id").primaryKey(),
+  walletId: varchar("wallet_id").notNull(),
+  hash: varchar("hash").notNull(),
+  chain: varchar("chain").$type<WalletChain>().notNull(),
+  type: varchar("type").$type<"send" | "receive" | "swap" | "approve" | "stake" | "unstake" | "contract">().notNull(),
+  fromAddress: varchar("from_address").notNull(),
+  toAddress: varchar("to_address").notNull(),
+  value: varchar("value").notNull(),
+  valueUsd: integer("value_usd").notNull().default(0),
+  tokenAddress: varchar("token_address"),
+  tokenSymbol: varchar("token_symbol"),
+  gasUsed: varchar("gas_used"),
+  gasPriceGwei: varchar("gas_price_gwei"),
+  status: varchar("status").$type<"pending" | "confirmed" | "failed">().notNull(),
+  blockNumber: integer("block_number"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+// Insert schemas for new features
+export const insertAlertConfigurationSchema = createInsertSchema(alertConfigurations).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBacktestScenarioSchema = createInsertSchema(backtestScenarios).omit({
+  createdAt: true,
+});
+
+export const insertBacktestRunSchema = createInsertSchema(backtestRuns).omit({
+  startedAt: true,
+  completedAt: true,
+  finalBalance: true,
+  totalTrades: true,
+  winningTrades: true,
+  losingTrades: true,
+  maxDrawdown: true,
+  sharpeRatio: true,
+  profitFactor: true,
+  decisions: true,
+});
+
+export const insertTrackedWalletSchema = createInsertSchema(trackedWallets).omit({
+  createdAt: true,
+  updatedAt: true,
+  lastSyncedAt: true,
+  tokenBalances: true,
+});
+
+// Type exports for new features
+export type InsertAlertConfiguration = z.infer<typeof insertAlertConfigurationSchema>;
+export type InsertBacktestScenario = z.infer<typeof insertBacktestScenarioSchema>;
+export type InsertBacktestRun = z.infer<typeof insertBacktestRunSchema>;
+export type InsertTrackedWallet = z.infer<typeof insertTrackedWalletSchema>;
+
 // Insert schemas for marketplace
 export const insertAgentTemplateSchema = createInsertSchema(agentTemplates).omit({ 
   createdAt: true, 
