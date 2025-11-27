@@ -3,6 +3,7 @@ import { AgentType, PersonalityTrait, MEVRiskMetrics } from "@shared/schema";
 import { flashbotsClient } from "../blockchain/FlashbotsClient";
 import { parseEther } from "viem";
 import Anthropic from "@anthropic-ai/sdk";
+import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -266,10 +267,6 @@ export class RiskAgent extends BaseAgent {
   }
 
   private async assessRisk(input: RiskInput): Promise<any> {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return this.fallbackRiskAssessment(input);
-    }
-
     const prompt = `You are the Risk Agent, a cautious and formal AI evaluator for DeFi safety.
 
 Proposal: ${JSON.stringify(input.proposal)}
@@ -291,28 +288,28 @@ Respond with JSON:
   "recommendations": ["string"]
 }`;
 
-    try {
-      const message = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 1024,
-        temperature: 0.3,
-        messages: [{ role: "user", content: prompt }],
-      });
+    return await anthropicCircuitBreaker.execute(
+      async () => {
+        const message = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 1024,
+          temperature: 0.3,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-      const content = message.content[0];
-      if (content.type === "text") {
-        try {
-          return JSON.parse(content.text);
-        } catch {
-          return this.fallbackRiskAssessment(input);
+        const content = message.content[0];
+        if (content.type === "text") {
+          try {
+            return JSON.parse(content.text);
+          } catch {
+            return this.fallbackRiskAssessment(input);
+          }
         }
-      }
-    } catch (error) {
-      console.error("[RiskAgent] AI assessment failed:", error);
-      return this.fallbackRiskAssessment(input);
-    }
-
-    throw new Error("Unexpected response from Risk Agent");
+        
+        throw new Error("Unexpected response from Risk Agent");
+      },
+      () => this.fallbackRiskAssessment(input)
+    );
   }
 
   private fallbackRiskAssessment(input: RiskInput): any {

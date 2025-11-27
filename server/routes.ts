@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
@@ -12,6 +12,9 @@ import { AutonomousCycleManager } from "./autonomous/AutonomousCycleManager";
 import { transactionManager } from "./execution/TransactionManager";
 import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
 import type { WSMessage, LogEntry } from "@shared/schema";
+import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
+import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
+import { anthropicCircuitBreaker } from "./utils/circuitBreaker";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -144,6 +147,12 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Initialize API key authentication
+  initializeApiKeys();
+
+  // Apply global rate limiting to all API routes
+  app.use("/api", rateLimit);
+
   // Initialize agents in storage
   const agents = orchestrator.getAllAgents();
   for (const agent of agents) {
@@ -171,7 +180,7 @@ export async function registerRoutes(
     );
   });
 
-  // System State
+  // System State (read endpoints with optional auth - returns limited data without auth)
   app.get("/api/system/state", async (_req, res) => {
     try {
       const state = await storage.getSystemState();
@@ -269,7 +278,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/simulate", async (req, res) => {
+  app.post("/api/simulate", requireWriteAuth, writeLimiter, async (req, res) => {
     try {
       const config = {
         timeHorizon: req.body.timeHorizon || 60,
@@ -292,7 +301,7 @@ export async function registerRoutes(
 
   // Synchronous simulation run - returns results directly
   // Note: Simulation persistence is handled by simulationCompleted event handler
-  app.post("/api/simulations/run", async (req, res) => {
+  app.post("/api/simulations/run", requireWriteAuth, writeLimiter, async (req, res) => {
     try {
       const config = {
         timeHorizon: req.body.timeHorizon || 60,
@@ -345,8 +354,8 @@ export async function registerRoutes(
     }
   });
 
-  // Control Endpoints
-  app.post("/api/autonomous/toggle", async (_req, res) => {
+  // Control Endpoints (require authentication for write operations)
+  app.post("/api/autonomous/toggle", requireWriteAuth, writeLimiter, async (_req, res) => {
     try {
       const state = await storage.getSystemState();
       const newMode = !state.autonomousMode;
@@ -383,8 +392,20 @@ export async function registerRoutes(
     }
   });
 
+  // Get circuit breaker status
+  app.get("/api/health/circuit-breakers", async (_req, res) => {
+    try {
+      res.json({
+        anthropic: anthropicCircuitBreaker.getStats(),
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get circuit breaker status" });
+    }
+  });
+
   // Manually trigger a single negotiation cycle
-  app.post("/api/autonomous/trigger", async (_req, res) => {
+  app.post("/api/autonomous/trigger", requireWriteAuth, writeLimiter, async (_req, res) => {
     try {
       const result = await orchestrator.runNegotiationCycle({
         timestamp: Date.now(),
@@ -399,8 +420,8 @@ export async function registerRoutes(
     }
   });
 
-  // Transaction Execution Endpoints
-  app.post("/api/execute", async (req, res) => {
+  // Transaction Execution Endpoints (require authentication)
+  app.post("/api/execute", requireWriteAuth, strictLimiter, async (req, res) => {
     try {
       const proposal = transactionManager.validateProposal(req.body.proposal || {});
       const executionPlan = transactionManager.validateExecutionPlan(req.body.executionPlan || {});
@@ -424,7 +445,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/execute/:txId/submit", async (req, res) => {
+  app.post("/api/execute/:txId/submit", requireWriteAuth, strictLimiter, async (req, res) => {
     try {
       const { txId } = req.params;
       const { signedHash } = req.body;
@@ -448,7 +469,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/execute/:txId/confirm", async (req, res) => {
+  app.post("/api/execute/:txId/confirm", requireWriteAuth, async (req, res) => {
     try {
       const { txId } = req.params;
       const { blockNumber, gasUsed } = req.body;
@@ -529,7 +550,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/selfhealing/check", async (_req, res) => {
+  app.post("/api/selfhealing/check", requireWriteAuth, async (_req, res) => {
     try {
       orchestrator.checkForDeprecation();
       res.json({ success: true, message: "Health check completed" });
@@ -598,10 +619,17 @@ export async function registerRoutes(
   app.get("/api/solana/wallet/health", async (req, res) => {
     try {
       const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const { PublicKey } = await import("@solana/web3.js");
       const address = req.query.address as string;
       
       if (!address) {
         return res.status(400).json({ error: "Wallet address required" });
+      }
+
+      try {
+        new PublicKey(address);
+      } catch {
+        return res.status(400).json({ error: "Invalid Solana wallet address format" });
       }
 
       const health = await solanaRpcClient.monitorWalletHealth(address);
