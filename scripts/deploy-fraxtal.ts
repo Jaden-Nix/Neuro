@@ -4,16 +4,17 @@ import solc from 'solc';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const fraxtal = defineChain({
-  id: 252,
-  name: 'Fraxtal',
+const fraxtalTestnet = defineChain({
+  id: 2522,
+  name: 'Fraxtal Testnet',
   nativeCurrency: { name: 'Frax Ether', symbol: 'frxETH', decimals: 18 },
   rpcUrls: {
-    default: { http: ['https://rpc.frax.com'] },
+    default: { http: ['https://rpc.testnet.frax.com'] },
   },
   blockExplorers: {
-    default: { name: 'Fraxscan', url: 'https://fraxscan.com' },
+    default: { name: 'Fraxscan Testnet', url: 'https://holesky.fraxscan.com' },
   },
+  testnet: true,
 });
 
 function compileContract(contractName: string): { abi: any; bytecode: string } {
@@ -81,28 +82,27 @@ async function main() {
 
   if (!privateKey) {
     console.error('ERROR: DEPLOYER_PRIVATE_KEY environment variable not set');
-    console.log('\nTo deploy, you need a wallet with frxETH on Fraxtal.');
-    console.log('Set the DEPLOYER_PRIVATE_KEY secret with your wallet private key.');
+    console.log('\nTo deploy, set the DEPLOYER_PRIVATE_KEY secret.');
     process.exit(1);
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
 
   console.log('========================================');
-  console.log('NEURONET FRAXTAL DEPLOYMENT');
+  console.log('NEURONET FRAXTAL TESTNET DEPLOYMENT');
   console.log('========================================');
-  console.log(`Network: Fraxtal (Chain ID: 252)`);
+  console.log(`Network: Fraxtal Testnet (Chain ID: 2522)`);
   console.log(`Deployer: ${account.address}`);
   console.log('');
 
   const publicClient = createPublicClient({
-    chain: fraxtal,
+    chain: fraxtalTestnet,
     transport: http(),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: fraxtal,
+    chain: fraxtalTestnet,
     transport: http(),
   });
 
@@ -110,8 +110,8 @@ async function main() {
   console.log(`Balance: ${Number(balance) / 1e18} frxETH`);
 
   if (balance === 0n) {
-    console.error('\nERROR: Wallet has no frxETH for gas fees!');
-    console.log('Get frxETH from: https://app.frax.finance/frxeth/mint');
+    console.error('\nERROR: Wallet has no testnet frxETH!');
+    console.log('Get testnet frxETH from Fraxtal faucet');
     process.exit(1);
   }
 
@@ -136,26 +136,26 @@ async function main() {
   console.log('\n========================================');
   console.log('DEPLOYMENT COMPLETE!');
   console.log('========================================');
-  console.log('\nDeployed Contract Addresses:');
+  console.log('\nDeployed Contract Addresses (Fraxtal Testnet):');
   for (const [name, address] of Object.entries(deployedAddresses)) {
     console.log(`  ${name}: ${address}`);
-    console.log(`    Explorer: https://fraxscan.com/address/${address}`);
+    console.log(`    Explorer: https://holesky.fraxscan.com/address/${address}`);
   }
 
   const deploymentRecord = {
-    network: 'fraxtal',
-    chainId: 252,
+    network: 'fraxtal-testnet',
+    chainId: 2522,
     deployedAt: new Date().toISOString(),
     deployer: account.address,
     contracts: deployedAddresses,
   };
 
   fs.writeFileSync(
-    'deployment-fraxtal.json',
+    'deployment-fraxtal-testnet.json',
     JSON.stringify(deploymentRecord, null, 2)
   );
 
-  console.log('\nDeployment record saved to: deployment-fraxtal.json');
+  console.log('\nDeployment record saved to: deployment-fraxtal-testnet.json');
   console.log('\nAdd these to your hackathon submission!');
 }
 
