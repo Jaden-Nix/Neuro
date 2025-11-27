@@ -1,21 +1,9 @@
-import { createWalletClient, createPublicClient, http, defineChain } from 'viem';
+import { createWalletClient, createPublicClient, http } from 'viem';
+import { sepolia } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import solc from 'solc';
 import * as fs from 'fs';
 import * as path from 'path';
-
-const fraxtalTestnet = defineChain({
-  id: 2522,
-  name: 'Fraxtal Testnet',
-  nativeCurrency: { name: 'Frax Ether', symbol: 'frxETH', decimals: 18 },
-  rpcUrls: {
-    default: { http: ['https://rpc.testnet.frax.com'] },
-  },
-  blockExplorers: {
-    default: { name: 'Fraxscan Testnet', url: 'https://holesky.fraxscan.com' },
-  },
-  testnet: true,
-});
 
 function compileContract(contractName: string): { abi: any; bytecode: string } {
   const contractPath = path.join(process.cwd(), 'contracts', `${contractName}.sol`);
@@ -82,36 +70,34 @@ async function main() {
 
   if (!privateKey) {
     console.error('ERROR: DEPLOYER_PRIVATE_KEY environment variable not set');
-    console.log('\nTo deploy, set the DEPLOYER_PRIVATE_KEY secret.');
     process.exit(1);
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
 
   console.log('========================================');
-  console.log('NEURONET FRAXTAL TESTNET DEPLOYMENT');
+  console.log('NEURONET SEPOLIA DEPLOYMENT');
   console.log('========================================');
-  console.log(`Network: Fraxtal Testnet (Chain ID: 2522)`);
+  console.log(`Network: Sepolia Testnet (Chain ID: 11155111)`);
   console.log(`Deployer: ${account.address}`);
   console.log('');
 
   const publicClient = createPublicClient({
-    chain: fraxtalTestnet,
+    chain: sepolia,
     transport: http(),
   });
 
   const walletClient = createWalletClient({
     account,
-    chain: fraxtalTestnet,
+    chain: sepolia,
     transport: http(),
   });
 
   const balance = await publicClient.getBalance({ address: account.address });
-  console.log(`Balance: ${Number(balance) / 1e18} frxETH`);
+  console.log(`Balance: ${Number(balance) / 1e18} ETH`);
 
   if (balance === 0n) {
-    console.error('\nERROR: Wallet has no testnet frxETH!');
-    console.log('Get testnet frxETH from Fraxtal faucet');
+    console.error('\nERROR: Wallet has no Sepolia ETH!');
     process.exit(1);
   }
 
@@ -136,27 +122,27 @@ async function main() {
   console.log('\n========================================');
   console.log('DEPLOYMENT COMPLETE!');
   console.log('========================================');
-  console.log('\nDeployed Contract Addresses (Fraxtal Testnet):');
+  console.log('\nDeployed Contract Addresses (Sepolia):');
   for (const [name, address] of Object.entries(deployedAddresses)) {
     console.log(`  ${name}: ${address}`);
-    console.log(`    Explorer: https://holesky.fraxscan.com/address/${address}`);
+    console.log(`    Explorer: https://sepolia.etherscan.io/address/${address}`);
   }
 
   const deploymentRecord = {
-    network: 'fraxtal-testnet',
-    chainId: 2522,
+    network: 'sepolia',
+    chainId: 11155111,
     deployedAt: new Date().toISOString(),
     deployer: account.address,
     contracts: deployedAddresses,
   };
 
   fs.writeFileSync(
-    'deployment-fraxtal-testnet.json',
+    'deployment-sepolia.json',
     JSON.stringify(deploymentRecord, null, 2)
   );
 
-  console.log('\nDeployment record saved to: deployment-fraxtal-testnet.json');
-  console.log('\nAdd these to your hackathon submission!');
+  console.log('\nDeployment record saved to: deployment-sepolia.json');
+  console.log('\nAdd these addresses to your hackathon submission!');
 }
 
 main().catch(console.error);
