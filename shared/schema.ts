@@ -134,6 +134,63 @@ export interface ChainTransaction {
   timestamp: number;
 }
 
+// MEV Protection Types
+export interface MEVRiskMetrics {
+  sandwichRisk: number;
+  frontrunRisk: number;
+  backrunRisk: number;
+  overallRiskScore: number;
+  riskLevel: "low" | "medium" | "high" | "critical";
+  estimatedMEVLoss: number;
+  recommendations: string[];
+}
+
+export interface MEVProtectionStatus {
+  flashbotsEnabled: boolean;
+  privateMempoolEnabled: boolean;
+  defaultSlippage: number;
+  protectedTransactions: number;
+  mevSaved: number;
+}
+
+// Solana Types
+export interface SolanaMetrics {
+  walletBalanceSol: number;
+  solPriceUsd: number;
+  totalValueUsd: number;
+  slot: number;
+  tokenBalances: Array<{
+    mint: string;
+    symbol?: string;
+    amount: number;
+    decimals: number;
+  }>;
+}
+
+export interface JupiterSwapQuote {
+  inputMint: string;
+  outputMint: string;
+  inAmount: string;
+  outAmount: string;
+  priceImpactPct: number;
+  routeDescription: string;
+}
+
+export interface MarinadeStakingMetrics {
+  totalStakedSol: number;
+  msolPrice: number;
+  apy: number;
+  validatorCount: number;
+}
+
+export interface OrcaPoolInfo {
+  poolAddress: string;
+  tokenA: string;
+  tokenB: string;
+  tvlUsd: number;
+  feeApr: number;
+}
+
 // Agent Schema
 export interface Agent {
   id: string;
@@ -171,7 +228,7 @@ export interface LiveMetrics {
 
 // WebSocket Message Types
 export interface WSMessage {
-  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits";
+  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits" | "autonomousCycle" | "transactionMonitor" | "selfHealing";
   data: any;
   timestamp: number;
 }
@@ -287,20 +344,3 @@ export const chainTransactions = pgTable("chain_transactions", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
-// Type exports for frontend use
-export type {
-  Agent,
-  SystemState,
-  LiveMetrics,
-  SimulationBranch,
-  CreditTransaction,
-  AgentCreditScore,
-  MemoryEntry,
-  NegotiationProposal,
-  NegotiationResult,
-  SentinelAlert,
-  ReplayEvent,
-  ChainTransaction,
-  LogEntry,
-  WSMessage
-};

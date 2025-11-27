@@ -538,6 +538,175 @@ export async function registerRoutes(
     }
   });
 
+  // Solana RPC Endpoints
+  app.get("/api/solana/metrics", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const walletAddress = req.query.wallet as string | undefined;
+      const metrics = await solanaRpcClient.getOnChainMetrics(walletAddress);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Failed to get Solana metrics:", error);
+      res.status(500).json({ error: "Failed to get Solana metrics" });
+    }
+  });
+
+  app.get("/api/solana/jupiter/quote", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const { inputMint, outputMint, amount, slippageBps } = req.query;
+      
+      if (!inputMint || !outputMint || !amount) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const route = await solanaRpcClient.getJupiterSwapRoute(
+        inputMint as string,
+        outputMint as string,
+        parseInt(amount as string),
+        slippageBps ? parseInt(slippageBps as string) : 50
+      );
+      res.json(route);
+    } catch (error) {
+      console.error("Failed to get Jupiter quote:", error);
+      res.status(500).json({ error: "Failed to get Jupiter quote" });
+    }
+  });
+
+  app.get("/api/solana/marinade/metrics", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const metrics = await solanaRpcClient.getMarinadeMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Failed to get Marinade metrics:", error);
+      res.status(500).json({ error: "Failed to get Marinade metrics" });
+    }
+  });
+
+  app.get("/api/solana/orca/pools", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const pools = await solanaRpcClient.getTopOrcaPools();
+      res.json(pools);
+    } catch (error) {
+      console.error("Failed to get Orca pools:", error);
+      res.status(500).json({ error: "Failed to get Orca pools" });
+    }
+  });
+
+  app.get("/api/solana/wallet/health", async (req, res) => {
+    try {
+      const { solanaRpcClient } = await import("./blockchain/SolanaRPCClient");
+      const address = req.query.address as string;
+      
+      if (!address) {
+        return res.status(400).json({ error: "Wallet address required" });
+      }
+
+      const health = await solanaRpcClient.monitorWalletHealth(address);
+      res.json(health);
+    } catch (error) {
+      console.error("Failed to check wallet health:", error);
+      res.status(500).json({ error: "Failed to check wallet health" });
+    }
+  });
+
+  // MEV Protection Endpoints
+  app.get("/api/mev/status", async (_req, res) => {
+    try {
+      const { flashbotsClient } = await import("./blockchain/FlashbotsClient");
+      const status = flashbotsClient.getProtectionStatus();
+      res.json({
+        ...status,
+        protectedTransactions: 0,
+        mevSaved: 0,
+      });
+    } catch (error) {
+      console.error("Failed to get MEV status:", error);
+      res.status(500).json({ error: "Failed to get MEV protection status" });
+    }
+  });
+
+  app.post("/api/mev/analyze", async (req, res) => {
+    try {
+      const { flashbotsClient } = await import("./blockchain/FlashbotsClient");
+      const { parseEther } = await import("viem");
+      const { txValue, txTo, txData } = req.body;
+      
+      if (!txValue || !txTo) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const value = parseEther(txValue);
+      const analysis = await flashbotsClient.analyzeMEVRisk(value, txTo, txData);
+      res.json(analysis);
+    } catch (error) {
+      console.error("Failed to analyze MEV risk:", error);
+      res.status(500).json({ error: "Failed to analyze MEV risk" });
+    }
+  });
+
+  app.post("/api/mev/protection-strategy", async (req, res) => {
+    try {
+      const { flashbotsClient } = await import("./blockchain/FlashbotsClient");
+      const { parseEther } = await import("viem");
+      const { txValue, mevRisk } = req.body;
+      
+      if (!txValue || !mevRisk) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const value = parseEther(txValue);
+      const strategy = flashbotsClient.calculateOptimalProtectionStrategy(value, mevRisk);
+      res.json(strategy);
+    } catch (error) {
+      console.error("Failed to calculate protection strategy:", error);
+      res.status(500).json({ error: "Failed to calculate protection strategy" });
+    }
+  });
+
+  app.post("/api/mev/assess-transaction", async (req, res) => {
+    try {
+      const { RiskAgent } = await import("./agents/RiskAgent");
+      const riskAgent = new RiskAgent();
+      const { txValue, txTo, txData, slippageTolerance } = req.body;
+      
+      if (!txValue || !txTo) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const assessment = await riskAgent.assessTransactionSafety(
+        txValue,
+        txTo,
+        txData,
+        slippageTolerance || 50
+      );
+      res.json(assessment);
+    } catch (error) {
+      console.error("Failed to assess transaction:", error);
+      res.status(500).json({ error: "Failed to assess transaction safety" });
+    }
+  });
+
+  app.post("/api/mev/estimate-loss", async (req, res) => {
+    try {
+      const { RiskAgent } = await import("./agents/RiskAgent");
+      const riskAgent = new RiskAgent();
+      const { txValue, mevRisk } = req.body;
+      
+      if (!txValue || !mevRisk) {
+        return res.status(400).json({ error: "Missing required parameters" });
+      }
+
+      const estimate = riskAgent.calculateMEVLossEstimate(txValue, mevRisk);
+      res.json(estimate);
+    } catch (error) {
+      console.error("Failed to estimate MEV loss:", error);
+      res.status(500).json({ error: "Failed to estimate MEV loss" });
+    }
+  });
+
   // Setup transaction event listeners
   transactionManager.on("transactionCreated", (tx) => {
     broadcastToClients({

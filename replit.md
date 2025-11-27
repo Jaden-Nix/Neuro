@@ -192,12 +192,26 @@ Preferred communication style: Simple, everyday language.
 ### Known Issues
 - **RPCClient.ts** has 3 pre-existing TypeScript type errors related to viem's bigint exponentiation syntax (lines 88-91, 96-99, 208) - these don't block functionality as they relate to type checking only, not runtime behavior
 
+### Recently Completed (November 27, 2025)
+1. ✅ Solana RPC integration with Helius endpoints
+2. ✅ Jupiter swap quote functionality
+3. ✅ Marinade staking metrics integration
+4. ✅ Orca liquidity pool analysis
+5. ✅ Flashbots MEV protection client
+6. ✅ Private transaction relay for sandwich attack protection
+7. ✅ MEV risk scoring and detection in RiskAgent
+8. ✅ API routes for Solana metrics (/api/solana/*)
+9. ✅ API routes for MEV protection (/api/mev/*)
+10. ✅ MEV Protection Dashboard with real-time visualization
+11. ✅ Solana Metrics Dashboard
+
 ### Remaining Work
-1. Solana/Helius RPC integration (blockchain support extension)
-2. Advanced simulation parameter tuning
-3. Performance optimization for large-scale Monte Carlo runs
-4. Extended testing suite for agent negotiation edge cases
-5. Frontend dashboard enhancements for Monte Carlo result visualization
+1. Phantom/Solflare wallet integration for Solana
+2. Database migrations for new schema types
+3. Advanced simulation parameter tuning
+4. Performance optimization for large-scale Monte Carlo runs
+5. Extended testing suite for agent negotiation edge cases
+6. Frontend dashboard enhancements for Monte Carlo result visualization
 
 ### Development Notes
 - **API Key Configuration**: All agents use `ANTHROPIC_API_KEY` environment variable directly
