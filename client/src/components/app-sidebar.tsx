@@ -28,7 +28,7 @@ const menuItems = [
     testId: "nav-dashboard",
   },
   {
-    title: "ML Insights",
+    title: "AI Insights",
     url: "/ml",
     icon: Brain,
     testId: "nav-ml",

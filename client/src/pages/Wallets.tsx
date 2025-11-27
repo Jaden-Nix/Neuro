@@ -63,7 +63,7 @@ export default function Wallets() {
   });
 
   const addMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("/api/wallets", { method: "POST", body: JSON.stringify(data) }),
+    mutationFn: async (data: any) => apiRequest("POST", "/api/wallets", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/aggregate"] });
@@ -78,7 +78,7 @@ export default function Wallets() {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/wallets/${id}`, { method: "DELETE" }),
+    mutationFn: async (id: string) => apiRequest("DELETE", `/api/wallets/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/aggregate"] });
@@ -88,7 +88,7 @@ export default function Wallets() {
   });
 
   const syncMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/wallets/${id}/sync`, { method: "POST" }),
+    mutationFn: async (id: string) => apiRequest("POST", `/api/wallets/${id}/sync`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/aggregate"] });
@@ -97,7 +97,7 @@ export default function Wallets() {
   });
 
   const syncAllMutation = useMutation({
-    mutationFn: async () => apiRequest("/api/wallets/sync-all", { method: "POST" }),
+    mutationFn: async () => apiRequest("POST", "/api/wallets/sync-all"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/aggregate"] });
@@ -106,7 +106,7 @@ export default function Wallets() {
   });
 
   const connectMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/wallets/${id}/connect`, { method: "POST" }),
+    mutationFn: async (id: string) => apiRequest("POST", `/api/wallets/${id}/connect`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/stats"] });
@@ -114,7 +114,7 @@ export default function Wallets() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: async (id: string) => apiRequest(`/api/wallets/${id}/disconnect`, { method: "POST" }),
+    mutationFn: async (id: string) => apiRequest("POST", `/api/wallets/${id}/disconnect`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallets/stats"] });
@@ -123,7 +123,7 @@ export default function Wallets() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<TrackedWallet> }) =>
-      apiRequest(`/api/wallets/${id}`, { method: "PATCH", body: JSON.stringify(updates) }),
+      apiRequest("PATCH", `/api/wallets/${id}`, updates),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/wallets"] });
     },

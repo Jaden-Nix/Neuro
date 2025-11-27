@@ -149,8 +149,8 @@ export function MLInsightsDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-bold" data-testid="text-ml-title">ML Pattern Recognition</h2>
-          <p className="text-muted-foreground">AI-powered market analysis and opportunity scoring</p>
+          <h2 className="text-2xl font-bold" data-testid="text-ml-title">AI Insights</h2>
+          <p className="text-muted-foreground">AI-powered market analysis, pattern recognition, and opportunity scoring</p>
         </div>
         <Button 
           onClick={() => clusterMutation.mutate()}

@@ -13,6 +13,7 @@ import { transactionManager } from "./execution/TransactionManager";
 import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
 import { mlPatternRecognition } from "./ml/MLPatternRecognition";
 import { governanceSystem } from "./governance/GovernanceSystem";
+import { PersonalityTrait } from "@shared/schema";
 import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
@@ -170,6 +171,122 @@ export async function registerRoutes(
   const agents = orchestrator.getAllAgents();
   for (const agent of agents) {
     await storage.upsertAgent(agent);
+  }
+
+  // Seed marketplace with agent templates if empty
+  const existingTemplates = await storage.getAgentTemplates({});
+  if (existingTemplates.length === 0) {
+    const seedTemplates = [
+      {
+        name: "Alpha Scout Pro",
+        description: "Advanced opportunity detection agent specializing in DeFi arbitrage and yield farming opportunities. Uses ML-powered pattern recognition to identify profitable trades across multiple DEXes.",
+        agentType: "scout" as const,
+        strategyType: "arbitrage" as const,
+        riskTolerance: "moderate" as const,
+        personality: [PersonalityTrait.CURIOUS, PersonalityTrait.PRECISE, PersonalityTrait.CALM],
+        basePrice: 9900,
+        rentalPricePerDay: 499,
+        yieldSharePercent: 15,
+        successRate: 72,
+        avgReturn: 9,
+        featured: true,
+        createdBy: "neuronet-platform",
+      },
+      {
+        name: "Risk Guardian",
+        description: "Conservative risk management agent that protects portfolios from excessive drawdowns. Implements stop-loss strategies and position sizing based on volatility analysis.",
+        agentType: "risk" as const,
+        strategyType: "yield_farming" as const,
+        riskTolerance: "conservative" as const,
+        personality: [PersonalityTrait.CAUTIOUS, PersonalityTrait.PRECISE, PersonalityTrait.COLD],
+        basePrice: 7500,
+        rentalPricePerDay: 349,
+        yieldSharePercent: 10,
+        successRate: 85,
+        avgReturn: 5,
+        featured: true,
+        createdBy: "neuronet-platform",
+      },
+      {
+        name: "Momentum Trader",
+        description: "Aggressive trend-following agent that capitalizes on market momentum. Uses technical indicators and volume analysis to ride price trends.",
+        agentType: "execution" as const,
+        strategyType: "trend_following" as const,
+        riskTolerance: "aggressive" as const,
+        personality: [PersonalityTrait.ENERGETIC, PersonalityTrait.SOVEREIGN, PersonalityTrait.CURIOUS],
+        basePrice: 12500,
+        rentalPricePerDay: 699,
+        yieldSharePercent: 20,
+        successRate: 65,
+        avgReturn: 15,
+        featured: false,
+        createdBy: "neuronet-platform",
+      },
+      {
+        name: "Yield Optimizer",
+        description: "Specializes in finding and optimizing yield farming positions across DeFi protocols. Auto-compounds rewards and rebalances for maximum APY.",
+        agentType: "scout" as const,
+        strategyType: "yield_farming" as const,
+        riskTolerance: "moderate" as const,
+        personality: [PersonalityTrait.CALM, PersonalityTrait.PRECISE, PersonalityTrait.CURIOUS],
+        basePrice: 8500,
+        rentalPricePerDay: 399,
+        yieldSharePercent: 12,
+        successRate: 78,
+        avgReturn: 12,
+        featured: true,
+        createdBy: "neuronet-platform",
+      },
+      {
+        name: "Liquidity Provider",
+        description: "Manages liquidity positions across AMMs. Monitors impermanent loss and optimizes fee earnings through strategic position management.",
+        agentType: "execution" as const,
+        strategyType: "liquidity_provision" as const,
+        riskTolerance: "conservative" as const,
+        personality: [PersonalityTrait.CALM, PersonalityTrait.PRECISE, PersonalityTrait.FORMAL],
+        basePrice: 6500,
+        rentalPricePerDay: 299,
+        yieldSharePercent: 8,
+        successRate: 82,
+        avgReturn: 7,
+        featured: false,
+        createdBy: "neuronet-platform",
+      },
+      {
+        name: "MEV Hunter",
+        description: "Advanced arbitrage agent that identifies and captures MEV opportunities while protecting against sandwich attacks using Flashbots.",
+        agentType: "scout" as const,
+        strategyType: "arbitrage" as const,
+        riskTolerance: "aggressive" as const,
+        personality: [PersonalityTrait.ENERGETIC, PersonalityTrait.SOVEREIGN, PersonalityTrait.COLD],
+        basePrice: 15000,
+        rentalPricePerDay: 899,
+        yieldSharePercent: 25,
+        successRate: 58,
+        avgReturn: 23,
+        featured: true,
+        createdBy: "neuronet-platform",
+      },
+    ];
+
+    for (const template of seedTemplates) {
+      await storage.createAgentTemplate(template);
+    }
+    console.log("[Routes] Seeded marketplace with agent templates");
+  }
+
+  // Seed leaderboard with sample data if empty
+  const existingLeaderboard = await storage.getLeaderboard("all_time");
+  if (existingLeaderboard.length === 0) {
+    const seedLeaderboard = [
+      { agentId: "alpha-scout-001", templateId: "scout-template-1", rank: 1, performanceScore: 95, totalReturn: 157, successRate: 78, totalTrades: 342, avgTradeSize: 5000, riskAdjustedReturn: 120, period: "all_time" as const },
+      { agentId: "mev-hunter-002", templateId: "scout-template-2", rank: 2, performanceScore: 88, totalReturn: 134, successRate: 65, totalTrades: 512, avgTradeSize: 8000, riskAdjustedReturn: 95, period: "all_time" as const },
+      { agentId: "yield-optimizer-003", templateId: "scout-template-3", rank: 3, performanceScore: 82, totalReturn: 99, successRate: 82, totalTrades: 156, avgTradeSize: 15000, riskAdjustedReturn: 85, period: "all_time" as const },
+      { agentId: "momentum-004", templateId: "execution-template-1", rank: 4, performanceScore: 75, totalReturn: 87, successRate: 71, totalTrades: 234, avgTradeSize: 3500, riskAdjustedReturn: 65, period: "all_time" as const },
+      { agentId: "risk-guardian-005", templateId: "risk-template-1", rank: 5, performanceScore: 70, totalReturn: 46, successRate: 89, totalTrades: 89, avgTradeSize: 25000, riskAdjustedReturn: 55, period: "all_time" as const },
+    ];
+    await storage.updateLeaderboard(seedLeaderboard);
+    console.log("[Routes] Seeded leaderboard with sample data");
   }
 
   // WebSocket Setup
