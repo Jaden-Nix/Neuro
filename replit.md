@@ -68,6 +68,17 @@ Frontend state is managed using React Query for server state and caching, with a
 ## Recent Changes
 
 ### November 27, 2025
+- **Stripe Connect Seller Onboarding**: Added marketplace revenue splitting between platform and agent creators
+  - `shared/schema.ts`: Added `sellerProfiles` table for Stripe Connect account tracking
+  - `server/storage.ts`: Added IStorage interface and MemStorage implementation for seller profiles
+  - `server/DatabaseStorage.ts`: Added PostgreSQL-backed seller profile CRUD operations
+  - `server/routes.ts`: New seller endpoints:
+    - `GET /api/sellers/:walletAddress` - Get seller profile
+    - `POST /api/sellers/onboard` - Start Stripe Connect onboarding
+    - `GET /api/sellers/:walletAddress/status` - Check onboarding status
+    - `GET /api/sellers/:walletAddress/dashboard` - Get Stripe dashboard link
+    - `GET /api/sellers/:walletAddress/balance` - Get seller balance
+
 - **Stripe Payment Integration**: Added marketplace payment processing for agent rentals and NFT minting
   - `server/index.ts`: Stripe initialization BEFORE express.json() middleware, webhook handlers
   - `shared/schema.ts`: Added `stripePaymentIntentId` to AgentRental and AgentNFT tables
@@ -75,6 +86,16 @@ Frontend state is managed using React Query for server state and caching, with a
   - `script/seed-stripe-products.ts`: Product seeding script for Stripe (run via `npx tsx script/seed-stripe-products.ts`)
 
 ## Important Implementation Notes
+
+### Stripe Connect (Marketplace Revenue Splitting)
+- Sellers must complete Stripe Connect onboarding before receiving marketplace payments
+- Platform fee is configurable (default 15%) via `stripeService.getPlatformFeePercent()`
+- Payment flow for marketplace sales:
+  1. Seller completes Connect onboarding (once)
+  2. Buyer initiates purchase via `/api/stripe/rental-payment` or `/api/stripe/mint-payment`
+  3. `stripeService.createMarketplacePayment()` creates destination charge with application fee
+  4. Stripe automatically splits payment: seller receives (100% - platform fee), platform receives fee
+- Seller dashboard access via `/api/sellers/:walletAddress/dashboard` for payout management
 
 ### Stripe Integration
 - Stripe webhook routes are registered BEFORE `express.json()` middleware to receive raw Buffer payloads
