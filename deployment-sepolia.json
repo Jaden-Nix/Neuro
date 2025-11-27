@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2025-11-27T10:00:26.768Z",
+  "deployer": "0xe47Dce1b7e31333329734E24089C0472c030d95B",
+  "contracts": {
+    "NeuroNetRegistry": "0xc4f97d52334f0de35fec958f24fc5af9c450f8dc",
+    "NeuroNetStorage": "0x7c2e91efeec7bf481a61a654f36fe6452ca16a07",
+    "NeuroNetHeartbeat": "0x7ab69aa7543e9ae43b5d01c5622868392252eaad"
+  }
+}

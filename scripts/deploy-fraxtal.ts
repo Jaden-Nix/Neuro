@@ -1,9 +1,22 @@
-import { createWalletClient, createPublicClient, http } from 'viem';
-import { sepolia } from 'viem/chains';
+import { createWalletClient, createPublicClient, http, defineChain } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import solc from 'solc';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Define Sepolia with reliable public RPC
+const sepolia = defineChain({
+  id: 11155111,
+  name: 'Sepolia',
+  nativeCurrency: { name: 'Sepolia Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://ethereum-sepolia-rpc.publicnode.com'] },
+  },
+  blockExplorers: {
+    default: { name: 'Etherscan', url: 'https://sepolia.etherscan.io' },
+  },
+  testnet: true,
+});
 
 function compileContract(contractName: string): { abi: any; bytecode: string } {
   const contractPath = path.join(process.cwd(), 'contracts', `${contractName}.sol`);
@@ -66,11 +79,16 @@ async function deployContract(
 }
 
 async function main() {
-  const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
+  let privateKey = process.env.DEPLOYER_PRIVATE_KEY;
 
   if (!privateKey) {
     console.error('ERROR: DEPLOYER_PRIVATE_KEY environment variable not set');
     process.exit(1);
+  }
+
+  // Ensure private key has 0x prefix
+  if (!privateKey.startsWith('0x')) {
+    privateKey = `0x${privateKey}`;
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
