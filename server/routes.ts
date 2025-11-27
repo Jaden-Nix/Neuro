@@ -2353,6 +2353,28 @@ export async function registerRoutes(
     }
   });
 
+  // Get wallet stats (must come before :id route)
+  app.get("/api/wallets/stats", async (req, res) => {
+    try {
+      const stats = walletManager.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get wallet stats:", error);
+      res.status(500).json({ error: "Failed to get wallet stats" });
+    }
+  });
+
+  // Get wallet aggregate (must come before :id route)
+  app.get("/api/wallets/aggregate", async (req, res) => {
+    try {
+      const aggregate = walletManager.getAggregate();
+      res.json(aggregate);
+    } catch (error) {
+      console.error("Failed to get wallet aggregate:", error);
+      res.status(500).json({ error: "Failed to get wallet aggregate" });
+    }
+  });
+
   // Get wallet by ID
   app.get("/api/wallets/:id", async (req, res) => {
     try {
@@ -2448,17 +2470,6 @@ export async function registerRoutes(
     }
   });
 
-  // Get wallet aggregate
-  app.get("/api/wallets/aggregate", async (req, res) => {
-    try {
-      const aggregate = walletManager.getAggregate();
-      res.json(aggregate);
-    } catch (error) {
-      console.error("Failed to get wallet aggregate:", error);
-      res.status(500).json({ error: "Failed to get wallet aggregate" });
-    }
-  });
-
   // Get wallet transactions
   app.get("/api/wallets/:id/transactions", async (req, res) => {
     try {
@@ -2480,17 +2491,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to get all transactions:", error);
       res.status(500).json({ error: "Failed to get all transactions" });
-    }
-  });
-
-  // Get wallet stats
-  app.get("/api/wallets/stats", async (req, res) => {
-    try {
-      const stats = walletManager.getStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Failed to get wallet stats:", error);
-      res.status(500).json({ error: "Failed to get wallet stats" });
     }
   });
 
