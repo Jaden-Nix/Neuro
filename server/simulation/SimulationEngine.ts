@@ -85,6 +85,7 @@ export class SimulationEngine extends EventEmitter {
 
   /**
    * Fetch real market data from on-chain sources with caching for Monte Carlo
+   * Uses single getOnChainMetrics call to avoid redundant RPC requests
    */
   private async fetchRealMarketData(existingData?: any, useCache: boolean = false): Promise<MarketSnapshot> {
     // Return cached data if valid and caching is requested (for Monte Carlo)
@@ -96,24 +97,17 @@ export class SimulationEngine extends EventEmitter {
     }
 
     try {
-      // Fetch live on-chain metrics
-      const [onChainMetrics, ethPrice, gasPriceGwei] = await Promise.all([
-        rpcClient.getOnChainMetrics(),
-        rpcClient.getETHUSDPrice(),
-        rpcClient.getGasPriceGwei(),
-      ]);
-      
-      // Use TVL in USD directly from updated RPC client
-      const tvlUsd = onChainMetrics.tvlUsd || 1000000;
+      // Fetch live on-chain metrics (single call that includes price, TVL, APY, gas)
+      const onChainMetrics = await rpcClient.getOnChainMetrics();
       
       // Calculate historical volatility from price history (time-aware)
       const calculatedVolatility = this.calculateHistoricalVolatility();
       
       const snapshot: MarketSnapshot = {
-        price: existingData?.currentPrice || ethPrice || 2000,
-        tvl: tvlUsd,
+        price: existingData?.currentPrice || onChainMetrics.ethPriceUsd || 2000,
+        tvl: onChainMetrics.tvlUsd || 1000000,
         yield: onChainMetrics.currentAPY || 3.5,
-        gasPrice: gasPriceGwei || 20, // In Gwei
+        gasPrice: onChainMetrics.gasPriceGwei || 20, // In Gwei
         volatility: calculatedVolatility || 0.25,
         timestamp: Date.now(),
       };

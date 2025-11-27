@@ -248,8 +248,13 @@ export class BlockchainRPCClient {
         this.getETHUSDPrice(),
       ]);
 
-      const wethValueUsd = (Number(wethBalance) / 1e18) * ethPrice;
-      const usdcValueUsd = Number(usdcBalance) / 1e6;
+      // Use formatEther for safe BigInt to decimal conversion (avoids Number overflow)
+      const wethEth = parseFloat(formatEther(wethBalance));
+      const wethValueUsd = wethEth * ethPrice;
+      
+      // USDC has 6 decimals - safe to use Number since USDC balances < 2^53
+      // But use BigInt-safe conversion anyway for consistency
+      const usdcValueUsd = Number(usdcBalance / BigInt(1e6)) + Number(usdcBalance % BigInt(1e6)) / 1e6;
       
       return wethValueUsd + usdcValueUsd;
     } catch (error) {
