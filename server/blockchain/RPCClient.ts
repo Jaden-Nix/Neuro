@@ -1,9 +1,6 @@
 import { createPublicClient, http, formatEther, parseAbi } from "viem";
 import { mainnet, base, fraxtal } from "viem/chains";
 
-/**
- * Retry configuration for RPC calls
- */
 interface RetryConfig {
   maxRetries: number;
   baseDelayMs: number;
@@ -18,33 +15,19 @@ const DEFAULT_RETRY_CONFIG: RetryConfig = {
   backoffMultiplier: 2,
 };
 
-/**
- * Sleep utility for delays
- */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Calculate delay with exponential backoff and jitter
- */
 function calculateBackoffDelay(
   attempt: number,
   config: RetryConfig = DEFAULT_RETRY_CONFIG
 ): number {
-  // Exponential backoff: baseDelay * (multiplier ^ attempt)
   const exponentialDelay = config.baseDelayMs * Math.pow(config.backoffMultiplier, attempt);
-  
-  // Add jitter (0-25% random variation) to prevent thundering herd
   const jitter = exponentialDelay * 0.25 * Math.random();
-  
-  // Clamp to max delay
   return Math.min(exponentialDelay + jitter, config.maxDelayMs);
 }
 
-/**
- * Execute a function with exponential backoff retry
- */
 async function withRetry<T>(
   fn: () => Promise<T>,
   operationName: string,
@@ -57,8 +40,6 @@ async function withRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
-      
-      // Check if error is retryable
       const isRetryable = isRetryableError(lastError);
       
       if (!isRetryable || attempt === config.maxRetries) {
@@ -79,59 +60,34 @@ async function withRetry<T>(
     }
   }
   
-  // This should never be reached, but TypeScript needs it
   throw lastError || new Error(`${operationName} failed with unknown error`);
 }
 
-/**
- * Determine if an error is retryable
- */
 function isRetryableError(error: Error): boolean {
   const message = error.message.toLowerCase();
   
-  // Network-related errors (retryable)
   const retryablePatterns = [
-    "timeout",
-    "econnreset",
-    "econnrefused",
-    "socket hang up",
-    "network",
-    "rate limit",
-    "429",
-    "503",
-    "502",
-    "504",
-    "too many requests",
-    "temporarily unavailable",
-    "service unavailable",
+    "timeout", "econnreset", "econnrefused", "socket hang up",
+    "network", "rate limit", "429", "503", "502", "504",
+    "too many requests", "temporarily unavailable", "service unavailable",
   ];
   
-  // Non-retryable errors
   const nonRetryablePatterns = [
-    "invalid",
-    "not found",
-    "revert",
-    "execution reverted",
-    "insufficient",
-    "nonce",
-    "already known",
+    "invalid", "not found", "revert", "execution reverted",
+    "insufficient", "nonce", "already known",
   ];
   
-  // Check if it's explicitly non-retryable
   if (nonRetryablePatterns.some((pattern) => message.includes(pattern))) {
     return false;
   }
   
-  // Check if it's explicitly retryable
   if (retryablePatterns.some((pattern) => message.includes(pattern))) {
     return true;
   }
   
-  // Default: retry unknown errors (they might be transient)
   return true;
 }
 
-// Uniswap V3 Pool ABI (minimal for slot0 and liquidity)
 const UNISWAP_V3_POOL_ABI = parseAbi([
   "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
   "function liquidity() external view returns (uint128)",
@@ -139,19 +95,16 @@ const UNISWAP_V3_POOL_ABI = parseAbi([
   "function token1() external view returns (address)",
 ]);
 
-// ERC20 ABI for token decimals and symbols
 const ERC20_ABI = parseAbi([
   "function decimals() external view returns (uint8)",
   "function symbol() external view returns (string)",
   "function balanceOf(address) external view returns (uint256)",
 ]);
 
-// Aave V3 Pool ABI for reserve data
 const AAVE_V3_POOL_ABI = parseAbi([
   "function getReserveData(address asset) external view returns (uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt)",
 ]);
 
-// Chainlink Price Feed ABI
 const CHAINLINK_AGGREGATOR_V3_ABI = parseAbi([
   "function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)",
   "function decimals() external view returns (uint8)",
@@ -165,22 +118,34 @@ export interface ChainConfig {
 }
 
 export interface OnChainMetrics {
-  walletBalance: string;
-  totalTVL: string;
+  walletBalanceEth: number;
+  tvlUsd: number;
   currentAPY: number;
   riskLevel: number;
   activeOpportunities: number;
   pendingTransactions: number;
-  gasPrice: string;
+  gasPriceGwei: number;
+  ethPriceUsd: number;
   timestamp: number;
 }
+
+interface ChainlinkRoundData {
+  roundId: bigint;
+  answer: bigint;
+  startedAt: bigint;
+  updatedAt: bigint;
+  answeredInRound: bigint;
+}
+
+const CHAINLINK_MAX_STALENESS_SECONDS = 3600;
 
 export class BlockchainRPCClient {
   private clients: Map<number, ReturnType<typeof createPublicClient>>;
   private chainConfigs: ChainConfig[];
+  private cachedEthPrice: { price: number; timestamp: number } | null = null;
+  private readonly PRICE_CACHE_TTL_MS = 60000;
 
   constructor() {
-    // Initialize chain configurations
     this.chainConfigs = [
       {
         chainId: mainnet.id,
@@ -202,7 +167,6 @@ export class BlockchainRPCClient {
       },
     ];
 
-    // Create public clients for each chain
     this.clients = new Map();
     
     this.clients.set(
@@ -230,12 +194,8 @@ export class BlockchainRPCClient {
     );
   }
 
-  /**
-   * Fetch wallet balance across all chains with retry logic
-   */
   async getWalletBalance(address?: `0x${string}`): Promise<bigint> {
     if (!address) {
-      // Return 0 if no wallet connected
       return BigInt(0);
     }
 
@@ -247,63 +207,57 @@ export class BlockchainRPCClient {
         const balance = await withRetry(
           () => client.getBalance({ address }),
           `getBalance(chain=${chainId})`
-        );
+        ) as bigint;
         totalBalance += balance;
       } catch (error) {
         console.error(`Failed to fetch balance on chain ${chainId}:`, error);
-        // Continue with other chains even if one fails
       }
     }
 
     return totalBalance;
   }
 
-  /**
-   * Get TVL from major liquidity pools (Uniswap V3 ETH/USDC example) with retry logic
-   */
-  async getTotalValueLocked(): Promise<bigint> {
+  async getTVLInUSD(): Promise<number> {
     const client = this.clients.get(mainnet.id);
-    if (!client) return BigInt(0);
+    if (!client) return 0;
 
-    // Uniswap V3 ETH/USDC 0.05% pool on Ethereum
-    const POOL_ADDRESS = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640";
+    const POOL_ADDRESS = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640" as `0x${string}`;
+    const WETH_ADDRESS = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" as `0x${string}`;
+    const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as `0x${string}`;
 
     try {
-      const liquidity = await withRetry(
-        () => client.readContract({
-          address: POOL_ADDRESS,
-          abi: UNISWAP_V3_POOL_ABI,
-          functionName: "liquidity",
-        }),
-        "getTVL.liquidity"
-      );
+      const [wethBalance, usdcBalance, ethPrice] = await Promise.all([
+        withRetry(
+          () => client.readContract({
+            address: WETH_ADDRESS,
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [POOL_ADDRESS],
+          }),
+          "getTVL.wethBalance"
+        ) as Promise<bigint>,
+        withRetry(
+          () => client.readContract({
+            address: USDC_ADDRESS,
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [POOL_ADDRESS],
+          }),
+          "getTVL.usdcBalance"
+        ) as Promise<bigint>,
+        this.getETHUSDPrice(),
+      ]);
 
-      const slot0 = await withRetry(
-        () => client.readContract({
-          address: POOL_ADDRESS,
-          abi: UNISWAP_V3_POOL_ABI,
-          functionName: "slot0",
-        }),
-        "getTVL.slot0"
-      );
-
-      // Simplified TVL calculation (liquidity * sqrt price)
-      // In production, this would need proper math for accurate TVL
-      const sqrtPriceX96 = slot0[0];
-      // Use bit shifting instead of exponentiation: 2^96 = 1 << 96
-      const divisor = BigInt(1) << BigInt(96);
-      const tvlEstimate = (liquidity * sqrtPriceX96) / divisor;
-
-      return tvlEstimate;
+      const wethValueUsd = (Number(wethBalance) / 1e18) * ethPrice;
+      const usdcValueUsd = Number(usdcBalance) / 1e6;
+      
+      return wethValueUsd + usdcValueUsd;
     } catch (error) {
-      console.error("Failed to fetch TVL:", error);
-      return BigInt(0);
+      console.error("Failed to fetch TVL in USD:", error);
+      return 0;
     }
   }
 
-  /**
-   * Get current gas prices across chains with retry logic
-   */
   async getGasPrices(): Promise<Map<number, bigint>> {
     const gasPrices = new Map<number, bigint>();
 
@@ -313,28 +267,22 @@ export class BlockchainRPCClient {
         const gasPrice = await withRetry(
           () => client.getGasPrice(),
           `getGasPrice(chain=${chainId})`
-        );
+        ) as bigint;
         gasPrices.set(chainId, gasPrice);
       } catch (error) {
         console.error(`Failed to fetch gas price on chain ${chainId}:`, error);
-        // Continue with other chains even if one fails
       }
     }
 
     return gasPrices;
   }
 
-  /**
-   * Fetch real APY from Aave V3 protocol with retry logic
-   */
   async getAaveV3APY(): Promise<number> {
     const client = this.clients.get(mainnet.id);
     if (!client) return 0;
 
-    // Aave V3 Pool address on Ethereum mainnet
-    const AAVE_V3_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2";
-    // USDC address on Ethereum
-    const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+    const AAVE_V3_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as `0x${string}`;
+    const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as `0x${string}`;
 
     try {
       const reserveData = await withRetry(
@@ -345,35 +293,23 @@ export class BlockchainRPCClient {
           args: [USDC_ADDRESS],
         }),
         "getAaveV3APY.getReserveData"
-      );
+      ) as readonly [bigint, bigint, bigint, bigint, bigint, bigint, bigint, number, `0x${string}`, `0x${string}`, `0x${string}`, `0x${string}`, bigint, bigint, bigint];
 
-      // currentLiquidityRate is at index 2 (uint128)
       const liquidityRate = reserveData[2];
-      
-      // Aave rates are in Ray units (1e27)
-      // Convert to APY: (rate / 1e27) * 100
       const RAY = BigInt(10) ** BigInt(27);
-      const apyDecimal = Number(liquidityRate) / Number(RAY);
-      const apy = apyDecimal * 100;
+      const apyBasisPoints = (liquidityRate * BigInt(10000)) / RAY;
+      const apy = Number(apyBasisPoints) / 100;
 
       return apy;
     } catch (error) {
       console.error("Failed to fetch Aave V3 APY:", error);
-      // Fallback to 0 if fetch fails
       return 0;
     }
   }
 
-  /**
-   * Calculate aggregate APY from multiple yield sources
-   */
   async calculateAPY(): Promise<number> {
     try {
-      // Fetch real APY from Aave V3
       const aaveAPY = await this.getAaveV3APY();
-      
-      // In production, would aggregate from multiple protocols (Compound, Yearn, etc.)
-      // For now, return Aave APY as primary source
       return aaveAPY;
     } catch (error) {
       console.error("Failed to calculate APY:", error);
@@ -381,15 +317,50 @@ export class BlockchainRPCClient {
     }
   }
 
-  /**
-   * Fetch ETH/USD price from Chainlink Price Feed with retry logic
-   */
-  async getETHUSDPrice(): Promise<number> {
-    const client = this.clients.get(mainnet.id);
-    if (!client) return 0;
+  private parseChainlinkRoundData(result: readonly [bigint, bigint, bigint, bigint, bigint]): ChainlinkRoundData {
+    return {
+      roundId: result[0],
+      answer: result[1],
+      startedAt: result[2],
+      updatedAt: result[3],
+      answeredInRound: result[4],
+    };
+  }
 
-    // Chainlink ETH/USD Price Feed on Ethereum mainnet
-    const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419";
+  private isChainlinkDataStale(roundData: ChainlinkRoundData): boolean {
+    const now = Math.floor(Date.now() / 1000);
+    const age = now - Number(roundData.updatedAt);
+    
+    if (age > CHAINLINK_MAX_STALENESS_SECONDS) {
+      console.warn(`Chainlink data is stale: ${age}s old (max: ${CHAINLINK_MAX_STALENESS_SECONDS}s)`);
+      return true;
+    }
+    
+    if (roundData.answeredInRound < roundData.roundId) {
+      console.warn("Chainlink answeredInRound < roundId, data may be stale");
+      return true;
+    }
+    
+    return false;
+  }
+
+  private isChainlinkAnswerValid(answer: bigint): boolean {
+    if (answer <= BigInt(0)) {
+      console.warn("Chainlink returned non-positive price");
+      return false;
+    }
+    return true;
+  }
+
+  async getETHUSDPrice(): Promise<number> {
+    if (this.cachedEthPrice && (Date.now() - this.cachedEthPrice.timestamp) < this.PRICE_CACHE_TTL_MS) {
+      return this.cachedEthPrice.price;
+    }
+
+    const client = this.clients.get(mainnet.id);
+    if (!client) return 2000;
+
+    const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" as `0x${string}`;
 
     try {
       const result = await withRetry(
@@ -399,24 +370,31 @@ export class BlockchainRPCClient {
           functionName: "latestRoundData",
         }),
         "getETHUSDPrice.latestRoundData"
-      );
+      ) as readonly [bigint, bigint, bigint, bigint, bigint];
 
-      // Extract answer (second element)
-      const answer = result[1];
+      const roundData = this.parseChainlinkRoundData(result);
       
-      // Chainlink ETH/USD has 8 decimals
-      const price = Number(answer) / 1e8;
+      if (this.isChainlinkDataStale(roundData)) {
+        console.warn("Using cached/fallback price due to stale Chainlink data");
+        return this.cachedEthPrice?.price || 2000;
+      }
+      
+      if (!this.isChainlinkAnswerValid(roundData.answer)) {
+        console.warn("Using cached/fallback price due to invalid Chainlink answer");
+        return this.cachedEthPrice?.price || 2000;
+      }
+
+      const price = Number(roundData.answer) / 1e8;
+      
+      this.cachedEthPrice = { price, timestamp: Date.now() };
+      
       return price;
     } catch (error) {
       console.error("Failed to fetch Chainlink ETH/USD price:", error);
-      // Fallback price - would use a secondary oracle in production
-      return 2000;
+      return this.cachedEthPrice?.price || 2000;
     }
   }
 
-  /**
-   * Get gas price in Gwei (proper units for simulation) with retry logic
-   */
   async getGasPriceGwei(chainId: number = mainnet.id): Promise<number> {
     const client = this.clients.get(chainId);
     if (!client) return 20;
@@ -425,56 +403,42 @@ export class BlockchainRPCClient {
       const gasPrice = await withRetry(
         () => client.getGasPrice(),
         `getGasPriceGwei(chain=${chainId})`
-      );
-      // Convert wei to gwei (1 gwei = 1e9 wei)
+      ) as bigint;
       return Number(gasPrice) / 1e9;
     } catch (error) {
       console.error(`Failed to fetch gas price in gwei on chain ${chainId}:`, error);
-      return 20; // Fallback to typical mainnet gas
+      return 20;
     }
   }
 
-  /**
-   * Get comprehensive on-chain metrics
-   */
   async getOnChainMetrics(walletAddress?: `0x${string}`): Promise<OnChainMetrics> {
-    const [walletBalance, tvl, apy, gasPrices] = await Promise.all([
+    const [walletBalance, tvlUsd, apy, gasPriceGwei, ethPrice] = await Promise.all([
       this.getWalletBalance(walletAddress),
-      this.getTotalValueLocked(),
+      this.getTVLInUSD(),
       this.calculateAPY(),
-      this.getGasPrices(),
+      this.getGasPriceGwei(),
+      this.getETHUSDPrice(),
     ]);
 
-    // Calculate average gas price across chains
-    const gasPriceValues = Array.from(gasPrices.values());
-    const totalGasPrice = gasPriceValues.reduce(
-      (sum, price) => sum + price,
-      BigInt(0)
-    );
-    const avgGasPrice = gasPriceValues.length > 0 
-      ? totalGasPrice / BigInt(gasPriceValues.length)
-      : BigInt(0);
+    const walletBalanceEth = Number(formatEther(walletBalance));
 
-    // Estimate risk level based on gas prices and volatility
-    const gasRisk = Number(avgGasPrice) / 1e9 > 50 ? 20 : 10; // High gas = higher risk
+    const gasRisk = gasPriceGwei > 50 ? 20 : 10;
     const baseRisk = 25;
     const riskLevel = Math.min(100, gasRisk + baseRisk);
 
     return {
-      walletBalance: formatEther(walletBalance),
-      totalTVL: formatEther(tvl),
+      walletBalanceEth,
+      tvlUsd,
       currentAPY: apy,
       riskLevel,
-      activeOpportunities: Math.floor(Math.random() * 5) + 3, // Mock for now
+      activeOpportunities: Math.floor(Math.random() * 5) + 3,
       pendingTransactions: 0,
-      gasPrice: formatEther(avgGasPrice),
+      gasPriceGwei,
+      ethPriceUsd: ethPrice,
       timestamp: Date.now(),
     };
   }
 
-  /**
-   * Monitor wallet health for Sentinel system
-   */
   async monitorWalletHealth(address?: `0x${string}`): Promise<{
     isHealthy: boolean;
     issues: string[];
@@ -488,22 +452,15 @@ export class BlockchainRPCClient {
 
     const issues: string[] = [];
     const balance = await this.getWalletBalance(address);
-    const gasPrices = await this.getGasPrices();
+    const gasPriceGwei = await this.getGasPriceGwei();
 
-    // Check if balance is too low
-    const minBalance = BigInt(100000000000000000); // 0.1 ETH
+    const minBalance = BigInt(100000000000000000);
     if (balance < minBalance) {
       issues.push("Low wallet balance - may not cover gas fees");
     }
 
-    // Check for extremely high gas prices
-    const gasPriceArray = Array.from(gasPrices.entries());
-    const highGasThreshold = BigInt(100000000000); // 100 gwei
-    for (const [chainId, gasPrice] of gasPriceArray) {
-      if (gasPrice > highGasThreshold) {
-        const chainName = this.chainConfigs.find((c) => c.chainId === chainId)?.name;
-        issues.push(`High gas prices on ${chainName}: ${formatEther(gasPrice)} ETH`);
-      }
+    if (gasPriceGwei > 100) {
+      issues.push(`High gas prices: ${gasPriceGwei.toFixed(1)} Gwei`);
     }
 
     return {
@@ -512,9 +469,6 @@ export class BlockchainRPCClient {
     };
   }
 
-  /**
-   * Get block number for a specific chain
-   */
   async getBlockNumber(chainId: number): Promise<bigint> {
     const client = this.clients.get(chainId);
     if (!client) {

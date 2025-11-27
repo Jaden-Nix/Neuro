@@ -27,13 +27,34 @@ export class SimulationEngine extends EventEmitter {
   private priceHistory: PriceHistory[] = [];
   private volatilityWindow = 20; // samples for volatility calculation
   private lastMarketSnapshot: MarketSnapshot | null = null;
+  private cachedMarketData: MarketSnapshot | null = null;
+  private readonly MARKET_DATA_CACHE_TTL_MS = 30000; // 30 seconds
+
+  private validateConfig(config: SimulationConfig): void {
+    if (!config.branchCount || config.branchCount < 1) {
+      throw new Error("branchCount must be at least 1");
+    }
+    if (!config.predictionInterval || config.predictionInterval <= 0) {
+      throw new Error("predictionInterval must be positive");
+    }
+    if (config.timeHorizon < 0) {
+      throw new Error("timeHorizon cannot be negative");
+    }
+  }
 
   public async runSimulation(config: SimulationConfig, marketData?: any): Promise<SimulationBranch[]> {
+    this.validateConfig(config);
+    
     const simulationId = `sim-${Date.now()}`;
     this.emit("simulationStarted", { simulationId, config });
 
     // Fetch real market data if not provided
     const realMarketData = await this.fetchRealMarketData(marketData);
+
+    // Handle edge case of zero time horizon
+    if (config.timeHorizon === 0) {
+      return [];
+    }
 
     const branches: SimulationBranch[] = [];
 
@@ -63,9 +84,17 @@ export class SimulationEngine extends EventEmitter {
   }
 
   /**
-   * Fetch real market data from on-chain sources
+   * Fetch real market data from on-chain sources with caching for Monte Carlo
    */
-  private async fetchRealMarketData(existingData?: any): Promise<MarketSnapshot> {
+  private async fetchRealMarketData(existingData?: any, useCache: boolean = false): Promise<MarketSnapshot> {
+    // Return cached data if valid and caching is requested (for Monte Carlo)
+    if (useCache && this.cachedMarketData) {
+      const age = Date.now() - this.cachedMarketData.timestamp;
+      if (age < this.MARKET_DATA_CACHE_TTL_MS) {
+        return this.cachedMarketData;
+      }
+    }
+
     try {
       // Fetch live on-chain metrics
       const [onChainMetrics, ethPrice, gasPriceGwei] = await Promise.all([
@@ -74,17 +103,17 @@ export class SimulationEngine extends EventEmitter {
         rpcClient.getGasPriceGwei(),
       ]);
       
-      // Convert TVL from ETH string to number
-      const tvlEth = parseFloat(onChainMetrics.totalTVL) || 1000000;
+      // Use TVL in USD directly from updated RPC client
+      const tvlUsd = onChainMetrics.tvlUsd || 1000000;
       
-      // Calculate historical volatility from price history
+      // Calculate historical volatility from price history (time-aware)
       const calculatedVolatility = this.calculateHistoricalVolatility();
       
       const snapshot: MarketSnapshot = {
         price: existingData?.currentPrice || ethPrice || 2000,
-        tvl: tvlEth,
+        tvl: tvlUsd,
         yield: onChainMetrics.currentAPY || 3.5,
-        gasPrice: gasPriceGwei || 20, // Already in Gwei
+        gasPrice: gasPriceGwei || 20, // In Gwei
         volatility: calculatedVolatility || 0.25,
         timestamp: Date.now(),
       };
@@ -92,6 +121,7 @@ export class SimulationEngine extends EventEmitter {
       // Update price history for volatility tracking
       this.updatePriceHistory(snapshot.price);
       this.lastMarketSnapshot = snapshot;
+      this.cachedMarketData = snapshot;
 
       return snapshot;
     } catch (error) {
@@ -124,32 +154,46 @@ export class SimulationEngine extends EventEmitter {
   }
 
   /**
-   * Calculate historical volatility using log returns
+   * Calculate historical volatility using log returns with time-aware annualization
+   * Uses actual time deltas between samples instead of assuming daily frequency
    */
   private calculateHistoricalVolatility(): number {
     if (this.priceHistory.length < 3) {
       return 0.25; // Default volatility if insufficient data
     }
 
-    // Calculate log returns
-    const logReturns: number[] = [];
+    // Calculate log returns with their time deltas
+    const logReturnsWithDt: { logReturn: number; dtYears: number }[] = [];
     for (let i = 1; i < this.priceHistory.length; i++) {
       const logReturn = Math.log(this.priceHistory[i].price / this.priceHistory[i - 1].price);
-      logReturns.push(logReturn);
+      const dtMs = this.priceHistory[i].timestamp - this.priceHistory[i - 1].timestamp;
+      const dtYears = dtMs / (365.25 * 24 * 60 * 60 * 1000); // Convert ms to years
+      
+      // Skip invalid time deltas (negative or zero)
+      if (dtYears > 0) {
+        logReturnsWithDt.push({ logReturn, dtYears });
+      }
     }
 
-    // Calculate mean
-    const mean = logReturns.reduce((sum, r) => sum + r, 0) / logReturns.length;
+    if (logReturnsWithDt.length < 2) {
+      return 0.25; // Fallback if not enough valid samples
+    }
 
-    // Calculate variance
-    const variance = logReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (logReturns.length - 1);
+    // Calculate annualized returns for each interval: r_annual = r / sqrt(dt)
+    const annualizedReturns = logReturnsWithDt.map(({ logReturn, dtYears }) => 
+      logReturn / Math.sqrt(dtYears)
+    );
 
-    // Standard deviation (volatility)
-    const volatility = Math.sqrt(variance);
+    // Calculate mean of annualized returns
+    const mean = annualizedReturns.reduce((sum, r) => sum + r, 0) / annualizedReturns.length;
 
-    // Annualize (assuming daily data, adjust for different timeframes)
-    const annualizedVolatility = volatility * Math.sqrt(365);
+    // Calculate variance of annualized returns
+    const variance = annualizedReturns.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / (annualizedReturns.length - 1);
 
+    // Standard deviation is the annualized volatility
+    const annualizedVolatility = Math.sqrt(variance);
+
+    // Bound to reasonable range [0.05, 1.0] (5% to 100% annual volatility)
     return Math.min(1, Math.max(0.05, annualizedVolatility));
   }
 
@@ -293,6 +337,17 @@ export class SimulationEngine extends EventEmitter {
       pred.ev = Math.round(boundedEV);
     });
 
+    // Guard against empty predictions array
+    if (predictions.length === 0) {
+      return {
+        id: branchId,
+        parentId: null,
+        predictions: [],
+        outcome: "pending",
+        evScore: 0,
+      };
+    }
+
     // Determine outcome based on final EV and risk metrics
     const finalEV = predictions[predictions.length - 1].ev;
     const avgVolatility = predictions.reduce((sum, p) => sum + p.volatility, 0) / predictions.length;
@@ -316,6 +371,11 @@ export class SimulationEngine extends EventEmitter {
   }
 
   private calculateEV(branch: SimulationBranch): number {
+    // Guard against empty predictions
+    if (!branch.predictions || branch.predictions.length === 0) {
+      return 0;
+    }
+
     // Time-weighted average with exponential decay (more weight on near-term)
     const lambda = 0.1; // Decay parameter
     let weightedSum = 0;
@@ -327,10 +387,20 @@ export class SimulationEngine extends EventEmitter {
       totalWeight += weight;
     });
     
+    // Guard against division by zero
+    if (totalWeight === 0) {
+      return 0;
+    }
+    
     return weightedSum / totalWeight;
   }
 
-  public selectBestBranch(branches: SimulationBranch[]): SimulationBranch {
+  public selectBestBranch(branches: SimulationBranch[]): SimulationBranch | null {
+    // Guard against empty branches array
+    if (!branches || branches.length === 0) {
+      return null;
+    }
+    
     return branches.reduce((best, current) => 
       current.evScore > best.evScore ? current : best
     );
@@ -433,6 +503,9 @@ export class SimulationEngine extends EventEmitter {
     skewness: number;
     kurtosis: number;
   }> {
+    // Validate config before running Monte Carlo
+    this.validateConfig(config);
+    
     const allEVs: number[] = [];
     let successCount = 0;
     let failureCount = 0;
@@ -445,13 +518,19 @@ export class SimulationEngine extends EventEmitter {
     // Emit start event
     this.emit("monteCarloStarted", { config, maxIterations });
 
+    // Fetch baseline market data ONCE for all Monte Carlo iterations
+    // This prevents RPC storms and ensures consistent baseline for statistical validity
+    const baselineMarketData = await this.fetchRealMarketData(undefined, false);
+    
+    // Cache this baseline for subsequent iterations
+    this.cachedMarketData = baselineMarketData;
+
     // Run simulation iterations with convergence checking
     for (let i = 0; i < maxIterations; i++) {
       iterationsRun = i + 1;
 
-      // Generate single path efficiently (avoid full simulation overhead)
-      const marketData = await this.fetchRealMarketData();
-      const branch = await this.createBranch(`mc-${Date.now()}`, i, config, marketData);
+      // Use cached baseline market data (stochastic variation comes from GBM, not data fetching)
+      const branch = await this.createBranch(`mc-${Date.now()}`, i, config, baselineMarketData);
       
       // Calculate EV for this path
       const rawEV = this.calculateEV(branch);
