@@ -89,16 +89,16 @@ export default function Dashboard() {
   // Mutations for control actions
   const simulationMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/simulate", {
+      return await apiRequest("POST", "/api/simulations/run", {
         timeHorizon: 60,
         branchCount: 5,
         predictionInterval: 10,
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast({
-        title: "Simulation Started",
-        description: "Running future fork predictions...",
+        title: "Simulation Complete",
+        description: `Generated ${data.branches?.length || 5} prediction branches`,
       });
       // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
