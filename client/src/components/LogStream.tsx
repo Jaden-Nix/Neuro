@@ -131,14 +131,8 @@ export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogS
                     </p>
                   )}
                 </div>
-              </div>
-            );
-          })}
-
-          {displayLogs.length === 0 && (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">
-              <p className="text-sm">No logs yet. Awaiting system activity...</p>
-            </div>
+              );
+            })
           )}
         </div>
       </ScrollArea>

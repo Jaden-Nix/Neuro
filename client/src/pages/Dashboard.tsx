@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Header } from "@/components/Header";
 import { NeuroNetCore } from "@/components/NeuroNetCore";
 import { LogStream } from "@/components/LogStream";
@@ -206,7 +207,7 @@ export default function Dashboard() {
   }));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <Header
         systemHealth={systemState?.systemHealth || 85}
         activeAgents={systemState?.activeAgents?.length || agents.length}
@@ -214,7 +215,10 @@ export default function Dashboard() {
         onOpenDevPanel={() => setDevPanelOpen(true)}
       />
 
-      <main className="pt-20 pb-8 px-6">
+      <main className="flex-1 pt-4 pb-8 px-6 overflow-auto">
+        <div className="mb-4">
+          <SidebarTrigger data-testid="button-sidebar-toggle" />
+        </div>
         <div className="container mx-auto space-y-6">
           {/* Metrics Dashboard */}
           <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
