@@ -153,14 +153,14 @@ export default function Dashboard() {
   };
 
   const defaultMetrics: LiveMetrics = {
-    walletBalanceEth: metrics?.walletBalanceEth || 1250000,
-    tvlUsd: metrics?.tvlUsd || 8500000,
-    currentAPY: metrics?.currentAPY || 12.5,
-    riskLevel: metrics?.riskLevel || 35,
-    activeOpportunities: metrics?.activeOpportunities || 7,
-    pendingTransactions: metrics?.pendingTransactions || 2,
-    gasPriceGwei: metrics?.gasPriceGwei || 25,
-    ethPriceUsd: metrics?.ethPriceUsd || 3200,
+    walletBalanceEth: metrics?.walletBalanceEth ?? 0,
+    tvlUsd: metrics?.tvlUsd ?? 0,
+    currentAPY: metrics?.currentAPY ?? 0,
+    riskLevel: metrics?.riskLevel ?? 0,
+    activeOpportunities: metrics?.activeOpportunities ?? 0,
+    pendingTransactions: metrics?.pendingTransactions ?? 0,
+    gasPriceGwei: metrics?.gasPriceGwei ?? 0,
+    ethPriceUsd: metrics?.ethPriceUsd ?? 0,
     timestamp: Date.now(),
   };
 
