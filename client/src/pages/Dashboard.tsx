@@ -48,15 +48,18 @@ export default function Dashboard() {
   // Use WebSocket metrics if available, otherwise fetch
   const { data: fetchedMetrics } = useQuery<LiveMetrics>({
     queryKey: ["/api/metrics"],
-    refetchInterval: wsState.connected ? 10000 : 1000, // Less frequent if WS connected
+    refetchInterval: wsState.connected ? 10000 : 1000,
   });
+
+  // Merge metrics from WebSocket or API
+  const metrics = wsState.metrics || fetchedMetrics;
 
   // Track previous metrics for change calculations
   useEffect(() => {
     if (metrics && metrics !== previousMetrics) {
       setPreviousMetrics(metrics);
     }
-  }, [metrics]);
+  }, [metrics, previousMetrics]);
 
   // Use WebSocket logs if available, otherwise fetch
   const { data: fetchedLogs = [] } = useQuery<LogEntry[]>({
@@ -97,7 +100,6 @@ export default function Dashboard() {
 
   // Merge WebSocket and fetched data
   const logs = wsState.logs.length > 0 ? wsState.logs : fetchedLogs;
-  const metrics = wsState.metrics || fetchedMetrics;
   const simulationTree = wsState.simulations.length > 0 ? wsState.simulations : fetchedSimulations;
 
   // Mutations for control actions
@@ -213,18 +215,16 @@ export default function Dashboard() {
       />
 
       <main className="pt-20 pb-8 px-6">
-        <div className="container mx-auto space-y-8">
+        <div className="container mx-auto space-y-6">
           {/* Metrics Dashboard */}
           <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
 
           {/* Main Grid Layout */}
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Left Column - Live Status, Control Panel & Risk Heatmap */}
-            <div className="space-y-6">
-              <LiveSystemStatus />
-              
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Column - Controls */}
+            <div className="space-y-4">
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="p-5">
                   <ControlPanel
                     autonomousMode={systemState?.autonomousMode || false}
                     onRunSimulation={handleRunSimulation}
@@ -237,16 +237,17 @@ export default function Dashboard() {
               </Card>
 
               <Card>
-                <CardContent className="p-6">
+                <CardContent className="p-5">
                   <RiskHeatmap />
                 </CardContent>
               </Card>
             </div>
 
-            {/* Center Column - NeuroNet Core */}
-            <div className="xl:col-span-1">
-              <Card className="h-full">
-                <CardContent className="p-6">
+            {/* Center - Status & Core */}
+            <div className="lg:col-span-2 space-y-4">
+              <LiveSystemStatus />
+              <Card className="flex-1">
+                <CardContent className="p-5">
                   <NeuroNetCore
                     agents={agents}
                     systemHealth={systemState?.systemHealth || 85}
@@ -255,10 +256,10 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Right Column - Log Stream */}
-            <div className="space-y-6">
-              <Card className="h-[600px]">
-                <CardContent className="p-6 h-full">
+            {/* Right Column - Logs */}
+            <div>
+              <Card className="h-full">
+                <CardContent className="p-5 h-full flex flex-col">
                   <LogStream 
                     logs={logs}
                     onClearLogs={() => clearLogsMutation.mutate()}
@@ -269,35 +270,23 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Timeline */}
-          <TimeWarpSlider events={timelineEvents} />
-
-          {/* Simulations Section */}
+          {/* Simulations Section - Compact */}
           {simulationTree.length > 0 && (
             <Card>
-              <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-2">Simulation Predictions</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {currentOpportunity?.details?.protocol 
-                    ? `Forecasting: ${currentOpportunity.details.protocol} (${currentOpportunity.details.apy}% APY)`
-                    : "Forecasting: Curve FRAX/USD (6.2% APY) | Lido stETH (3.8%) | dYdX Lending Pool"}
-                </p>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {simulationTree.map((sim, idx) => (
-                    <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/50 bg-green-500/10" : sim.outcome === "failure" ? "border-red-500/50 bg-red-500/10" : "border-border bg-card/50"}`}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="font-semibold text-sm">Branch {idx + 1}</span>
-                        <span className={`text-xs px-2 py-1 rounded-md font-medium ${sim.outcome === "success" ? "bg-green-500/30 text-green-700 dark:text-green-300" : sim.outcome === "failure" ? "bg-red-500/30 text-red-700 dark:text-red-300" : "bg-blue-500/20"}`}>
-                          {sim.outcome === "success" ? "✓ Viable" : sim.outcome === "failure" ? "✗ Risky" : "◐ Evaluating"}
+              <CardContent className="p-5">
+                <h3 className="text-base font-semibold mb-3">Active Predictions</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-52 overflow-y-auto">
+                  {simulationTree.slice(0, 6).map((sim, idx) => (
+                    <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/40 bg-green-500/5" : sim.outcome === "failure" ? "border-red-500/40 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-mono text-muted-foreground">#{idx + 1}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${sim.outcome === "success" ? "bg-green-500/30 text-green-700 dark:text-green-300" : sim.outcome === "failure" ? "bg-red-500/30 text-red-700 dark:text-red-300" : "bg-blue-500/20 text-blue-700 dark:text-blue-300"}`}>
+                          {sim.outcome === "success" ? "Viable" : sim.outcome === "failure" ? "Risky" : "Pending"}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        {sim.predictions.slice(0, 2).map((pred, pidx) => (
-                          <div key={pidx} className="space-y-1">
-                            <div className="text-muted-foreground">Price: ${pred.price.toFixed(2)}</div>
-                            <div className="text-muted-foreground">Yield: {pred.yield.toFixed(2)}%</div>
-                          </div>
-                        ))}
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div>EV: {sim.evScore.toFixed(2)}</div>
+                        {sim.predictions[0] && <div>Yield: {sim.predictions[0].yield.toFixed(1)}%</div>}
                       </div>
                     </div>
                   ))}

@@ -32,54 +32,57 @@ export function ControlPanel({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <div className="space-y-2">
         <Button
-          className="h-12 text-sm font-display font-semibold"
+          className="w-full text-sm font-display font-semibold"
           onClick={onRunSimulation}
           disabled={isSimulating}
           data-testid="button-run-simulation"
         >
-          <Play className="w-4 h-4 mr-1 flex-shrink-0" />
-          <span className="truncate">{isSimulating ? "Simulating..." : "Run Simulation"}</span>
+          <Play className="w-4 h-4 mr-2" />
+          {isSimulating ? "Simulating..." : "Run Simulation"}
         </Button>
 
-        <Button
-          variant={autonomousMode ? "destructive" : "default"}
-          className="h-12 text-sm font-display font-semibold"
-          onClick={onToggleAutonomous}
-          data-testid="button-toggle-autonomous"
-        >
-          {autonomousMode ? (
-            <>
-              <Pause className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span className="truncate">Stop Auto</span>
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4 mr-1 flex-shrink-0" />
-              <span className="truncate">Autonomous Mode</span>
-            </>
-          )}
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant={autonomousMode ? "destructive" : "default"}
+            size="sm"
+            onClick={onToggleAutonomous}
+            data-testid="button-toggle-autonomous"
+          >
+            {autonomousMode ? (
+              <>
+                <Pause className="w-3 h-3 mr-1" />
+                Stop
+              </>
+            ) : (
+              <>
+                <Zap className="w-3 h-3 mr-1" />
+                Auto
+              </>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onManualOverride}
+            data-testid="button-manual-override"
+          >
+            <Hand className="w-3 h-3 mr-1" />
+            Override
+          </Button>
+        </div>
 
         <Button
           variant="outline"
-          className="h-12 text-sm font-display font-semibold"
-          onClick={onManualOverride}
-          data-testid="button-manual-override"
-        >
-          <Hand className="w-4 h-4 mr-1 flex-shrink-0" />
-          <span className="truncate">Manual Override</span>
-        </Button>
-
-        <Button
-          variant="outline"
-          className="h-12 text-sm font-display font-semibold"
+          size="sm"
+          className="w-full"
           onClick={onReplay}
           data-testid="button-replay"
         >
-          <History className="w-4 h-4 mr-1 flex-shrink-0" />
-          <span className="truncate">Replay Last Cycle</span>
+          <History className="w-3 h-3 mr-2" />
+          Replay
         </Button>
       </div>
 

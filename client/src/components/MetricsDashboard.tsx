@@ -81,31 +81,31 @@ export function MetricsDashboard({ metrics, previousMetrics }: MetricsDashboardP
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4" data-testid="metrics-dashboard">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="metrics-dashboard">
       {metricCards.map((metric) => {
         const Icon = metric.icon;
         return (
           <Card key={metric.label} className="hover-elevate" data-testid={metric.testId}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <Icon className="w-4 h-4 text-muted-foreground" />
+            <CardContent className="p-3">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 {metric.change && (
                   <span
-                    className={`text-xs font-medium flex items-center gap-0.5 ${
+                    className={`text-xs font-medium flex items-center gap-0.5 flex-shrink-0 ${
                       metric.positive ? "text-green-500" : "text-red-500"
                     }`}
                   >
                     {metric.positive ? (
-                      <TrendingUp className="w-3 h-3" />
+                      <TrendingUp className="w-2.5 h-2.5" />
                     ) : (
-                      <TrendingDown className="w-3 h-3" />
+                      <TrendingDown className="w-2.5 h-2.5" />
                     )}
                     {metric.change}
                   </span>
                 )}
               </div>
               <div>
-                <p className={`text-2xl font-bold font-display ${metric.valueColor || ""}`}>
+                <p className={`text-xl font-bold font-display ${metric.valueColor || ""}`}>
                   {metric.value}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">{metric.label}</p>
