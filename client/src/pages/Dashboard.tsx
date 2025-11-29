@@ -168,7 +168,24 @@ export default function Dashboard() {
   const handleRunSimulation = () => {
     setIsSimulating(true);
     simulationMutation.mutate();
-    setTimeout(() => setIsSimulating(false), 3000);
+    
+    // Save simulation to memory after it completes
+    setTimeout(() => {
+      if (simulationTree.length > 0) {
+        const latestSim = simulationTree[0];
+        apiRequest("POST", "/api/memory", {
+          agentId: "system",
+          agentType: "meta",
+          eventType: "simulation_completed",
+          outcome: latestSim.outcome,
+          evScore: latestSim.evScore,
+          predictions: latestSim.predictions,
+          timestamp: Date.now(),
+          description: `Simulation completed with EV Score: ${latestSim.evScore.toFixed(2)}. Outcome: ${latestSim.outcome}`
+        } as any).catch(err => console.error("Failed to save memory:", err));
+      }
+      setIsSimulating(false);
+    }, 3000);
   };
 
   const handleToggleAutonomous = () => {
@@ -273,11 +290,32 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Timeline Slider */}
+          {timelineEvents.length > 0 && (
+            <Card>
+              <CardContent className="p-5">
+                <TimeWarpSlider events={timelineEvents} onTimeChange={(timestamp) => {
+                  console.log("Timeline changed to:", new Date(timestamp).toISOString());
+                }} />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Simulations Section - Compact */}
           {simulationTree.length > 0 && (
             <Card>
               <CardContent className="p-5">
-                <h3 className="text-base font-semibold mb-3">Active Predictions</h3>
+                <div className="mb-4">
+                  <h3 className="text-base font-semibold mb-2">Active Predictions</h3>
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm text-muted-foreground mb-4">
+                    <p className="font-mono text-xs mb-2"><strong>What you're seeing:</strong></p>
+                    <ul className="space-y-1 text-xs list-disc list-inside">
+                      <li><strong>EV Score:</strong> Expected Value (-2 to +2) - Higher = Better profit chance</li>
+                      <li><strong>Viable/Risky/Pending:</strong> Risk assessment of the opportunity</li>
+                      <li><strong>Yield:</strong> Projected annual percentage return if strategy succeeds</li>
+                    </ul>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-52 overflow-y-auto">
                   {simulationTree.slice(0, 6).map((sim, idx) => (
                     <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/40 bg-green-500/5" : sim.outcome === "failure" ? "border-red-500/40 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5"}`}>

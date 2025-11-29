@@ -27,6 +27,7 @@ export function ControlPanel({
           variant={autonomousMode ? "default" : "secondary"}
           className="text-xs"
           data-testid="badge-autonomous-status"
+          title={autonomousMode ? "System is running autonomously" : "System requires manual commands"}
         >
           {autonomousMode ? "AUTONOMOUS" : "MANUAL"}
         </Badge>
@@ -38,6 +39,7 @@ export function ControlPanel({
           onClick={onRunSimulation}
           disabled={isSimulating}
           data-testid="button-run-simulation"
+          title="Run a simulation to test strategy and predict outcomes"
         >
           <Play className="w-4 h-4 mr-2" />
           {isSimulating ? "Simulating..." : "Run Simulation"}
@@ -49,6 +51,7 @@ export function ControlPanel({
             size="sm"
             onClick={onToggleAutonomous}
             data-testid="button-toggle-autonomous"
+            title={autonomousMode ? "Stop autonomous mode and return to manual control" : "Enable autonomous mode to run strategies automatically"}
           >
             {autonomousMode ? (
               <>
@@ -68,6 +71,7 @@ export function ControlPanel({
             size="sm"
             onClick={onManualOverride}
             data-testid="button-manual-override"
+            title="Pause all autonomous actions and take manual control"
           >
             <Hand className="w-3 h-3 mr-1" />
             Override
@@ -80,10 +84,22 @@ export function ControlPanel({
           className="w-full"
           onClick={onReplay}
           data-testid="button-replay"
+          title="Replay past events and examine historical decisions"
         >
           <History className="w-3 h-3 mr-2" />
           Replay
         </Button>
+      </div>
+
+      {/* Explanation Box */}
+      <div className="mt-6 p-3 rounded-lg bg-card/50 border border-border/50">
+        <h4 className="text-xs font-semibold mb-2 text-foreground">How it works:</h4>
+        <ul className="space-y-1 text-xs text-muted-foreground">
+          <li>• <strong>Simulation:</strong> Tests strategy outcomes before executing</li>
+          <li>• <strong>Autonomous:</strong> Auto-executes approved strategies 24/7</li>
+          <li>• <strong>Manual:</strong> You approve each trade before execution</li>
+          <li>• <strong>Replay:</strong> Review historical decisions using timeline</li>
+        </ul>
       </div>
 
       <div className="mt-6 p-4 rounded-lg bg-card/50 border border-border">

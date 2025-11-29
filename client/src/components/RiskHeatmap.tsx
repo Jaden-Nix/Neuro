@@ -33,7 +33,10 @@ export function RiskHeatmap({ data, width = 12, height = 8 }: RiskHeatmapProps) 
   return (
     <div className="space-y-3" data-testid="risk-heatmap">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-display font-semibold">Risk Matrix</h3>
+        <div>
+          <h3 className="text-sm font-display font-semibold">Risk Matrix</h3>
+          <p className="text-xs text-muted-foreground mt-1">Market exposure & volatility assessment</p>
+        </div>
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-sm bg-green-500/80" />
@@ -48,6 +51,11 @@ export function RiskHeatmap({ data, width = 12, height = 8 }: RiskHeatmapProps) 
             <span className="text-muted-foreground">High</span>
           </div>
         </div>
+      </div>
+
+      <div className="bg-muted/30 rounded-md p-3 text-xs text-muted-foreground space-y-1 mb-3">
+        <p><strong>What this shows:</strong> Each cell = risk exposure for a market/asset pair</p>
+        <p><strong>Green:</strong> Safe to trade | <strong>Yellow:</strong> Caution | <strong>Red:</strong> High risk - avoid or reduce position</p>
       </div>
 
       <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}>
