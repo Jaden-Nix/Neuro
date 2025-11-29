@@ -28,6 +28,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [devPanelOpen, setDevPanelOpen] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
+  const [previousMetrics, setPreviousMetrics] = useState<LiveMetrics | null>(null);
 
   // WebSocket for real-time updates
   const wsState = useWebSocket();
@@ -49,6 +50,13 @@ export default function Dashboard() {
     queryKey: ["/api/metrics"],
     refetchInterval: wsState.connected ? 10000 : 1000, // Less frequent if WS connected
   });
+
+  // Track previous metrics for change calculations
+  useEffect(() => {
+    if (metrics && metrics !== previousMetrics) {
+      setPreviousMetrics(metrics);
+    }
+  }, [metrics]);
 
   // Use WebSocket logs if available, otherwise fetch
   const { data: fetchedLogs = [] } = useQuery<LogEntry[]>({
@@ -114,6 +122,26 @@ export default function Dashboard() {
       toast({
         title: "Simulation Failed",
         description: "An error occurred during simulation.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clearLogsMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", "/api/logs", {});
+    },
+    onSuccess: () => {
+      toast({
+        title: "Logs Cleared",
+        description: "System logs have been cleared and archived",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
+    },
+    onError: () => {
+      toast({
+        title: "Clear Failed",
+        description: "Could not clear logs",
         variant: "destructive",
       });
     },
@@ -187,7 +215,7 @@ export default function Dashboard() {
       <main className="pt-20 pb-8 px-6">
         <div className="container mx-auto space-y-8">
           {/* Metrics Dashboard */}
-          <MetricsDashboard metrics={defaultMetrics} />
+          <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
 
           {/* Main Grid Layout */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -231,7 +259,11 @@ export default function Dashboard() {
             <div className="space-y-6">
               <Card className="h-[600px]">
                 <CardContent className="p-6 h-full">
-                  <LogStream logs={logs} />
+                  <LogStream 
+                    logs={logs}
+                    onClearLogs={() => clearLogsMutation.mutate()}
+                    isClearing={clearLogsMutation.isPending}
+                  />
                 </CardContent>
               </Card>
             </div>

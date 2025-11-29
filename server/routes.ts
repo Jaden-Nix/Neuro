@@ -366,6 +366,30 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/logs", writeLimiter, async (_req, res) => {
+    try {
+      const result = await storage.clearLogs();
+      broadcastToClients({
+        type: "logsCleared",
+        data: result,
+        timestamp: Date.now(),
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear logs" });
+    }
+  });
+
+  app.get("/api/logs/archived", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const logs = await storage.getArchivedLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get archived logs" });
+    }
+  });
+
   // Credits
   app.get("/api/credits", async (_req, res) => {
     try {
