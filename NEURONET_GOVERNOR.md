@@ -4,6 +4,12 @@
 
 NeuroNet Governor is an **autonomous multi-agent AI system for DeFi protocol governance** built on the AGENT ARENA Hackathon's ADK-TS framework. Four specialized AI agents collaborate to identify opportunities, assess risks, and execute transactions in DeFi protocols 24/7 without human intervention.
 
+### Philosophy
+
+**Governance today moves at human speed. Markets move at machine speed.**
+
+NeuroNet's mission is to close that gap with transparent, accountable, AI-driven autonomy. We believe the future of decentralized governance isn't humans voting for days—it's AI agents making intelligent, verifiable decisions in seconds, with humans retaining final authority through multi-signature controls. This is governance for the speed of money, not the speed of committees.
+
 ---
 
 ## The Problem It Solves
@@ -410,6 +416,63 @@ queryAgent(agentName, prompt, {
 - **Automatic deprecation:** Credit < 20 triggers replacement with new instance
 
 **Result:** Bad decision-making is punished; only quality agents survive.
+
+---
+
+## System Pipeline Visualization
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Scout Agent (Gemini-2.5)                                                │
+│ Identifies opportunities: yield farming, arbitrage, staking              │
+│ Output: opportunityType, confidence, expectedReturn                     │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Risk Agent (Gemini-2.5)                                                 │
+│ Evaluates safety: risk score, can veto, identifies vulnerabilities     │
+│ Output: riskScore, shouldVeto, potentialLoss                           │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Execution Agent (Gemini-2.5)                                            │
+│ Plans transaction: gas, steps, success probability                      │
+│ Output: feasible, gasEstimate, successProbability                       │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Meta Agent (Gemini-2.5)                                                 │
+│ Final orchestrator: synthesizes all, makes APPROVED/REJECTED            │
+│ Output: approved, confidence, reasoning                                 │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Multi-Sig Gating (3-of-5 signatures required)                          │
+│ 24-hour timelock, human override available                              │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ Blockchain Execution (Ethereum/Base/Fraxtal)                            │
+│ Transaction broadcast, outcome recorded                                 │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ MemoryVault Smart Contract                                              │
+│ Stores decision, reasoning, execution result, agent credit update       │
+└────────────────────────┬────────────────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│ ATP (Agent Tokenization Platform)                                       │
+│ Publishes agent metrics, spawns generations, updates leaderboard        │
+└─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
