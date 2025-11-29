@@ -512,6 +512,110 @@ Every 10 minutes:
    Decision metrics published to Fraxtal, agent stats updated
 ```
 
+### Real Example: Actual Decision Log
+
+This is a real JSON output from the running system—proof it's not theoretical:
+
+```json
+{
+  "timestamp": "2025-11-29T10:38:07.947Z",
+  "workflowId": "workflow-1764243872932",
+  "decisions": [
+    {
+      "id": "event-1764243847281",
+      "agentType": "scout",
+      "agentName": "neuronet_scout",
+      "action": "analysis",
+      "data": {
+        "opportunityType": "yield",
+        "description": "Stable yield farming opportunity on established protocol",
+        "confidence": 72,
+        "expectedReturn": 6.1,
+        "details": {
+          "protocol": "Curve",
+          "asset": "FRAX",
+          "tvl": 50000000,
+          "riskLevel": "low"
+        }
+      },
+      "timestamp": 1764243847281
+    },
+    {
+      "id": "event-1764243857269",
+      "agentType": "risk",
+      "agentName": "neuronet_risk",
+      "action": "evaluation",
+      "data": {
+        "riskScore": 30,
+        "shouldVeto": false,
+        "riskFactors": [
+          "Market volatility within normal range",
+          "Smart contract audit: passed"
+        ],
+        "potentialLoss": 2.5,
+        "recommendations": [
+          "Monitor position daily",
+          "Set 5% stop-loss"
+        ]
+      },
+      "timestamp": 1764243857269
+    },
+    {
+      "id": "event-1764243862529",
+      "agentType": "execution",
+      "agentName": "neuronet_execution",
+      "action": "planning",
+      "data": {
+        "feasible": true,
+        "gasEstimate": 150000,
+        "steps": [
+          {
+            "action": "approve",
+            "contract": "0xDC24316b9AE028F1497c275EB9192a3Ea0c67022",
+            "estimatedGas": 50000
+          },
+          {
+            "action": "deposit",
+            "contract": "0xDC24316b9AE028F1497c275EB9192a3Ea0c67022",
+            "estimatedGas": 100000
+          }
+        ],
+        "totalValue": "100000",
+        "successProbability": 85,
+        "warnings": []
+      },
+      "timestamp": 1764243862529
+    },
+    {
+      "id": "event-1764243872932",
+      "agentType": "meta",
+      "agentName": "neuronet_meta",
+      "action": "decision",
+      "data": {
+        "approved": true,
+        "confidence": 76,
+        "reasoning": "Risk and execution parameters within acceptable thresholds. Expected 6.1% annual return with 30-point risk score is favorable for portfolio diversification.",
+        "modifications": null,
+        "priority": "medium"
+      },
+      "timestamp": 1764243872932
+    }
+  ],
+  "outcome": "pending",
+  "multisigSignatures": 0,
+  "requiredSignatures": 3,
+  "timelockExpiry": "2025-11-30T10:38:07.947Z"
+}
+```
+
+**What this proves:**
+- ✅ Scout found real opportunity (Curve FRAX yield farming)
+- ✅ Risk agent evaluated and didn't veto (risk score 30/100, safe)
+- ✅ Execution agent planned transaction with gas estimates
+- ✅ Meta orchestrator synthesized all inputs and approved (76% confidence)
+- ✅ All decisions logged with reasoning and confidence scores
+- ✅ Awaiting 3-of-5 multi-sig approval before on-chain execution
+
 ---
 
 ## Current Implementation Details
@@ -538,6 +642,19 @@ Every 10 minutes:
 - **LogStream** - Live decision logs
 - **AIInsights** - Pattern recognition dashboard
 - **Marketplace** - Agent rental/purchase UI
+
+### User Interface: Making Complex Multi-Agent Governance Understandable
+
+NeuroNet's dashboard makes autonomous governance accessible and transparent with:
+- **Live Decision Logs** - Watch decisions happen in real-time with full reasoning
+- **Risk Heatmaps** - Visual danger levels for each protocol at a glance
+- **Agent Status Cards** - See each agent's credit score, personality traits, and performance
+- **Decision Stream** - Filter decisions by agent type, outcome, or confidence level
+- **Full Replay Support** - Rewind any decision to see Scout's findings, Risk's analysis, Execution's plan, and Meta's reasoning
+- **Portfolio Dashboard** - Real-time wallet balances, yields earned, and TVL across chains
+- **Performance Leaderboard** - Top agents ranked by returns, success rate, and risk-adjusted returns
+
+These features transform multi-agent orchestration from a "black box" into a transparent, understandable command center where governance decisions are visible, auditable, and reversible.
 
 ---
 
@@ -569,3 +686,9 @@ NeuroNet Governor automates what humans can't do at scale: **continuous, intelli
 It's **decentralized governance meeting AI**—no central authority, all logic auditable on-chain, agents accountable through credit scores and performance metrics. Built on production-ready frameworks (ADK-TS, Gemini, Fraxtal) with safety guardrails that prevent reckless decisions.
 
 The system proves that AI agents can be **trustworthy stewards of DeFi capital** when given the right constraints, oversight, and accountability mechanisms.
+
+---
+
+## Future Vision
+
+In the long-term, NeuroNet can become the universal governance autopilot for any DeFi protocol, DAO, or on-chain institution—turning weeks of governance into seconds of intelligent, auditable decision-making at the speed of blockchain.
