@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,25 @@ interface TimeWarpSliderProps {
 export function TimeWarpSlider({ events, onTimeChange }: TimeWarpSliderProps) {
   const [currentIndex, setCurrentIndex] = useState(events.length > 0 ? events.length - 1 : 0);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  // Auto-advance when playing
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => {
+        if (prev >= events.length - 1) {
+          setIsPlaying(false);
+          return prev;
+        }
+        const newIndex = prev + 1;
+        if (events[newIndex] && onTimeChange) {
+          onTimeChange(events[newIndex].timestamp);
+        }
+        return newIndex;
+      });
+    }, 800);
+    return () => clearInterval(interval);
+  }, [isPlaying, events, onTimeChange]);
 
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
@@ -116,13 +135,16 @@ export function TimeWarpSlider({ events, onTimeChange }: TimeWarpSliderProps) {
         </div>
 
         {currentEvent && (
-          <div className="p-3 rounded-md bg-muted/50 border border-border">
-            <div className="flex justify-between items-start mb-1">
+          <div className="p-3 rounded-md bg-muted/50 border border-border space-y-2">
+            <div className="flex justify-between items-start">
+              <span className="text-xs font-mono font-semibold text-foreground">
+                Event {currentIndex + 1} / {events.length}
+              </span>
               <span className="text-xs font-mono text-muted-foreground">
                 {formatTimestamp(currentEvent.timestamp)}
               </span>
             </div>
-            <p className="text-sm" data-testid="text-current-event">
+            <p className="text-sm text-foreground leading-relaxed break-words max-w-sm" data-testid="text-current-event">
               {currentEvent.description}
             </p>
           </div>

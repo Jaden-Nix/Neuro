@@ -1,4 +1,13 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Info } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface RiskHeatmapProps {
   data?: number[][];
@@ -7,6 +16,8 @@ interface RiskHeatmapProps {
 }
 
 export function RiskHeatmap({ data, width = 12, height = 8 }: RiskHeatmapProps) {
+  const [showHelp, setShowHelp] = useState(false);
+  
   const heatmapData = useMemo(() => {
     if (data) return data;
     
@@ -32,11 +43,46 @@ export function RiskHeatmap({ data, width = 12, height = 8 }: RiskHeatmapProps) 
 
   return (
     <div className="space-y-3" data-testid="risk-heatmap">
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Risk Matrix Guide</DialogTitle>
+            <DialogDescription>Understanding the risk heatmap</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <p className="text-muted-foreground">Each colored square represents the current risk exposure for a specific market or asset pair.</p>
+            <div className="space-y-3">
+              <div>
+                <h4 className="font-semibold text-green-600 dark:text-green-400 mb-1">Green - Low Risk</h4>
+                <p className="text-muted-foreground">Safe to trade. Market volatility is low and conditions are favorable.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-yellow-600 dark:text-yellow-400 mb-1">Yellow - Medium Risk</h4>
+                <p className="text-muted-foreground">Proceed with caution. Some volatility present but manageable if you reduce position size.</p>
+              </div>
+              <div>
+                <h4 className="font-semibold text-red-600 dark:text-red-400 mb-1">Red - High Risk</h4>
+                <p className="text-muted-foreground">Avoid trading. Very high volatility or unstable market conditions. Wait for better conditions.</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-4">Hover over any cell to see the exact risk percentage and coordinates.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-display font-semibold">Risk Matrix</h3>
           <p className="text-xs text-muted-foreground mt-1">Market exposure & volatility assessment</p>
         </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setShowHelp(true)}
+          data-testid="button-help-risk"
+        >
+          <Info className="w-4 h-4" />
+        </Button>
         <div className="flex items-center gap-2 text-xs">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-sm bg-green-500/80" />
@@ -51,11 +97,6 @@ export function RiskHeatmap({ data, width = 12, height = 8 }: RiskHeatmapProps) 
             <span className="text-muted-foreground">High</span>
           </div>
         </div>
-      </div>
-
-      <div className="bg-muted/30 rounded-md p-3 text-xs text-muted-foreground space-y-1 mb-3">
-        <p><strong>What this shows:</strong> Each cell = risk exposure for a market/asset pair</p>
-        <p><strong>Green:</strong> Safe to trade | <strong>Yellow:</strong> Caution | <strong>Red:</strong> High risk - avoid or reduce position</p>
       </div>
 
       <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}>

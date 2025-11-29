@@ -95,7 +95,7 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
         return (
           <motion.div
             key={agent.id}
-            className="absolute"
+            className="absolute z-20"
             style={{
               left: "50%",
               top: "50%",

@@ -1,6 +1,14 @@
-import { Play, Zap, Hand, History, Pause } from "lucide-react";
+import { Play, Zap, Hand, History, Pause, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ControlPanelProps {
   autonomousMode: boolean;
@@ -19,19 +27,58 @@ export function ControlPanel({
   onReplay,
   isSimulating = false,
 }: ControlPanelProps) {
+  const [showHelp, setShowHelp] = useState(false);
+
   return (
     <div className="space-y-4" data-testid="control-panel">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-display font-bold">Control Center</h3>
-        <Badge 
-          variant={autonomousMode ? "default" : "secondary"}
-          className="text-xs"
-          data-testid="badge-autonomous-status"
-          title={autonomousMode ? "System is running autonomously" : "System requires manual commands"}
-        >
-          {autonomousMode ? "AUTONOMOUS" : "MANUAL"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowHelp(true)}
+            data-testid="button-help-control"
+          >
+            <Info className="w-4 h-4" />
+          </Button>
+          <Badge 
+            variant={autonomousMode ? "default" : "secondary"}
+            className="text-xs"
+            data-testid="badge-autonomous-status"
+            title={autonomousMode ? "System is running autonomously" : "System requires manual commands"}
+          >
+            {autonomousMode ? "AUTONOMOUS" : "MANUAL"}
+          </Badge>
+        </div>
       </div>
+
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Control Center Guide</DialogTitle>
+            <DialogDescription>How to use each control</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Run Simulation</h4>
+              <p className="text-muted-foreground">Tests your strategy on multiple market scenarios to predict outcomes and profitability before risking real money.</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Auto Mode</h4>
+              <p className="text-muted-foreground">Enables the system to automatically execute approved strategies 24/7 without waiting for your approval on each trade.</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Manual Override</h4>
+              <p className="text-muted-foreground">Pauses all autonomous actions and requires you to manually approve each trade before execution.</p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Replay</h4>
+              <p className="text-muted-foreground">Step through past events on the timeline to review historical decisions and understand what happened.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="space-y-2">
         <Button
@@ -91,16 +138,6 @@ export function ControlPanel({
         </Button>
       </div>
 
-      {/* Explanation Box */}
-      <div className="mt-6 p-3 rounded-lg bg-card/50 border border-border/50">
-        <h4 className="text-xs font-semibold mb-2 text-foreground">How it works:</h4>
-        <ul className="space-y-1 text-xs text-muted-foreground">
-          <li>• <strong>Simulation:</strong> Tests strategy outcomes before executing</li>
-          <li>• <strong>Autonomous:</strong> Auto-executes approved strategies 24/7</li>
-          <li>• <strong>Manual:</strong> You approve each trade before execution</li>
-          <li>• <strong>Replay:</strong> Review historical decisions using timeline</li>
-        </ul>
-      </div>
 
       <div className="mt-6 p-4 rounded-lg bg-card/50 border border-border">
         <h4 className="text-sm font-display font-semibold mb-3">System Status</h4>
