@@ -8,6 +8,7 @@ import { MetricsDashboard } from "@/components/MetricsDashboard";
 import { ControlPanel } from "@/components/ControlPanel";
 import { TimeWarpSlider } from "@/components/TimeWarpSlider";
 import { DeveloperPanel } from "@/components/DeveloperPanel";
+import { PipelineDemo } from "@/components/PipelineDemo";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -152,12 +153,14 @@ export default function Dashboard() {
   };
 
   const defaultMetrics: LiveMetrics = {
-    walletBalance: metrics?.walletBalance || "1250000",
-    totalTVL: metrics?.totalTVL || "8500000",
+    walletBalanceEth: metrics?.walletBalanceEth || 1250000,
+    tvlUsd: metrics?.tvlUsd || 8500000,
     currentAPY: metrics?.currentAPY || 12.5,
     riskLevel: metrics?.riskLevel || 35,
     activeOpportunities: metrics?.activeOpportunities || 7,
     pendingTransactions: metrics?.pendingTransactions || 2,
+    gasPriceGwei: metrics?.gasPriceGwei || 25,
+    ethPriceUsd: metrics?.ethPriceUsd || 3200,
     timestamp: Date.now(),
   };
 
@@ -177,6 +180,9 @@ export default function Dashboard() {
 
       <main className="pt-20 pb-8 px-6">
         <div className="container mx-auto space-y-8">
+          {/* Pipeline Demo - The Hero Feature for Judges */}
+          <PipelineDemo creditScores={creditScores} />
+
           {/* Metrics Dashboard */}
           <MetricsDashboard metrics={defaultMetrics} />
 

@@ -7,12 +7,11 @@ interface MetricsDashboardProps {
 }
 
 export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
-  const formatCurrency = (value: string) => {
-    const num = parseFloat(value);
-    if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
-    if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
-    if (num >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
-    return `$${num.toFixed(2)}`;
+  const formatCurrency = (value: number) => {
+    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
+    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
+    if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
+    return `$${value.toFixed(2)}`;
   };
 
   const getRiskColor = (level: number) => {
@@ -25,7 +24,7 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
     {
       icon: Wallet,
       label: "Wallet Balance",
-      value: formatCurrency(metrics.walletBalance),
+      value: formatCurrency(metrics.walletBalanceEth),
       change: "+2.4%",
       positive: true,
       testId: "metric-wallet-balance"
@@ -33,7 +32,7 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
     {
       icon: DollarSign,
       label: "Total TVL",
-      value: formatCurrency(metrics.totalTVL),
+      value: formatCurrency(metrics.tvlUsd),
       change: "+5.7%",
       positive: true,
       testId: "metric-total-tvl"
