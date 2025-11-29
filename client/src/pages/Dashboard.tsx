@@ -233,6 +233,35 @@ export default function Dashboard() {
 
           {/* Timeline */}
           <TimeWarpSlider events={timelineEvents} />
+
+          {/* Simulations Section */}
+          {simulationTree.length > 0 && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-bold mb-4">Simulation Predictions</h3>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {simulationTree.map((sim, idx) => (
+                    <div key={sim.id} className="border border-border rounded-md p-3 bg-card/50">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-semibold text-sm">Branch {idx + 1}</span>
+                        <span className={`text-xs px-2 py-1 rounded-md ${sim.outcome === "pending" ? "bg-blue-500/20" : "bg-green-500/20"}`}>
+                          {sim.outcome || "pending"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {sim.predictions.slice(0, 2).map((pred, pidx) => (
+                          <div key={pidx} className="space-y-1">
+                            <div className="text-muted-foreground">Price: ${pred.price.toFixed(2)}</div>
+                            <div className="text-muted-foreground">Yield: {(pred.yield * 100).toFixed(2)}%</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </main>
 
