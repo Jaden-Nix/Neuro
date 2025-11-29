@@ -8,7 +8,6 @@ import { MetricsDashboard } from "@/components/MetricsDashboard";
 import { ControlPanel } from "@/components/ControlPanel";
 import { TimeWarpSlider } from "@/components/TimeWarpSlider";
 import { DeveloperPanel } from "@/components/DeveloperPanel";
-import { PipelineDemo } from "@/components/PipelineDemo";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -180,9 +179,6 @@ export default function Dashboard() {
 
       <main className="pt-20 pb-8 px-6">
         <div className="container mx-auto space-y-8">
-          {/* Pipeline Demo - The Hero Feature for Judges */}
-          <PipelineDemo creditScores={creditScores} />
-
           {/* Metrics Dashboard */}
           <MetricsDashboard metrics={defaultMetrics} />
 
