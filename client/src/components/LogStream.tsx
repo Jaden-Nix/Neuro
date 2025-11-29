@@ -94,34 +94,37 @@ export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogS
         </div>
       </div>
 
-      <ScrollArea className="flex-1 h-96" ref={scrollRef}>
-        <div className="space-y-2 font-mono text-xs pr-4">
-          {displayLogs.map((log) => {
-            const AgentIcon = agentIcons[log.agentType];
-            const LevelIcon = levelIcons[log.level];
-            const agentColorClass = agentColors[log.agentType];
-            const levelColorClass = levelColors[log.level];
+      <ScrollArea className="flex-1" ref={scrollRef}>
+        <div className="space-y-2 text-xs pr-4">
+          {displayLogs.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">No logs yet</p>
+          ) : (
+            displayLogs.map((log) => {
+              const AgentIcon = agentIcons[log.agentType];
+              const LevelIcon = levelIcons[log.level];
+              const agentColorClass = agentColors[log.agentType];
+              const levelColorClass = levelColors[log.level];
 
-            return (
-              <div
-                key={log.id}
-                className="flex items-start gap-2 p-2 rounded-md bg-card/50 border border-border/50 hover-elevate"
-                data-testid={`log-entry-${log.id}`}
-              >
-                <span className="text-muted-foreground shrink-0 w-20">
-                  {formatTimestamp(log.timestamp)}
-                </span>
-                
-                <div className={`shrink-0 w-5 h-5 rounded flex items-center justify-center ${agentColorClass}`}>
-                  <AgentIcon className="w-3 h-3" />
-                </div>
-
-                <div className={`shrink-0 ${levelColorClass}`}>
-                  <LevelIcon className="w-4 h-4" />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <p className="text-foreground break-words">{log.message}</p>
+              return (
+                <div
+                  key={log.id}
+                  className="p-3 rounded-md bg-card/50 border border-border/50 hover-elevate space-y-1"
+                  data-testid={`log-entry-${log.id}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground font-mono text-[11px]">
+                      {formatTimestamp(log.timestamp)}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${agentColorClass}`}>
+                        <AgentIcon className="w-3 h-3" />
+                      </div>
+                      <div className={`shrink-0 ${levelColorClass}`}>
+                        <LevelIcon className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-foreground break-words leading-relaxed">{log.message}</p>
                   {log.personality && (
                     <p className="text-muted-foreground text-[10px] italic mt-0.5">
                       [{log.personality}]

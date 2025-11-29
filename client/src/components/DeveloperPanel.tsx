@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { X, Code, GitBranch, Coins, Database, Copy, Check } from "lucide-react";
+import { X, Code, GitBranch, Coins, Database, Copy, Check, Zap, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import type { LogEntry, AgentCreditScore, MemoryEntry, SimulationBranch } from "@shared/schema";
+import { LiveSystemStatus } from "./LiveSystemStatus";
+import { Badge } from "@/components/ui/badge";
 
 interface DeveloperPanelProps {
   isOpen: boolean;
@@ -53,65 +54,72 @@ export function DeveloperPanel({
         </Button>
       </div>
 
-      <Tabs defaultValue="logs" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="w-full grid grid-cols-4 rounded-none border-b border-border shrink-0">
-          <TabsTrigger value="logs" data-testid="tab-logs">
-            <Code className="w-4 h-4 mr-1" />
+      <Tabs defaultValue="logs" className="flex-1 flex flex-col">
+        <TabsList className="w-full grid grid-cols-5 rounded-none border-b border-border">
+          <TabsTrigger value="logs" data-testid="tab-logs" className="text-xs">
+            <Code className="w-3 h-3 mr-1" />
             Logs
           </TabsTrigger>
-          <TabsTrigger value="simulations" data-testid="tab-simulations">
-            <GitBranch className="w-4 h-4 mr-1" />
+          <TabsTrigger value="simulations" data-testid="tab-simulations" className="text-xs">
+            <GitBranch className="w-3 h-3 mr-1" />
             Sims
           </TabsTrigger>
-          <TabsTrigger value="credits" data-testid="tab-credits">
-            <Coins className="w-4 h-4 mr-1" />
+          <TabsTrigger value="credits" data-testid="tab-credits" className="text-xs">
+            <Coins className="w-3 h-3 mr-1" />
             Credits
           </TabsTrigger>
-          <TabsTrigger value="memory" data-testid="tab-memory">
-            <Database className="w-4 h-4 mr-1" />
+          <TabsTrigger value="memory" data-testid="tab-memory" className="text-xs">
+            <Database className="w-3 h-3 mr-1" />
             Memory
+          </TabsTrigger>
+          <TabsTrigger value="status" data-testid="tab-status" className="text-xs">
+            <Zap className="w-3 h-3 mr-1" />
+            Status
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="logs" className="flex-1 p-4 min-h-0 flex flex-col">
-          <ScrollArea className="flex-1">
-            <div className="space-y-2 font-mono text-xs pr-4">
-              {logs.map((log) => (
+        <TabsContent value="logs" className="flex-1 p-4 overflow-y-auto">
+          <div className="space-y-2 text-xs">
+            {logs.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No logs yet</p>
+            ) : (
+              logs.map((log) => (
                 <div
                   key={log.id}
-                  className="p-2 rounded bg-muted/50 border border-border"
+                  className="p-3 rounded bg-muted/50 border border-border/50 space-y-1"
                 >
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="text-muted-foreground text-[10px]">
-                      {new Date(log.timestamp).toISOString()}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground text-[11px] font-mono">
+                      {new Date(log.timestamp).toLocaleTimeString()}
                     </span>
-                    <span
-                      className={`text-[10px] uppercase ${
-                        log.level === "error"
-                          ? "text-destructive"
-                          : log.level === "warn"
-                          ? "text-yellow-500"
-                          : log.level === "success"
-                          ? "text-green-500"
-                          : "text-primary"
-                      }`}
-                    >
-                      {log.level}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {log.agentType}
+                      </Badge>
+                      <Badge 
+                        className={`text-[10px] ${
+                          log.level === "error"
+                            ? "bg-destructive/20 text-destructive"
+                            : log.level === "warn"
+                            ? "bg-yellow-500/20 text-yellow-600"
+                            : log.level === "success"
+                            ? "bg-green-500/20 text-green-600"
+                            : "bg-primary/20 text-primary"
+                        }`}
+                      >
+                        {log.level.toUpperCase()}
+                      </Badge>
+                    </div>
                   </div>
-                  <p className="text-foreground text-[11px] break-words">{log.message}</p>
-                  <p className="text-muted-foreground text-[10px] mt-1">
-                    Agent: {log.agentType}
-                  </p>
+                  <p className="text-foreground text-xs break-words">{log.message}</p>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
+              ))
+            )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="simulations" className="flex-1 p-4 min-h-0 flex flex-col">
-          <ScrollArea className="flex-1">
-            <div className="space-y-3 pr-4">
+        <TabsContent value="simulations" className="flex-1 p-4 overflow-y-auto">
+          <div className="space-y-3">
               {simulationTree.map((branch) => (
                 <Card key={branch.id} className="p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -146,17 +154,13 @@ export function DeveloperPanel({
               ))}
 
               {simulationTree.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <p className="text-sm">No simulation data available</p>
-                </div>
+                <p className="text-center text-muted-foreground text-sm py-8">No simulations</p>
               )}
             </div>
-          </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="credits" className="flex-1 p-4 min-h-0 flex flex-col">
-          <ScrollArea className="flex-1">
-            <div className="space-y-3 pr-4">
+        <TabsContent value="credits" className="flex-1 p-4 overflow-y-auto">
+          <div className="space-y-3">
               {creditScores.map((score) => (
                 <Card key={score.agentId} className="p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -187,17 +191,13 @@ export function DeveloperPanel({
               ))}
 
               {creditScores.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <p className="text-sm">No credit data available</p>
-                </div>
+                <p className="text-center text-muted-foreground text-sm py-8">No credits yet</p>
               )}
             </div>
-          </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="memory" className="flex-1 p-4 min-h-0 flex flex-col">
-          <ScrollArea className="flex-1">
-            <div className="space-y-3 pr-4">
+        <TabsContent value="memory" className="flex-1 p-4 overflow-y-auto">
+          <div className="space-y-3">
               {memoryEntries.map((entry) => (
                 <Card key={entry.id} className="p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -250,12 +250,13 @@ export function DeveloperPanel({
               ))}
 
               {memoryEntries.length === 0 && (
-                <div className="text-center text-muted-foreground py-8">
-                  <p className="text-sm">No memory entries available</p>
-                </div>
+                <p className="text-center text-muted-foreground text-sm py-8">No memories</p>
               )}
             </div>
-          </ScrollArea>
+        </TabsContent>
+
+        <TabsContent value="status" className="flex-1 p-4 overflow-y-auto">
+          <LiveSystemStatus />
         </TabsContent>
       </Tabs>
     </div>

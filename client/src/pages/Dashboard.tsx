@@ -243,10 +243,9 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Center - Status & Core */}
-            <div className="lg:col-span-2 space-y-4">
-              <LiveSystemStatus />
-              <Card className="flex-1">
+            {/* Center - Core */}
+            <div className="lg:col-span-2">
+              <Card className="h-full">
                 <CardContent className="p-5">
                   <NeuroNetCore
                     agents={agents}
