@@ -410,6 +410,16 @@ export async function registerRoutes(
     }
   });
 
+  // Current Opportunity
+  app.get("/api/opportunity", async (_req, res) => {
+    try {
+      const opportunity = await storage.getCurrentOpportunity();
+      res.json(opportunity || {});
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get opportunity" });
+    }
+  });
+
   app.post("/api/simulate", requireWriteAuth, writeLimiter, async (req, res) => {
     try {
       const config = {
@@ -440,6 +450,11 @@ export async function registerRoutes(
         branchCount: req.body.branchCount || 5,
         predictionInterval: req.body.predictionInterval || 10,
       };
+
+      // Save opportunity if provided
+      if (req.body.opportunity) {
+        await storage.setCurrentOpportunity(req.body.opportunity);
+      }
 
       const branches = await simulationEngine.runSimulation(config, req.body.marketData);
       const bestBranch = simulationEngine.selectBestBranch(branches);

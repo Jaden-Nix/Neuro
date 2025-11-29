@@ -70,6 +70,12 @@ export default function Dashboard() {
     refetchInterval: 5000,
   });
 
+  // Fetch current opportunity
+  const { data: currentOpportunity } = useQuery({
+    queryKey: ["/api/opportunity"],
+    refetchInterval: 5000,
+  });
+
   // Use WebSocket simulations if available, otherwise fetch
   const { data: fetchedSimulations = [] } = useQuery<SimulationBranch[]>({
     queryKey: ["/api/simulations"],
@@ -239,7 +245,11 @@ export default function Dashboard() {
             <Card>
               <CardContent className="p-6">
                 <h3 className="text-lg font-bold mb-2">Simulation Predictions</h3>
-                <p className="text-sm text-muted-foreground mb-4">Forecasting: Curve FRAX/USD (6.2% APY) | Lido stETH (3.8%) | dYdX Lending Pool</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {currentOpportunity?.details?.protocol 
+                    ? `Forecasting: ${currentOpportunity.details.protocol} (${currentOpportunity.details.apy}% APY)`
+                    : "Forecasting: Curve FRAX/USD (6.2% APY) | Lido stETH (3.8%) | dYdX Lending Pool"}
+                </p>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {simulationTree.map((sim, idx) => (
                     <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/50 bg-green-500/10" : sim.outcome === "failure" ? "border-red-500/50 bg-red-500/10" : "border-border bg-card/50"}`}>

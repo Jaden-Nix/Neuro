@@ -56,6 +56,8 @@ export interface IStorage {
   // Simulations
   getSimulations(): Promise<SimulationBranch[]>;
   addSimulation(simulation: SimulationBranch): Promise<SimulationBranch>;
+  getCurrentOpportunity(): Promise<any | null>;
+  setCurrentOpportunity(opportunity: any): Promise<void>;
 
   // Replay
   getReplayEvents(filters?: any): Promise<ReplayEvent[]>;
@@ -124,6 +126,7 @@ export class MemStorage implements IStorage {
   private alerts: SentinelAlert[];
   private chainTransactions: Map<string, ChainTransaction>;
   private solanaWallets: Map<string, SolanaWallet>;
+  private currentOpportunity: any | null;
 
   constructor() {
     this.systemState = {
@@ -145,6 +148,7 @@ export class MemStorage implements IStorage {
     this.alerts = [];
     this.chainTransactions = new Map();
     this.solanaWallets = new Map();
+    this.currentOpportunity = null;
 
     this.metrics = {
       walletBalance: "1250000",
@@ -271,6 +275,14 @@ export class MemStorage implements IStorage {
   async addSimulation(simulation: SimulationBranch): Promise<SimulationBranch> {
     this.simulations.push(simulation);
     return simulation;
+  }
+
+  async getCurrentOpportunity(): Promise<any | null> {
+    return this.currentOpportunity;
+  }
+
+  async setCurrentOpportunity(opportunity: any): Promise<void> {
+    this.currentOpportunity = opportunity;
   }
 
   async getReplayEvents(filters?: any): Promise<ReplayEvent[]> {
