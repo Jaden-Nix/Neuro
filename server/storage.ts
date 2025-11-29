@@ -58,6 +58,7 @@ export interface IStorage {
   addSimulation(simulation: SimulationBranch): Promise<SimulationBranch>;
   getCurrentOpportunity(): Promise<any | null>;
   setCurrentOpportunity(opportunity: any): Promise<void>;
+  clearLogs(): Promise<void>;
 
   // Replay
   getReplayEvents(filters?: any): Promise<ReplayEvent[]>;
@@ -189,6 +190,10 @@ export class MemStorage implements IStorage {
 
   async getLogs(limit: number = 250): Promise<LogEntry[]> {
     return this.logs.slice(-limit);
+  }
+
+  async clearLogs(): Promise<void> {
+    this.logs = [];
   }
 
   async addLog(log: Omit<LogEntry, "id">): Promise<LogEntry> {

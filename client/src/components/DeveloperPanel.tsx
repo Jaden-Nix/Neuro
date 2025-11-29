@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { X, Code, GitBranch, Coins, Database, Copy, Check } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Code, GitBranch, Coins, Database, Copy, Check, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { LogEntry, AgentCreditScore, MemoryEntry, SimulationBranch } from "@shared/schema";
 
 interface DeveloperPanelProps {
@@ -23,12 +25,35 @@ export function DeveloperPanel({
   memoryEntries,
   simulationTree = [],
 }: DeveloperPanelProps) {
+  const { toast } = useToast();
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [localLogs, setLocalLogs] = useState<LogEntry[]>(logs);
+
+  useEffect(() => {
+    setLocalLogs(logs);
+  }, [logs]);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      await apiRequest("POST", "/api/logs/clear", {});
+      setLocalLogs([]);
+      toast({
+        title: "Logs Cleared",
+        description: "All developer logs have been cleared",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clear logs",
+        variant: "destructive",
+      });
+    }
   };
 
   if (!isOpen) return null;
@@ -73,10 +98,23 @@ export function DeveloperPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="logs" className="flex-1 p-4 overflow-hidden">
-          <ScrollArea className="h-full">
+        <TabsContent value="logs" className="flex-1 p-4 overflow-hidden flex flex-col">
+          <div className="mb-2 flex justify-between items-center">
+            <span className="text-xs text-muted-foreground">{localLogs.length} logs</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleClearLogs}
+              data-testid="button-clear-logs"
+              className="text-xs"
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Clear
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
             <div className="space-y-2 font-mono text-xs pr-4">
-              {logs.map((log) => (
+              {localLogs.map((log) => (
                 <div
                   key={log.id}
                   className="p-2 rounded bg-muted/50 border border-border"
