@@ -322,35 +322,74 @@ Respond with VALID JSON:
 
   private fallbackRiskAssessment(input: RiskInput): any {
     const proposal = input.proposal || {};
-    let riskScore = 30;
     const riskFactors: string[] = [];
     const recommendations: string[] = [];
 
-    if (proposal.value && parseFloat(proposal.value) > 10) {
-      riskScore += 20;
-      riskFactors.push("High transaction value");
-      recommendations.push("Consider splitting into smaller transactions");
+    // START WITH VOLATILITY COMPONENT
+    const volatility = proposal.volatilityPrediction || 50;
+    let riskScore = volatility * 0.7; // High volatility = high risk
+
+    // ADD LOW CONFIDENCE PENALTY
+    const confidence = proposal.confidence || 50;
+    riskScore += (100 - confidence) * 0.5; // Low confidence = penalty
+
+    // OPPORTUNITY TYPE ADJUSTMENTS
+    switch (proposal.opportunityType) {
+      case "arbitrage":
+        riskScore += 25;
+        riskFactors.push(`Arbitrage: Spread ${proposal.details?.spread || "unknown"} - execution & slippage risk`);
+        recommendations.push("Use private mempool to avoid slippage");
+        break;
+      case "yield":
+        riskScore -= 10;
+        riskFactors.push(`Yield farming: ${proposal.details?.protocol || "protocol"} - smart contract risk`);
+        if (proposal.details?.contractAge?.includes("audited")) {
+          riskScore -= 5;
+          recommendations.push("Protocol is audited - acceptable risk");
+        } else {
+          riskScore += 15;
+          recommendations.push("Verify smart contract audit before proceeding");
+        }
+        break;
+      case "stake":
+        riskScore -= 15;
+        riskFactors.push(`Staking: ${proposal.details?.protocol || "protocol"} - validator risk`);
+        if (proposal.details?.incidentsLast3y === 0) {
+          riskScore -= 5;
+          recommendations.push("No slashing incidents in 3 years - solid track record");
+        }
+        break;
+      case "swap":
+        riskScore += 20;
+        riskFactors.push("Swap: MEV and slippage exposure");
+        recommendations.push("Use Flashbots or private mempool");
+        break;
+      case "none":
+        riskScore = 10;
+        riskFactors.push("No opportunity detected - wait for better conditions");
+        recommendations.push("Market unfavorable currently");
+        break;
     }
 
-    if (proposal.type === "swap") {
-      riskScore += 15;
-      riskFactors.push("Swap transaction type - MEV exposure");
-      recommendations.push("Use private mempool or reduce slippage");
+    // POOL/TVL RISK CHECK
+    if (proposal.details?.tvl) {
+      if (proposal.details.tvl < 1000000) {
+        riskScore += 20;
+        riskFactors.push(`Low TVL ($${(proposal.details.tvl / 1000000).toFixed(1)}M) - liquidity risk`);
+        recommendations.push("Increase position size gradually");
+      }
     }
 
-    if (input.marketConditions?.volatility === "high") {
-      riskScore += 25;
-      riskFactors.push("High market volatility");
-      recommendations.push("Wait for market stabilization");
-    }
+    riskScore = Math.max(0, Math.min(100, riskScore));
 
     return {
-      riskScore: Math.min(100, riskScore),
-      shouldVeto: riskScore > 70,
-      riskFactors: riskFactors.length > 0 ? riskFactors : ["Standard transaction risk"],
+      riskScore: Math.round(riskScore),
+      shouldVeto: riskScore > 65 || confidence < 40,
+      riskFactors: riskFactors.length > 0 ? riskFactors : ["Standard market conditions"],
       potentialLoss: riskScore / 2,
-      liquidationRisk: Math.min(100, riskScore * 0.5),
-      recommendations: recommendations.length > 0 ? recommendations : ["Proceed with standard caution"],
+      liquidationRisk: Math.min(100, riskScore * 0.6),
+      reasoning: `Risk calculated from volatility (${Math.round(volatility)}%), confidence (${confidence}%), and opportunity type. Score: ${Math.round(riskScore)}/100`,
+      recommendations: recommendations.length > 0 ? recommendations : ["Monitor positions"],
     };
   }
 }
