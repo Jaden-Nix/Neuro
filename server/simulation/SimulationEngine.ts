@@ -345,11 +345,12 @@ export class SimulationEngine extends EventEmitter {
     // Determine outcome based on final EV and risk metrics
     const finalEV = predictions[predictions.length - 1].ev;
     const avgVolatility = predictions.reduce((sum, p) => sum + p.volatility, 0) / predictions.length;
+    const avgYield = predictions.reduce((sum, p) => sum + p.yield, 0) / predictions.length;
     
     let outcome: "success" | "failure" | "pending";
-    if (finalEV > 8 && avgVolatility < 0.5) {
+    if (finalEV > 0 && avgYield > 3.0 && avgVolatility < 0.35) {
       outcome = "success";
-    } else if (finalEV < -8 || avgVolatility > 0.7) {
+    } else if (finalEV < -5 || avgVolatility > 0.5) {
       outcome = "failure";
     } else {
       outcome = "pending";
