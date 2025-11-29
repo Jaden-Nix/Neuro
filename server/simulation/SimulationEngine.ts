@@ -348,15 +348,15 @@ export class SimulationEngine extends EventEmitter {
     const avgYield = predictions.reduce((sum, p) => sum + p.yield, 0) / predictions.length;
     
     let outcome: "success" | "failure" | "pending";
-    // Success: profitable yields, stable volatility
-    if (avgYield > 3.0 && avgVolatility < 0.3) {
+    // Success: positive EV with acceptable volatility, or good yield with stable conditions
+    if ((finalEV > 0 && avgVolatility <= 0.35) || (avgYield >= 2.5 && avgVolatility < 0.3)) {
       outcome = "success";
     } 
-    // Failure: high volatility or low yield
-    else if (avgVolatility > 0.35 || avgYield < 2.5) {
+    // Failure: negative EV with high volatility, or very poor conditions
+    else if ((finalEV <= -5 && avgVolatility > 0.4) || avgVolatility >= 0.45 || avgYield < 1.5) {
       outcome = "failure";
     } 
-    // Pending: moderate conditions
+    // Pending: moderate conditions - needs more evaluation
     else {
       outcome = "pending";
     }

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Brain, Search, Shield, Zap, Info, AlertTriangle, XCircle, CheckCircle } from "lucide-react";
+import { Brain, Search, Shield, Zap, Info, AlertTriangle, XCircle, CheckCircle, Trash2 } from "lucide-react";
 import { AgentType, type LogEntry } from "@shared/schema";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface LogStreamProps {
   logs: LogEntry[];
   maxLogs?: number;
+  onClearLogs?: () => void;
+  isClearing?: boolean;
 }
 
 const agentIcons = {
@@ -37,7 +40,7 @@ const levelColors = {
   success: "text-green-500",
 };
 
-export function LogStream({ logs, maxLogs = 100 }: LogStreamProps) {
+export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogStreamProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const displayLogs = logs.slice(-maxLogs);
@@ -64,6 +67,19 @@ export function LogStream({ logs, maxLogs = 100 }: LogStreamProps) {
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-display font-semibold">System Logs</h3>
         <div className="flex items-center gap-2">
+          {onClearLogs && displayLogs.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClearLogs}
+              disabled={isClearing}
+              className="h-6 text-xs"
+              data-testid="button-clear-logs"
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              Clear
+            </Button>
+          )}
           <Badge 
             variant={autoScroll ? "default" : "secondary"}
             className="cursor-pointer text-xs"

@@ -263,7 +263,7 @@ export default function Dashboard() {
                         {sim.predictions.slice(0, 2).map((pred, pidx) => (
                           <div key={pidx} className="space-y-1">
                             <div className="text-muted-foreground">Price: ${pred.price.toFixed(2)}</div>
-                            <div className="text-muted-foreground">Yield: {(pred.yield * 100).toFixed(2)}%</div>
+                            <div className="text-muted-foreground">Yield: {pred.yield.toFixed(2)}%</div>
                           </div>
                         ))}
                       </div>

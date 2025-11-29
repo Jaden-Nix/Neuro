@@ -4,9 +4,10 @@ import type { LiveMetrics } from "@shared/schema";
 
 interface MetricsDashboardProps {
   metrics: LiveMetrics;
+  previousMetrics?: LiveMetrics | null;
 }
 
-export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
+export function MetricsDashboard({ metrics, previousMetrics }: MetricsDashboardProps) {
   const formatCurrency = (value: number) => {
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
@@ -20,29 +21,42 @@ export function MetricsDashboard({ metrics }: MetricsDashboardProps) {
     return "text-red-500";
   };
 
+  const calculateChange = (current: number, previous: number | undefined): { change: string; positive: boolean } | null => {
+    if (!previous || previous === 0) return null;
+    const delta = ((current - previous) / previous) * 100;
+    return {
+      change: `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`,
+      positive: delta >= 0
+    };
+  };
+
+  const walletChange = calculateChange(metrics.walletBalanceEth, previousMetrics?.walletBalanceEth);
+  const tvlChange = calculateChange(metrics.tvlUsd, previousMetrics?.tvlUsd);
+  const apyChange = calculateChange(metrics.currentAPY, previousMetrics?.currentAPY);
+
   const metricCards = [
     {
       icon: Wallet,
       label: "Wallet Balance",
       value: formatCurrency(metrics.walletBalanceEth),
-      change: "+2.4%",
-      positive: true,
+      change: walletChange?.change,
+      positive: walletChange?.positive ?? true,
       testId: "metric-wallet-balance"
     },
     {
       icon: DollarSign,
       label: "Total TVL",
       value: formatCurrency(metrics.tvlUsd),
-      change: "+5.7%",
-      positive: true,
+      change: tvlChange?.change,
+      positive: tvlChange?.positive ?? true,
       testId: "metric-total-tvl"
     },
     {
       icon: TrendingUp,
       label: "Current APY",
       value: `${metrics.currentAPY.toFixed(2)}%`,
-      change: "+0.3%",
-      positive: true,
+      change: apyChange?.change,
+      positive: apyChange?.positive ?? true,
       testId: "metric-current-apy"
     },
     {

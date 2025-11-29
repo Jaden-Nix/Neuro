@@ -39,6 +39,8 @@ export interface IStorage {
   // Logs
   getLogs(limit?: number): Promise<LogEntry[]>;
   addLog(log: Omit<LogEntry, "id">): Promise<LogEntry>;
+  clearLogs(): Promise<{ archivedCount: number }>;
+  getArchivedLogs(limit?: number): Promise<LogEntry[]>;
 
   // Metrics
   getMetrics(): Promise<LiveMetrics>;
@@ -117,7 +119,9 @@ export class MemStorage implements IStorage {
   private systemState: SystemState;
   private agents: Map<string, Agent>;
   private logs: LogEntry[];
+  private archivedLogs: LogEntry[];
   private metrics: LiveMetrics;
+  private previousMetrics: LiveMetrics | null;
   private creditScores: Map<string, AgentCreditScore>;
   private creditTransactions: CreditTransaction[];
   private memoryEntries: MemoryEntry[];
@@ -140,6 +144,7 @@ export class MemStorage implements IStorage {
 
     this.agents = new Map();
     this.logs = [];
+    this.archivedLogs = [];
     this.creditScores = new Map();
     this.creditTransactions = [];
     this.memoryEntries = [];
@@ -149,6 +154,7 @@ export class MemStorage implements IStorage {
     this.chainTransactions = new Map();
     this.solanaWallets = new Map();
     this.currentOpportunity = null;
+    this.previousMetrics = null;
 
     this.metrics = {
       walletBalance: "1250000",
@@ -204,6 +210,22 @@ export class MemStorage implements IStorage {
     }
     
     return fullLog;
+  }
+
+  async clearLogs(): Promise<{ archivedCount: number }> {
+    const count = this.logs.length;
+    // Archive logs before clearing
+    this.archivedLogs.push(...this.logs);
+    // Keep archive to last 1000 entries
+    if (this.archivedLogs.length > 1000) {
+      this.archivedLogs = this.archivedLogs.slice(-1000);
+    }
+    this.logs = [];
+    return { archivedCount: count };
+  }
+
+  async getArchivedLogs(limit: number = 100): Promise<LogEntry[]> {
+    return this.archivedLogs.slice(-limit);
   }
 
   async getMetrics(): Promise<LiveMetrics> {

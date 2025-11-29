@@ -53,8 +53,8 @@ export function DeveloperPanel({
         </Button>
       </div>
 
-      <Tabs defaultValue="logs" className="flex-1 flex flex-col">
-        <TabsList className="w-full grid grid-cols-4 rounded-none border-b border-border">
+      <Tabs defaultValue="logs" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="w-full grid grid-cols-4 rounded-none border-b border-border shrink-0">
           <TabsTrigger value="logs" data-testid="tab-logs">
             <Code className="w-4 h-4 mr-1" />
             Logs
@@ -73,8 +73,8 @@ export function DeveloperPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="logs" className="flex-1 p-4 overflow-hidden">
-          <ScrollArea className="h-full">
+        <TabsContent value="logs" className="flex-1 p-4 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1">
             <div className="space-y-2 font-mono text-xs pr-4">
               {logs.map((log) => (
                 <div
@@ -109,8 +109,8 @@ export function DeveloperPanel({
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="simulations" className="flex-1 p-4 overflow-hidden">
-          <ScrollArea className="h-full">
+        <TabsContent value="simulations" className="flex-1 p-4 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1">
             <div className="space-y-3 pr-4">
               {simulationTree.map((branch) => (
                 <Card key={branch.id} className="p-3">
@@ -154,8 +154,8 @@ export function DeveloperPanel({
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="credits" className="flex-1 p-4 overflow-hidden">
-          <ScrollArea className="h-full">
+        <TabsContent value="credits" className="flex-1 p-4 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1">
             <div className="space-y-3 pr-4">
               {creditScores.map((score) => (
                 <Card key={score.agentId} className="p-4">
@@ -195,8 +195,8 @@ export function DeveloperPanel({
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="memory" className="flex-1 p-4 overflow-hidden">
-          <ScrollArea className="h-full">
+        <TabsContent value="memory" className="flex-1 p-4 min-h-0 flex flex-col">
+          <ScrollArea className="flex-1">
             <div className="space-y-3 pr-4">
               {memoryEntries.map((entry) => (
                 <Card key={entry.id} className="p-3">
