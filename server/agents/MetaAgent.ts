@@ -133,12 +133,12 @@ export class MetaAgent extends BaseAgent {
       priority: rejected ? "low" : scoutConfidence > 70 && riskScore < 40 ? "high" : "medium",
     };
 
-    if (mlPrediction) {
+    if (input.mlPrediction) {
       decision.mlInsights = {
-        successProbability: mlPrediction.successProbability,
-        riskAdjustedScore: mlPrediction.riskAdjustedScore,
-        clusterLabel: mlPrediction.clusterLabel,
-        features: mlPrediction.features,
+        successProbability: input.mlPrediction.successProbability,
+        riskAdjustedScore: input.mlPrediction.riskAdjustedScore,
+        clusterLabel: input.mlPrediction.clusterLabel,
+        features: input.mlPrediction.features,
       };
     }
 
