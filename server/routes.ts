@@ -346,10 +346,12 @@ export async function registerRoutes(
   // Metrics
   app.get("/api/metrics", async (_req, res) => {
     try {
-      const metrics = await storage.getMetrics();
+      const metrics = await rpcClient.getOnChainMetrics();
       res.json(metrics);
     } catch (error) {
-      res.status(500).json({ error: "Failed to get metrics" });
+      console.error("Failed to fetch live metrics, using fallback:", error);
+      const fallbackMetrics = await storage.getMetrics();
+      res.json(fallbackMetrics);
     }
   });
 
