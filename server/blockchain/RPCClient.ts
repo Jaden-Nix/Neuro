@@ -1,5 +1,5 @@
 import { createPublicClient, http, formatEther, parseAbi } from "viem";
-import { mainnet, base, fraxtal } from "viem/chains";
+import { sepolia, baseSepolia, fraxtal } from "viem/chains";
 
 interface RetryConfig {
   maxRetries: number;
@@ -148,15 +148,15 @@ export class BlockchainRPCClient {
   constructor() {
     this.chainConfigs = [
       {
-        chainId: mainnet.id,
-        name: "Ethereum",
-        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://eth.llamarpc.com",
+        chainId: sepolia.id,
+        name: "Ethereum Sepolia",
+        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
         nativeSymbol: "ETH",
       },
       {
-        chainId: base.id,
-        name: "Base",
-        rpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
+        chainId: baseSepolia.id,
+        name: "Base Sepolia",
+        rpcUrl: process.env.BASE_RPC_URL || "https://sepolia.base.org",
         nativeSymbol: "ETH",
       },
       {
@@ -170,17 +170,17 @@ export class BlockchainRPCClient {
     this.clients = new Map();
     
     this.clients.set(
-      mainnet.id,
+      sepolia.id,
       createPublicClient({
-        chain: mainnet,
+        chain: sepolia,
         transport: http(this.chainConfigs[0].rpcUrl),
       })
     );
 
     this.clients.set(
-      base.id,
+      baseSepolia.id,
       createPublicClient({
-        chain: base,
+        chain: baseSepolia,
         transport: http(this.chainConfigs[1].rpcUrl),
       })
     );

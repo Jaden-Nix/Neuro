@@ -136,8 +136,8 @@ export class SolanaRPCClient {
     this.heliusApiKey = process.env.HELIUS_API_KEY;
     
     const rpcUrl = this.heliusApiKey
-      ? `https://mainnet.helius-rpc.com/?api-key=${this.heliusApiKey}`
-      : process.env.SOLANA_RPC_URL || clusterApiUrl("mainnet-beta");
+      ? `https://devnet.helius-rpc.com/?api-key=${this.heliusApiKey}`
+      : process.env.SOLANA_RPC_URL || clusterApiUrl("devnet");
     
     this.connection = new Connection(rpcUrl, {
       commitment: "confirmed",
