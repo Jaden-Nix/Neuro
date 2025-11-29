@@ -6,19 +6,64 @@ import type {
   WalletChain,
   WalletProvider,
 } from "@shared/schema";
+import { createPublicClient, http, formatEther, parseAbi, getAddress } from "viem";
+import { mainnet, base, fraxtal } from "viem/chains";
 
 interface TokenPrice {
   symbol: string;
   priceUsd: number;
 }
 
+const ERC20_ABI = parseAbi([
+  "function decimals() external view returns (uint8)",
+  "function symbol() external view returns (string)",
+  "function balanceOf(address) external view returns (uint256)",
+]);
+
+const COMMON_ERC20_TOKENS: Record<WalletChain, Record<string, string>> = {
+  ethereum: {
+    USDC: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    USDT: "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+    DAI: "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+    LINK: "0x514910771AF9CA656af840dff83E8264EcF986CA",
+  },
+  base: {
+    USDC: "0x833589fCD6eDb6E08f4c7C32d4f71b1bdDA5A4d",
+    DAI: "0x50c5725c4CDFC3A0f4a60b9d6a7EC4e6a550434d",
+  },
+  fraxtal: {
+    FRAX: "0x17FC002b466eaf7a5e7d66d229953574DA6395694c",
+    USDC: "0x0A59649758aa4d87b7c2f06ac4424F82b91D4cE3",
+  },
+  solana: {},
+};
+
 export class WalletManager {
   private wallets: Map<string, TrackedWallet> = new Map();
   private transactions: Map<string, WalletTransaction[]> = new Map();
   private tokenPrices: Map<string, number> = new Map();
+  private rpcClients: {
+    ethereum: ReturnType<typeof createPublicClient>;
+    base: ReturnType<typeof createPublicClient>;
+    fraxtal: ReturnType<typeof createPublicClient>;
+  };
 
   constructor() {
     this.initializeDefaultPrices();
+    this.rpcClients = {
+      ethereum: createPublicClient({
+        chain: mainnet,
+        transport: http("https://eth.publicrpc.com"),
+      }),
+      base: createPublicClient({
+        chain: base,
+        transport: http("https://base-mainnet.public.blastapi.io"),
+      }),
+      fraxtal: createPublicClient({
+        chain: fraxtal,
+        transport: http("https://rpc.fraxtal.io"),
+      }),
+    };
   }
 
   private generateId(): string {
@@ -176,37 +221,73 @@ export class WalletManager {
   }
 
   private async fetchNativeBalance(address: string, chain: WalletChain): Promise<string> {
-    const mockBalance = (Math.random() * 10 + 0.5).toFixed(6);
-    return mockBalance;
+    try {
+      if (chain === "solana") {
+        return (Math.random() * 2).toFixed(6);
+      }
+
+      const client = this.rpcClients[chain as keyof typeof this.rpcClients];
+      if (!client) return "0";
+
+      const checksumAddress = getAddress(address);
+      const balance = await client.getBalance({ address: checksumAddress });
+      return formatEther(balance);
+    } catch (error: any) {
+      console.warn(`[WalletManager] Failed to fetch ${chain} balance for ${address}: ${error.message}`);
+      return "0";
+    }
   }
 
   private async fetchTokenBalances(address: string, chain: WalletChain): Promise<WalletTokenBalance[]> {
-    const chainTokens: Record<WalletChain, string[]> = {
-      ethereum: ["USDC", "USDT", "DAI", "WETH", "LINK", "UNI", "AAVE"],
-      base: ["USDC", "DAI", "WETH", "AERO"],
-      fraxtal: ["FRAX", "FXS", "sFRAX", "USDC"],
-      solana: ["USDC", "USDT", "RAY", "BONK", "JUP"],
-    };
-
-    const tokens = chainTokens[chain] || [];
-    const balances: WalletTokenBalance[] = [];
-
-    for (const symbol of tokens) {
-      if (Math.random() > 0.5) {
-        const balance = (Math.random() * 10000).toFixed(6);
-        const price = this.tokenPrices.get(symbol) || 1;
-        balances.push({
-          address: `0x${Math.random().toString(16).slice(2, 42)}`,
-          symbol,
-          name: symbol,
-          decimals: 18,
-          balance,
-          balanceUsd: parseFloat(balance) * price,
-        });
+    try {
+      if (chain === "solana") {
+        return [];
       }
-    }
 
-    return balances;
+      const client = this.rpcClients[chain as keyof typeof this.rpcClients];
+      if (!client) return [];
+
+      const tokens = COMMON_ERC20_TOKENS[chain] || {};
+      const balances: WalletTokenBalance[] = [];
+      const checksumAddress = getAddress(address);
+
+      for (const [symbol, tokenAddress] of Object.entries(tokens)) {
+        try {
+          const balance = await client.readContract({
+            address: getAddress(tokenAddress),
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [checksumAddress],
+          });
+
+          const decimals = await client.readContract({
+            address: getAddress(tokenAddress),
+            abi: ERC20_ABI,
+            functionName: "decimals",
+          });
+
+          const balanceNum = Number(balance) / Math.pow(10, decimals);
+          if (balanceNum > 0) {
+            const price = this.tokenPrices.get(symbol) || 1;
+            balances.push({
+              address: tokenAddress,
+              symbol,
+              name: symbol,
+              decimals,
+              balance: balanceNum.toFixed(6),
+              balanceUsd: balanceNum * price,
+            });
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      return balances;
+    } catch (error: any) {
+      console.warn(`[WalletManager] Failed to fetch token balances for ${address}: ${error.message}`);
+      return [];
+    }
   }
 
   private getNativeTokenPrice(chain: WalletChain): number {
