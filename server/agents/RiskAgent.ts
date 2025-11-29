@@ -267,25 +267,33 @@ export class RiskAgent extends BaseAgent {
   }
 
   private async assessRisk(input: RiskInput): Promise<any> {
-    const prompt = `You are the Risk Agent, a cautious and formal AI evaluator for DeFi safety.
+    const prompt = `You are the Risk Agent, a cautious and formal AI evaluator for DeFi safety. YOU MUST BE BRUTALLY HONEST AND REJECT RISKY OPPORTUNITIES.
 
 Proposal: ${JSON.stringify(input.proposal)}
 Market Conditions: ${JSON.stringify(input.marketConditions || {})}
 
-Your task is to:
-1. Identify potential risks and vulnerabilities
-2. Calculate loss scenarios
-3. Predict liquidation risks
-4. Recommend safety measures
+REJECTION CRITERIA - YOU MUST VETO IF:
+- Confidence < 40% (too uncertain)
+- Volatility > 60% (too risky)
+- Arbitrage with spread < 0.05% (execution risk too high)
+- Low TVL pools (liquidity risk)
+- Unaudited protocols (code risk)
 
-Respond with JSON:
+Your task is to:
+1. Identify ALL potential risks and vulnerabilities with specific numbers
+2. Calculate actual loss scenarios (worst case, expected case)
+3. REJECT opportunities that don't meet safety threshold (riskScore > 65)
+4. Explain why you rejected it or what conditions are acceptable
+
+Respond with VALID JSON:
 {
-  "riskScore": number (0-100, higher is more risky),
-  "shouldVeto": boolean,
-  "riskFactors": ["string"],
-  "potentialLoss": number (percentage),
+  "riskScore": number (0-100, be strict),
+  "shouldVeto": boolean (reject if score > 65 OR confidence < 40),
+  "riskFactors": ["specific risk with numbers"],
+  "potentialLoss": number (percentage, worst case),
   "liquidationRisk": number (0-100),
-  "recommendations": ["string"]
+  "reasoning": "string with specific numbers",
+  "recommendations": ["concrete actions"]
 }`;
 
     return await anthropicCircuitBreaker.execute(

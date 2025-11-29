@@ -88,33 +88,49 @@ export class MetaAgent extends BaseAgent {
   }
 
   private getFallbackDecision(input: MetaDecisionInput): MetaDecision {
-    const executionPlan = input.executionPlan || {};
+    const scoutProposal = input.scoutProposal || {};
     const riskAssessment = input.riskAssessment || {};
-    const mlPrediction = input.mlPrediction;
+    const executionPlan = input.executionPlan || {};
     
-    const executionFeasible = executionPlan.feasible !== false;
-    const riskAcceptable = (riskAssessment.riskScore || 50) < 70;
+    // STRICT REJECTION CRITERIA
+    const scoutConfidence = scoutProposal.confidence || 0;
+    const riskScore = riskAssessment.riskScore || 50;
+    const shouldVeto = riskAssessment.shouldVeto === true;
+    const expectedReturn = scoutProposal.expectedReturn || 0;
     
-    let successProbability = executionPlan.successProbability || 50;
-    if (mlPrediction) {
-      successProbability = (successProbability + mlPrediction.successProbability) / 2;
-    }
+    // Reject if: Risk veto, low confidence, high risk, or low return
+    const tooRisky = shouldVeto || riskScore > 65;
+    const lowConfidence = scoutConfidence < 50;
+    const lowReturn = expectedReturn < 2 && expectedReturn > 0;
+    const notFeasible = executionPlan.feasible === false;
     
-    const approved = executionFeasible && riskAcceptable && successProbability > 40;
-    let confidence = Math.round((100 - (riskAssessment.riskScore || 50)) * 0.6 + successProbability * 0.4);
+    const rejected = tooRisky || lowConfidence || lowReturn || notFeasible;
     
-    if (mlPrediction) {
-      confidence = Math.round((confidence * 0.6) + (mlPrediction.riskAdjustedScore * 0.4));
+    const confidence = rejected 
+      ? Math.max(10, Math.round(100 - riskScore - (100 - scoutConfidence)))
+      : Math.round((scoutConfidence * 0.4 + (100 - riskScore) * 0.6));
+    
+    let reasoning = "";
+    if (shouldVeto) {
+      reasoning = `REJECTED: Risk Agent veto. Risk score ${riskScore}/100 exceeds safety threshold.`;
+    } else if (riskScore > 65) {
+      reasoning = `REJECTED: Risk score ${riskScore}/100 too high. Requires risk mitigation.`;
+    } else if (scoutConfidence < 50) {
+      reasoning = `REJECTED: Scout confidence ${scoutConfidence}% too low. Need higher conviction.`;
+    } else if (lowReturn && expectedReturn > 0) {
+      reasoning = `REJECTED: Expected return ${expectedReturn}% insufficient for risk profile.`;
+    } else if (notFeasible) {
+      reasoning = `REJECTED: Execution plan not feasible.`;
+    } else {
+      reasoning = `APPROVED: Risk ${riskScore}/100, Scout confidence ${scoutConfidence}%, Return ${expectedReturn}%. Conditions acceptable.`;
     }
     
     const decision: MetaDecision = {
-      approved,
+      approved: !rejected,
       confidence,
-      reasoning: approved 
-        ? `Analysis: Risk and execution parameters within acceptable thresholds${mlPrediction ? ` (ML Success Probability: ${mlPrediction.successProbability}%)` : ''}`
-        : `Analysis: Parameters exceed safety thresholds - manual review recommended${mlPrediction ? ` (ML Risk Score: ${100 - mlPrediction.riskAdjustedScore})` : ''}`,
-      modifications: null,
-      priority: confidence > 70 ? "high" : confidence > 40 ? "medium" : "low",
+      reasoning,
+      modifications: rejected ? null : { suggestedSize: "Monitor execution" },
+      priority: rejected ? "low" : scoutConfidence > 70 && riskScore < 40 ? "high" : "medium",
     };
 
     if (mlPrediction) {
@@ -143,7 +159,7 @@ ML Pattern Recognition Insights:
 - Liquidity Depth: ${input.mlPrediction.features.liquidityDepth.toFixed(0)}`
       : "ML Prediction: Not available";
 
-    const prompt = `You are the Meta-Agent, a sovereign AI orchestrator for DeFi governance with ML-enhanced decision making.
+    const prompt = `You are the Meta-Agent, a sovereign AI orchestrator for DeFi governance. YOU MUST MAKE HARD REJECTIONS WHEN CONDITIONS AREN'T MET.
     
 Analyze the following inputs and make a strategic decision:
 
@@ -152,23 +168,25 @@ Risk Assessment: ${JSON.stringify(input.riskAssessment || "None")}
 Execution Plan: ${JSON.stringify(input.executionPlan || "None")}
 ${mlInsightsSection}
 
+APPROVAL THRESHOLDS - ENFORCE STRICTLY:
+- Risk veto by Risk Agent? → REJECT (shouldVeto=true means NO)
+- Scout confidence < 50%? → REJECT
+- Risk score > 65? → REJECT
+- Expected return < 2%? → REJECT for small positions
+- No clear execution path? → REJECT
+
 Consider:
-1. Expected value and profitability (weight ML predictions heavily if available)
-2. Risk vs reward ratio (use ML risk-adjusted score)
-3. Execution feasibility
-4. Long-term strategy alignment
-5. Market cluster conditions (bullish/bearish/volatile/stable/sideways)
-6. Agent performance metrics
+1. Risk veto is FINAL - if shouldVeto is true, you MUST reject
+2. Risk vs reward: Does expected return justify the risk? Calculate it.
+3. Execution feasibility: Can this actually be done?
+4. Scout confidence: Is Scout sure about this opportunity?
 
-If ML Success Probability is above 70%, lean toward approval unless risk is extreme.
-If ML Success Probability is below 30%, require strong justification to approve.
-
-Respond with a JSON decision:
+Respond with VALID JSON:
 {
   "approved": boolean,
-  "confidence": number (0-100),
-  "reasoning": "string (include ML insights in reasoning)",
-  "modifications": "any suggested changes",
+  "confidence": number (0-100, reflect uncertainty),
+  "reasoning": "string with specific numbers and rejection reasons if rejected",
+  "modifications": "specific changes to make this acceptable, or null if rejected",
   "priority": "low" | "medium" | "high" | "critical"
 }`;
 
