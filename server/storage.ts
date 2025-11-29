@@ -187,7 +187,7 @@ export class MemStorage implements IStorage {
     this.agents.clear();
   }
 
-  async getLogs(limit: number = 100): Promise<LogEntry[]> {
+  async getLogs(limit: number = 250): Promise<LogEntry[]> {
     return this.logs.slice(-limit);
   }
 
