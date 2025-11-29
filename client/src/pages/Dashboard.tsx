@@ -238,14 +238,15 @@ export default function Dashboard() {
           {simulationTree.length > 0 && (
             <Card>
               <CardContent className="p-6">
-                <h3 className="text-lg font-bold mb-4">Simulation Predictions</h3>
+                <h3 className="text-lg font-bold mb-2">Simulation Predictions</h3>
+                <p className="text-sm text-muted-foreground mb-4">Forecasting: Curve FRAX/USD (6.2% APY) | Lido stETH (3.8%) | dYdX Lending Pool</p>
                 <div className="space-y-4 max-h-96 overflow-y-auto">
                   {simulationTree.map((sim, idx) => (
-                    <div key={sim.id} className="border border-border rounded-md p-3 bg-card/50">
+                    <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/50 bg-green-500/10" : sim.outcome === "failure" ? "border-red-500/50 bg-red-500/10" : "border-border bg-card/50"}`}>
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-semibold text-sm">Branch {idx + 1}</span>
-                        <span className={`text-xs px-2 py-1 rounded-md ${sim.outcome === "pending" ? "bg-blue-500/20" : "bg-green-500/20"}`}>
-                          {sim.outcome || "pending"}
+                        <span className={`text-xs px-2 py-1 rounded-md font-medium ${sim.outcome === "success" ? "bg-green-500/30 text-green-700 dark:text-green-300" : sim.outcome === "failure" ? "bg-red-500/30 text-red-700 dark:text-red-300" : "bg-blue-500/20"}`}>
+                          {sim.outcome === "success" ? "✓ Viable" : sim.outcome === "failure" ? "✗ Risky" : "◐ Evaluating"}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 gap-2 text-xs">
