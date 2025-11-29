@@ -5,6 +5,7 @@ import { NeuroNetCore } from "@/components/NeuroNetCore";
 import { LogStream } from "@/components/LogStream";
 import { RiskHeatmap } from "@/components/RiskHeatmap";
 import { MetricsDashboard } from "@/components/MetricsDashboard";
+import { LiveSystemStatus } from "@/components/LiveSystemStatus";
 import { ControlPanel } from "@/components/ControlPanel";
 import { TimeWarpSlider } from "@/components/TimeWarpSlider";
 import { DeveloperPanel } from "@/components/DeveloperPanel";
@@ -184,8 +185,10 @@ export default function Dashboard() {
 
           {/* Main Grid Layout */}
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-            {/* Left Column - Control Panel & Risk Heatmap */}
+            {/* Left Column - Live Status, Control Panel & Risk Heatmap */}
             <div className="space-y-6">
+              <LiveSystemStatus />
+              
               <Card>
                 <CardContent className="p-6">
                   <ControlPanel
