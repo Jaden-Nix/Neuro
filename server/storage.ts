@@ -58,7 +58,6 @@ export interface IStorage {
   addSimulation(simulation: SimulationBranch): Promise<SimulationBranch>;
   getCurrentOpportunity(): Promise<any | null>;
   setCurrentOpportunity(opportunity: any): Promise<void>;
-  clearLogs(): Promise<void>;
 
   // Replay
   getReplayEvents(filters?: any): Promise<ReplayEvent[]>;
@@ -143,38 +142,7 @@ export class MemStorage implements IStorage {
     this.logs = [];
     this.creditScores = new Map();
     this.creditTransactions = [];
-    this.memoryEntries = [
-      {
-        id: "mem-init-1",
-        strategyType: "successful",
-        description: "Curve FRAX/USD pool yielded 3.2% APY with low volatility",
-        agentScores: { scout: 8.5, risk: 8.2, execution: 8.1, meta: 8.3 },
-        riskPattern: "Stable peg, TVL > $60M, volatility < 0.25",
-        simulationSummary: "5 simulation branches all showed viable returns",
-        timestamp: Date.now() - 3600000,
-        tags: ["stable-asset", "curve", "low-risk"],
-      },
-      {
-        id: "mem-init-2",
-        strategyType: "blocked",
-        description: "Lido stETH position rejected - excess correlation with ETH",
-        agentScores: { scout: 6.5, risk: 3.2, execution: 0, meta: 5.1 },
-        riskPattern: "Market correlation > 0.85, veto from Risk Agent",
-        simulationSummary: "Simulation showed potential liquidation at ETH -15%",
-        timestamp: Date.now() - 7200000,
-        tags: ["liquid-staking", "correlated", "blocked"],
-      },
-      {
-        id: "mem-init-3",
-        strategyType: "learned",
-        description: "Pattern: High TVL + stable peg = lower risk profile",
-        agentScores: { scout: 9.2, risk: 8.8, execution: 8.5, meta: 9.1 },
-        riskPattern: "TVL correlation with safety factor: R² = 0.87",
-        simulationSummary: "Meta Agent reinforced this across 12 simulations",
-        timestamp: Date.now() - 10800000,
-        tags: ["pattern-recognition", "tvl-safety"],
-      },
-    ];
+    this.memoryEntries = [];
     this.simulations = [];
     this.replayEvents = [];
     this.alerts = [];
@@ -219,12 +187,8 @@ export class MemStorage implements IStorage {
     this.agents.clear();
   }
 
-  async getLogs(limit: number = 250): Promise<LogEntry[]> {
+  async getLogs(limit: number = 100): Promise<LogEntry[]> {
     return this.logs.slice(-limit);
-  }
-
-  async clearLogs(): Promise<void> {
-    this.logs = [];
   }
 
   async addLog(log: Omit<LogEntry, "id">): Promise<LogEntry> {

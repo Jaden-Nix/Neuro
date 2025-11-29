@@ -420,16 +420,6 @@ export async function registerRoutes(
     }
   });
 
-  // Clear Logs (public endpoint - no auth required)
-  app.post("/api/logs/clear", async (req, res) => {
-    try {
-      await storage.clearLogs();
-      res.json({ message: "Logs cleared", status: "cleared" });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to clear logs" });
-    }
-  });
-
   app.post("/api/simulate", requireWriteAuth, writeLimiter, async (req, res) => {
     try {
       const config = {
