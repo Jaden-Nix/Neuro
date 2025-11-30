@@ -13,7 +13,7 @@ import { transactionManager } from "./execution/TransactionManager";
 import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
 import { mlPatternRecognition } from "./ml/MLPatternRecognition";
 import { governanceSystem } from "./governance/GovernanceSystem";
-import { PersonalityTrait } from "@shared/schema";
+import { PersonalityTrait, AgentType } from "@shared/schema";
 import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
@@ -24,6 +24,7 @@ import { getStripePublishableKey } from "./stripeClient";
 import { alertService } from "./alerts/AlertService";
 import { backtestingEngine } from "./backtesting/BacktestingEngine";
 import { walletManager } from "./wallets/WalletManager";
+import { rpcClient } from "./blockchain/RPCClient";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -370,8 +371,8 @@ export async function registerRoutes(
     try {
       const result = await storage.clearLogs();
       broadcastToClients({
-        type: "logsCleared",
-        data: result,
+        type: "log",
+        data: { ...result, event: "logsCleared" },
         timestamp: Date.now(),
       });
       res.json(result);
@@ -1460,10 +1461,10 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid Solana wallet address" });
       }
 
-      const metrics = await solanaRpcClient.getWalletMetrics(address);
+      const metrics = await solanaRpcClient.getOnChainMetrics(address);
       const updated = await storage.updateSolanaWallet(address, {
         balanceSol: metrics.walletBalanceSol,
-        totalValueUsd: metrics.totalValueUsd,
+        totalValueUsd: metrics.walletBalanceSol * metrics.solPriceUsd,
         lastUpdated: Date.now(),
       });
 
@@ -1514,9 +1515,10 @@ export async function registerRoutes(
       if (data.agentId && data.result) {
         await creditEconomy.recordTransaction({
           agentId: data.agentId,
+          agentType: AgentType.EXECUTION,
           amount: data.result.creditAdjustment,
           reason: "Transaction confirmed successfully",
-          success: true,
+          timestamp: Date.now(),
         });
       }
 
@@ -1543,9 +1545,10 @@ export async function registerRoutes(
       if (data.agentId && data.result) {
         await creditEconomy.recordTransaction({
           agentId: data.agentId,
+          agentType: AgentType.EXECUTION,
           amount: data.result.creditAdjustment,
           reason: `Transaction failed: ${data.error}`,
-          success: false,
+          timestamp: Date.now(),
         });
       }
 
@@ -1630,7 +1633,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
       }
-      const template = await storage.updateAgentTemplate(req.params.id, parsed.data);
+      const template = await storage.updateAgentTemplate(req.params.id, parsed.data as any);
       if (!template) {
         return res.status(404).json({ error: "Template not found" });
       }
@@ -1692,7 +1695,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
       }
-      const listing = await storage.updateMarketplaceListing(req.params.id, parsed.data);
+      const listing = await storage.updateMarketplaceListing(req.params.id, parsed.data as any);
       if (!listing) {
         return res.status(404).json({ error: "Listing not found" });
       }
@@ -1726,7 +1729,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid rental data", details: parsed.error.flatten() });
       }
-      const rental = await storage.createAgentRental(parsed.data);
+      const rental = await storage.createAgentRental(parsed.data as any);
       res.status(201).json(rental);
     } catch (error) {
       console.error("Failed to create rental:", error);
@@ -1741,7 +1744,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
       }
-      const rental = await storage.updateAgentRental(req.params.id, parsed.data);
+      const rental = await storage.updateAgentRental(req.params.id, parsed.data as any);
       if (!rental) {
         return res.status(404).json({ error: "Rental not found" });
       }
