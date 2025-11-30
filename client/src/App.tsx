@@ -21,6 +21,10 @@ import Marketplace from "@/pages/Marketplace";
 import Alerts from "@/pages/Alerts";
 import Backtesting from "@/pages/Backtesting";
 import Wallets from "@/pages/Wallets";
+import Parliament from "@/pages/Parliament";
+import Evolution from "@/pages/Evolution";
+import StressTesting from "@/pages/StressTesting";
+import DreamMode from "@/pages/DreamMode";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,6 +37,10 @@ function Router() {
       <Route path="/alerts" component={Alerts} />
       <Route path="/backtesting" component={Backtesting} />
       <Route path="/wallets" component={Wallets} />
+      <Route path="/parliament" component={Parliament} />
+      <Route path="/evolution" component={Evolution} />
+      <Route path="/stress-test" component={StressTesting} />
+      <Route path="/dream-mode" component={DreamMode} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -3166,5 +3166,329 @@ export async function registerRoutes(
     }
   }, 5000);
 
+  // =============================================================================
+  // HACKATHON SHOWCASE API: Parliament, Evolution, Dream Mode, Stress Testing
+  // =============================================================================
+
+  // Reasoning Chains (Claude Transparency)
+  app.get("/api/reasoning", async (req, res) => {
+    try {
+      const filters = {
+        agentId: req.query.agentId as string | undefined,
+        topic: req.query.topic as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+      };
+      const chains = await storage.getReasoningChains(filters);
+      res.json(chains);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get reasoning chains" });
+    }
+  });
+
+  app.get("/api/reasoning/:id", async (req, res) => {
+    try {
+      const chain = await storage.getReasoningChain(req.params.id);
+      if (!chain) return res.status(404).json({ error: "Reasoning chain not found" });
+      res.json(chain);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get reasoning chain" });
+    }
+  });
+
+  // Parliament Sessions
+  app.get("/api/parliament", async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
+      };
+      const sessions = await storage.getParliamentSessions(filters);
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get parliament sessions" });
+    }
+  });
+
+  app.get("/api/parliament/:id", async (req, res) => {
+    try {
+      const session = await storage.getParliamentSession(req.params.id);
+      if (!session) return res.status(404).json({ error: "Parliament session not found" });
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get parliament session" });
+    }
+  });
+
+  app.post("/api/parliament", writeLimiter, async (req, res) => {
+    try {
+      const { topic, description, proposalData, quorum, requiredMajority } = req.body;
+      if (!topic || !description) {
+        return res.status(400).json({ error: "Topic and description required" });
+      }
+      const session = await storage.createParliamentSession({
+        topic,
+        description,
+        proposalData: proposalData || {},
+        status: "deliberating",
+        quorum: quorum || 3,
+        requiredMajority: requiredMajority || 50,
+      });
+      broadcastToClients({
+        type: "log",
+        data: { event: "parliament_session_created", session },
+        timestamp: Date.now(),
+      });
+      res.status(201).json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create parliament session" });
+    }
+  });
+
+  app.post("/api/parliament/:id/debate", writeLimiter, async (req, res) => {
+    try {
+      const { agentId, agentType, position, statement, rebuttalTo, reasoningChainId } = req.body;
+      if (!agentId || !agentType || !position || !statement) {
+        return res.status(400).json({ error: "Missing required debate fields" });
+      }
+      const entry = { agentId, agentType, position, statement, rebuttalTo, reasoningChainId, timestamp: Date.now() };
+      const session = await storage.addDebateEntry(req.params.id, entry);
+      if (!session) return res.status(404).json({ error: "Session not found" });
+      broadcastToClients({
+        type: "log",
+        data: { event: "parliament_debate", sessionId: req.params.id, entry },
+        timestamp: Date.now(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add debate entry" });
+    }
+  });
+
+  app.post("/api/parliament/:id/vote", writeLimiter, async (req, res) => {
+    try {
+      const { agentId, agentType, vote, reasoning, confidence } = req.body;
+      if (!agentId || !agentType || !vote) {
+        return res.status(400).json({ error: "Missing required vote fields" });
+      }
+      const voteEntry = { agentId, agentType, vote, reasoning: reasoning || "", confidence: confidence || 0.5, timestamp: Date.now() };
+      const session = await storage.addVote(req.params.id, voteEntry);
+      if (!session) return res.status(404).json({ error: "Session not found" });
+      broadcastToClients({
+        type: "log",
+        data: { event: "parliament_vote", sessionId: req.params.id, vote: voteEntry },
+        timestamp: Date.now(),
+      });
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add vote" });
+    }
+  });
+
+  app.post("/api/parliament/:id/conclude", writeLimiter, async (req, res) => {
+    try {
+      const session = await storage.getParliamentSession(req.params.id);
+      if (!session) return res.status(404).json({ error: "Session not found" });
+      
+      const approves = session.votes.filter(v => v.vote === "approve").length;
+      const rejects = session.votes.filter(v => v.vote === "reject").length;
+      const total = session.votes.length;
+      
+      let outcome: "approved" | "rejected" | "deadlocked" = "deadlocked";
+      if (total >= session.quorum) {
+        const approvalPct = (approves / total) * 100;
+        if (approvalPct >= session.requiredMajority) outcome = "approved";
+        else if ((rejects / total) * 100 >= session.requiredMajority) outcome = "rejected";
+      }
+      
+      const updated = await storage.updateParliamentSession(req.params.id, {
+        status: "concluded",
+        outcome,
+        concludedAt: Date.now(),
+      });
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "parliament_concluded", sessionId: req.params.id, outcome },
+        timestamp: Date.now(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to conclude session" });
+    }
+  });
+
+  // Agent Evolutions
+  app.get("/api/evolution", async (req, res) => {
+    try {
+      const filters = {
+        agentId: req.query.agentId as string | undefined,
+        generation: req.query.generation ? parseInt(req.query.generation as string) : undefined,
+        parentAgentId: req.query.parentAgentId as string | undefined,
+      };
+      const evolutions = await storage.getAgentEvolutions(filters);
+      res.json(evolutions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent evolutions" });
+    }
+  });
+
+  app.get("/api/evolution/:id", async (req, res) => {
+    try {
+      const evolution = await storage.getAgentEvolution(req.params.id);
+      if (!evolution) return res.status(404).json({ error: "Evolution not found" });
+      res.json(evolution);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get evolution" });
+    }
+  });
+
+  // Dream Sessions
+  app.get("/api/dream", async (req, res) => {
+    try {
+      const filters = {
+        status: req.query.status as string | undefined,
+        limit: req.query.limit ? parseInt(req.query.limit as string) : 10,
+      };
+      const sessions = await storage.getDreamSessions(filters);
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get dream sessions" });
+    }
+  });
+
+  app.get("/api/dream/:id", async (req, res) => {
+    try {
+      const session = await storage.getDreamSession(req.params.id);
+      if (!session) return res.status(404).json({ error: "Dream session not found" });
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get dream session" });
+    }
+  });
+
+  app.post("/api/dream/start", writeLimiter, async (req, res) => {
+    try {
+      const { metabolicRate, dreamDepth, realTimeMultiplier } = req.body;
+      const session = await storage.createDreamSession({
+        status: "dreaming",
+        simulationsRun: 0,
+        branchesExplored: 0,
+        metabolicRate: metabolicRate || 10,
+        dreamDepth: dreamDepth || 5,
+        realTimeMultiplier: realTimeMultiplier || 10,
+      });
+      broadcastToClients({
+        type: "log",
+        data: { event: "dream_started", session },
+        timestamp: Date.now(),
+      });
+      res.status(201).json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to start dream session" });
+    }
+  });
+
+  app.post("/api/dream/:id/wake", writeLimiter, async (req, res) => {
+    try {
+      const updated = await storage.updateDreamSession(req.params.id, {
+        status: "awake",
+        endedAt: Date.now(),
+      });
+      if (!updated) return res.status(404).json({ error: "Session not found" });
+      broadcastToClients({
+        type: "log",
+        data: { event: "dream_ended", session: updated },
+        timestamp: Date.now(),
+      });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to wake from dream" });
+    }
+  });
+
+  // Stress Scenarios
+  app.get("/api/stress/scenarios", async (req, res) => {
+    try {
+      const filters = {
+        category: req.query.category as string | undefined,
+        isTemplate: req.query.isTemplate === "true" ? true : req.query.isTemplate === "false" ? false : undefined,
+      };
+      const scenarios = await storage.getStressScenarios(filters);
+      res.json(scenarios);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get stress scenarios" });
+    }
+  });
+
+  app.post("/api/stress/scenarios", writeLimiter, async (req, res) => {
+    try {
+      const { name, description, category, severity, parameters, isTemplate, createdBy } = req.body;
+      if (!name || !description || !category || !createdBy) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      const scenario = await storage.createStressScenario({
+        name,
+        description,
+        category,
+        severity: severity || 3,
+        parameters: parameters || {},
+        isTemplate: isTemplate || false,
+        createdBy,
+      });
+      res.status(201).json(scenario);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create stress scenario" });
+    }
+  });
+
+  // Stress Test Runs
+  app.get("/api/stress/runs", async (req, res) => {
+    try {
+      const filters = {
+        scenarioId: req.query.scenarioId as string | undefined,
+        status: req.query.status as string | undefined,
+      };
+      const runs = await storage.getStressTestRuns(filters);
+      res.json(runs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get stress test runs" });
+    }
+  });
+
+  app.get("/api/stress/runs/:id", async (req, res) => {
+    try {
+      const run = await storage.getStressTestRun(req.params.id);
+      if (!run) return res.status(404).json({ error: "Stress test run not found" });
+      res.json(run);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get stress test run" });
+    }
+  });
+
+  app.post("/api/stress/runs", writeLimiter, async (req, res) => {
+    try {
+      const { scenarioId, systemHealthBefore } = req.body;
+      if (!scenarioId) {
+        return res.status(400).json({ error: "Scenario ID required" });
+      }
+      const run = await storage.createStressTestRun({
+        scenarioId,
+        status: "preparing",
+        overallOutcome: "pending",
+        portfolioImpact: 0,
+        systemHealthBefore: systemHealthBefore || 85,
+        systemHealthAfter: systemHealthBefore || 85,
+      });
+      broadcastToClients({
+        type: "log",
+        data: { event: "stress_test_started", run },
+        timestamp: Date.now(),
+      });
+      res.status(201).json(run);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create stress test run" });
+    }
+  });
+
   return httpServer;
 }

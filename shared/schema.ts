@@ -1182,3 +1182,279 @@ export type SelectGovernanceProposal = typeof governanceProposals.$inferSelect;
 export type SelectGovernanceVote = typeof governanceVotes.$inferSelect;
 export type SelectSafeConfig = typeof safeConfigs.$inferSelect;
 
+// =============================================================================
+// HACKATHON SHOWCASE FEATURES: Parliament, Evolution, Dream Mode, Stress Testing
+// =============================================================================
+
+// Reasoning Chain - Captures Claude's full reasoning process with transparency
+export interface ReasoningStep {
+  stepNumber: number;
+  thought: string;
+  confidence: number;
+  evidence?: string[];
+  alternatives?: string[];
+  risks?: string[];
+}
+
+export interface ReasoningChain {
+  id: string;
+  agentId: string;
+  agentType: AgentType;
+  topic: string;
+  question: string;
+  steps: ReasoningStep[];
+  conclusion: string;
+  finalConfidence: number;
+  processingTimeMs: number;
+  modelUsed: string;
+  timestamp: number;
+}
+
+export const reasoningChains = pgTable("reasoning_chains", {
+  id: varchar("id").primaryKey(),
+  agentId: varchar("agent_id").notNull(),
+  agentType: varchar("agent_type").$type<AgentType>().notNull(),
+  topic: varchar("topic").notNull(),
+  question: text("question").notNull(),
+  steps: jsonb("steps").$type<ReasoningStep[]>().notNull(),
+  conclusion: text("conclusion").notNull(),
+  finalConfidence: integer("final_confidence").notNull(),
+  processingTimeMs: integer("processing_time_ms").notNull(),
+  modelUsed: varchar("model_used").notNull().default("claude-sonnet-4-20250514"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+// Parliament Session - Multi-agent debates with votes and reasoning
+export interface ParliamentVote {
+  agentId: string;
+  agentType: AgentType;
+  vote: "approve" | "reject" | "abstain";
+  reasoning: string;
+  confidence: number;
+  timestamp: number;
+}
+
+export interface ParliamentDebateEntry {
+  agentId: string;
+  agentType: AgentType;
+  position: "for" | "against" | "clarification";
+  statement: string;
+  rebuttalTo?: string;
+  reasoningChainId?: string;
+  timestamp: number;
+}
+
+export interface ParliamentSession {
+  id: string;
+  topic: string;
+  description: string;
+  proposalData: Record<string, any>;
+  status: "deliberating" | "voting" | "concluded";
+  debates: ParliamentDebateEntry[];
+  votes: ParliamentVote[];
+  outcome: "approved" | "rejected" | "deadlocked" | null;
+  quorum: number;
+  requiredMajority: number;
+  startedAt: number;
+  concludedAt?: number;
+}
+
+export const parliamentSessions = pgTable("parliament_sessions", {
+  id: varchar("id").primaryKey(),
+  topic: varchar("topic").notNull(),
+  description: text("description").notNull(),
+  proposalData: jsonb("proposal_data").$type<Record<string, any>>().notNull(),
+  status: varchar("status").$type<"deliberating" | "voting" | "concluded">().notNull(),
+  debates: jsonb("debates").$type<ParliamentDebateEntry[]>().notNull().default(sql`'[]'::jsonb`),
+  votes: jsonb("votes").$type<ParliamentVote[]>().notNull().default(sql`'[]'::jsonb`),
+  outcome: varchar("outcome").$type<"approved" | "rejected" | "deadlocked">(),
+  quorum: integer("quorum").notNull().default(3),
+  requiredMajority: integer("required_majority").notNull().default(50),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  concludedAt: timestamp("concluded_at"),
+});
+
+// Agent Evolution - Tracking agent mutations, genealogy, and performance inheritance
+export interface AgentMutation {
+  trait: string;
+  previousValue: any;
+  newValue: any;
+  reason: string;
+  performanceImpact?: number;
+}
+
+export interface AgentEvolution {
+  id: string;
+  agentId: string;
+  parentAgentId: string | null;
+  generation: number;
+  mutations: AgentMutation[];
+  inheritedTraits: string[];
+  performanceScore: number;
+  survivalScore: number;
+  reproductionScore: number;
+  spawnedAt: number;
+  retiredAt?: number;
+  retirementReason?: string;
+}
+
+export const agentEvolutions = pgTable("agent_evolutions", {
+  id: varchar("id").primaryKey(),
+  agentId: varchar("agent_id").notNull(),
+  parentAgentId: varchar("parent_agent_id"),
+  generation: integer("generation").notNull().default(1),
+  mutations: jsonb("mutations").$type<AgentMutation[]>().notNull().default(sql`'[]'::jsonb`),
+  inheritedTraits: jsonb("inherited_traits").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  performanceScore: integer("performance_score").notNull().default(50),
+  survivalScore: integer("survival_score").notNull().default(50),
+  reproductionScore: integer("reproduction_score").notNull().default(0),
+  spawnedAt: timestamp("spawned_at").notNull().defaultNow(),
+  retiredAt: timestamp("retired_at"),
+  retirementReason: text("retirement_reason"),
+});
+
+// Dream Mode - Overnight background simulations and discoveries
+export interface DreamDiscovery {
+  type: "pattern" | "opportunity" | "risk" | "strategy" | "insight";
+  title: string;
+  description: string;
+  confidence: number;
+  potentialValue: number;
+  relatedMarkets: string[];
+  actionable: boolean;
+}
+
+export interface DreamSession {
+  id: string;
+  status: "sleeping" | "dreaming" | "waking" | "awake";
+  startedAt: number;
+  endedAt?: number;
+  simulationsRun: number;
+  branchesExplored: number;
+  discoveries: DreamDiscovery[];
+  topInsight?: string;
+  metabolicRate: number; // Credits consumed per hour
+  dreamDepth: number; // How speculative (1-10)
+  realTimeMultiplier: number; // 10x means 1 hour explores 10 hours of scenarios
+}
+
+export const dreamSessions = pgTable("dream_sessions", {
+  id: varchar("id").primaryKey(),
+  status: varchar("status").$type<"sleeping" | "dreaming" | "waking" | "awake">().notNull(),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  simulationsRun: integer("simulations_run").notNull().default(0),
+  branchesExplored: integer("branches_explored").notNull().default(0),
+  discoveries: jsonb("discoveries").$type<DreamDiscovery[]>().notNull().default(sql`'[]'::jsonb`),
+  topInsight: text("top_insight"),
+  metabolicRate: integer("metabolic_rate").notNull().default(10),
+  dreamDepth: integer("dream_depth").notNull().default(5),
+  realTimeMultiplier: integer("real_time_multiplier").notNull().default(10),
+});
+
+// Stress Testing - Scenario builder and agent response tracking
+export interface StressScenario {
+  id: string;
+  name: string;
+  description: string;
+  category: "market_crash" | "liquidity_crisis" | "oracle_failure" | "smart_contract_exploit" | "flash_loan_attack" | "custom";
+  severity: 1 | 2 | 3 | 4 | 5;
+  parameters: Record<string, any>;
+  isTemplate: boolean;
+  createdBy: string;
+  createdAt: number;
+}
+
+export interface AgentStressResponse {
+  agentId: string;
+  agentType: AgentType;
+  action: string;
+  reasoning: string;
+  reasoningChainId?: string;
+  responseTimeMs: number;
+  creditsUsed: number;
+  success: boolean;
+  timestamp: number;
+}
+
+export interface StressTestRun {
+  id: string;
+  scenarioId: string;
+  status: "preparing" | "running" | "completed" | "failed";
+  agentResponses: AgentStressResponse[];
+  overallOutcome: "survived" | "degraded" | "failed" | "pending";
+  portfolioImpact: number;
+  systemHealthBefore: number;
+  systemHealthAfter: number;
+  lessonsLearned: string[];
+  startedAt: number;
+  completedAt?: number;
+}
+
+export const stressScenarios = pgTable("stress_scenarios", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  description: text("description").notNull(),
+  category: varchar("category").$type<"market_crash" | "liquidity_crisis" | "oracle_failure" | "smart_contract_exploit" | "flash_loan_attack" | "custom">().notNull(),
+  severity: integer("severity").notNull().default(3),
+  parameters: jsonb("parameters").$type<Record<string, any>>().notNull(),
+  isTemplate: boolean("is_template").notNull().default(false),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const stressTestRuns = pgTable("stress_test_runs", {
+  id: varchar("id").primaryKey(),
+  scenarioId: varchar("scenario_id").notNull(),
+  status: varchar("status").$type<"preparing" | "running" | "completed" | "failed">().notNull(),
+  agentResponses: jsonb("agent_responses").$type<AgentStressResponse[]>().notNull().default(sql`'[]'::jsonb`),
+  overallOutcome: varchar("overall_outcome").$type<"survived" | "degraded" | "failed" | "pending">().notNull().default("pending"),
+  portfolioImpact: integer("portfolio_impact").notNull().default(0),
+  systemHealthBefore: integer("system_health_before").notNull().default(85),
+  systemHealthAfter: integer("system_health_after").notNull().default(85),
+  lessonsLearned: jsonb("lessons_learned").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// Insert schemas for new showcase features
+export const insertReasoningChainSchema = createInsertSchema(reasoningChains).omit({ timestamp: true });
+export const insertParliamentSessionSchema = createInsertSchema(parliamentSessions).omit({ 
+  startedAt: true, 
+  concludedAt: true,
+  debates: true,
+  votes: true 
+});
+export const insertAgentEvolutionSchema = createInsertSchema(agentEvolutions).omit({ 
+  spawnedAt: true, 
+  retiredAt: true 
+});
+export const insertDreamSessionSchema = createInsertSchema(dreamSessions).omit({ 
+  startedAt: true, 
+  endedAt: true,
+  discoveries: true 
+});
+export const insertStressScenarioSchema = createInsertSchema(stressScenarios).omit({ createdAt: true });
+export const insertStressTestRunSchema = createInsertSchema(stressTestRuns).omit({ 
+  startedAt: true, 
+  completedAt: true,
+  agentResponses: true,
+  lessonsLearned: true 
+});
+
+// Types for inserts
+export type InsertReasoningChain = z.infer<typeof insertReasoningChainSchema>;
+export type InsertParliamentSession = z.infer<typeof insertParliamentSessionSchema>;
+export type InsertAgentEvolution = z.infer<typeof insertAgentEvolutionSchema>;
+export type InsertDreamSession = z.infer<typeof insertDreamSessionSchema>;
+export type InsertStressScenario = z.infer<typeof insertStressScenarioSchema>;
+export type InsertStressTestRun = z.infer<typeof insertStressTestRunSchema>;
+
+// Select types
+export type SelectReasoningChain = typeof reasoningChains.$inferSelect;
+export type SelectParliamentSession = typeof parliamentSessions.$inferSelect;
+export type SelectAgentEvolution = typeof agentEvolutions.$inferSelect;
+export type SelectDreamSession = typeof dreamSessions.$inferSelect;
+export type SelectStressScenario = typeof stressScenarios.$inferSelect;
+export type SelectStressTestRun = typeof stressTestRuns.$inferSelect;
+

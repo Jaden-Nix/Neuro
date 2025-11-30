@@ -17,7 +17,11 @@ import {
   Store,
   Bell,
   FlaskConical,
-  Wallet
+  Wallet,
+  Gavel,
+  GitBranch,
+  Moon,
+  Gauge
 } from "lucide-react";
 
 const menuItems = [
@@ -62,6 +66,30 @@ const menuItems = [
     url: "/wallets",
     icon: Wallet,
     testId: "nav-wallets",
+  },
+  {
+    title: "Parliament",
+    url: "/parliament",
+    icon: Gavel,
+    testId: "nav-parliament",
+  },
+  {
+    title: "Evolution Tree",
+    url: "/evolution",
+    icon: GitBranch,
+    testId: "nav-evolution",
+  },
+  {
+    title: "Stress Testing",
+    url: "/stress-test",
+    icon: Gauge,
+    testId: "nav-stress-test",
+  },
+  {
+    title: "Dream Mode",
+    url: "/dream-mode",
+    icon: Moon,
+    testId: "nav-dream-mode",
   },
 ];
 

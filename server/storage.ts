@@ -22,6 +22,22 @@ import type {
   InsertAgentRental,
   InsertAgentNFT,
   InsertSellerProfile,
+  ReasoningChain,
+  ParliamentSession,
+  ParliamentDebateEntry,
+  ParliamentVote,
+  AgentEvolution,
+  DreamSession,
+  DreamDiscovery,
+  StressScenario,
+  StressTestRun,
+  AgentStressResponse,
+  InsertReasoningChain,
+  InsertParliamentSession,
+  InsertAgentEvolution,
+  InsertDreamSession,
+  InsertStressScenario,
+  InsertStressTestRun,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -113,6 +129,44 @@ export interface IStorage {
   getSellerProfileById(id: string): Promise<SellerProfile | undefined>;
   createSellerProfile(profile: InsertSellerProfile): Promise<SellerProfile>;
   updateSellerProfile(id: string, updates: Partial<SellerProfile>): Promise<SellerProfile | undefined>;
+
+  // Reasoning Chains (Claude transparency)
+  getReasoningChains(filters?: { agentId?: string; topic?: string; limit?: number }): Promise<ReasoningChain[]>;
+  getReasoningChain(id: string): Promise<ReasoningChain | undefined>;
+  createReasoningChain(chain: InsertReasoningChain): Promise<ReasoningChain>;
+
+  // Parliament Sessions
+  getParliamentSessions(filters?: { status?: string; limit?: number }): Promise<ParliamentSession[]>;
+  getParliamentSession(id: string): Promise<ParliamentSession | undefined>;
+  createParliamentSession(session: InsertParliamentSession): Promise<ParliamentSession>;
+  updateParliamentSession(id: string, updates: Partial<ParliamentSession>): Promise<ParliamentSession | undefined>;
+  addDebateEntry(sessionId: string, entry: ParliamentDebateEntry): Promise<ParliamentSession | undefined>;
+  addVote(sessionId: string, vote: ParliamentVote): Promise<ParliamentSession | undefined>;
+
+  // Agent Evolutions
+  getAgentEvolutions(filters?: { agentId?: string; generation?: number; parentAgentId?: string }): Promise<AgentEvolution[]>;
+  getAgentEvolution(id: string): Promise<AgentEvolution | undefined>;
+  createAgentEvolution(evolution: InsertAgentEvolution): Promise<AgentEvolution>;
+  updateAgentEvolution(id: string, updates: Partial<AgentEvolution>): Promise<AgentEvolution | undefined>;
+
+  // Dream Sessions
+  getDreamSessions(filters?: { status?: string; limit?: number }): Promise<DreamSession[]>;
+  getDreamSession(id: string): Promise<DreamSession | undefined>;
+  createDreamSession(session: InsertDreamSession): Promise<DreamSession>;
+  updateDreamSession(id: string, updates: Partial<DreamSession>): Promise<DreamSession | undefined>;
+  addDreamDiscovery(sessionId: string, discovery: DreamDiscovery): Promise<DreamSession | undefined>;
+
+  // Stress Scenarios
+  getStressScenarios(filters?: { category?: string; isTemplate?: boolean }): Promise<StressScenario[]>;
+  getStressScenario(id: string): Promise<StressScenario | undefined>;
+  createStressScenario(scenario: InsertStressScenario): Promise<StressScenario>;
+
+  // Stress Test Runs
+  getStressTestRuns(filters?: { scenarioId?: string; status?: string }): Promise<StressTestRun[]>;
+  getStressTestRun(id: string): Promise<StressTestRun | undefined>;
+  createStressTestRun(run: InsertStressTestRun): Promise<StressTestRun>;
+  updateStressTestRun(id: string, updates: Partial<StressTestRun>): Promise<StressTestRun | undefined>;
+  addAgentStressResponse(runId: string, response: AgentStressResponse): Promise<StressTestRun | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -582,6 +636,226 @@ export class MemStorage implements IStorage {
     const updated = { ...existing, ...updates, updatedAt: Date.now() };
     this.sellerProfiles.set(id, updated);
     return updated;
+  }
+
+  // Reasoning Chains
+  private reasoningChains: Map<string, ReasoningChain> = new Map();
+
+  async getReasoningChains(filters?: { agentId?: string; topic?: string; limit?: number }): Promise<ReasoningChain[]> {
+    let results = Array.from(this.reasoningChains.values());
+    if (filters?.agentId) results = results.filter(r => r.agentId === filters.agentId);
+    if (filters?.topic) results = results.filter(r => r.topic === filters.topic);
+    results.sort((a, b) => b.timestamp - a.timestamp);
+    if (filters?.limit) results = results.slice(0, filters.limit);
+    return results;
+  }
+
+  async getReasoningChain(id: string): Promise<ReasoningChain | undefined> {
+    return this.reasoningChains.get(id);
+  }
+
+  async createReasoningChain(chain: InsertReasoningChain): Promise<ReasoningChain> {
+    const fullChain: ReasoningChain = {
+      ...chain,
+      id: chain.id || randomUUID(),
+      timestamp: Date.now(),
+    };
+    this.reasoningChains.set(fullChain.id, fullChain);
+    return fullChain;
+  }
+
+  // Parliament Sessions
+  private parliamentSessions: Map<string, ParliamentSession> = new Map();
+
+  async getParliamentSessions(filters?: { status?: string; limit?: number }): Promise<ParliamentSession[]> {
+    let results = Array.from(this.parliamentSessions.values());
+    if (filters?.status) results = results.filter(s => s.status === filters.status);
+    results.sort((a, b) => b.startedAt - a.startedAt);
+    if (filters?.limit) results = results.slice(0, filters.limit);
+    return results;
+  }
+
+  async getParliamentSession(id: string): Promise<ParliamentSession | undefined> {
+    return this.parliamentSessions.get(id);
+  }
+
+  async createParliamentSession(session: InsertParliamentSession): Promise<ParliamentSession> {
+    const fullSession: ParliamentSession = {
+      ...session,
+      id: session.id || randomUUID(),
+      debates: [],
+      votes: [],
+      outcome: null,
+      startedAt: Date.now(),
+    };
+    this.parliamentSessions.set(fullSession.id, fullSession);
+    return fullSession;
+  }
+
+  async updateParliamentSession(id: string, updates: Partial<ParliamentSession>): Promise<ParliamentSession | undefined> {
+    const existing = this.parliamentSessions.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.parliamentSessions.set(id, updated);
+    return updated;
+  }
+
+  async addDebateEntry(sessionId: string, entry: ParliamentDebateEntry): Promise<ParliamentSession | undefined> {
+    const session = this.parliamentSessions.get(sessionId);
+    if (!session) return undefined;
+    session.debates.push(entry);
+    return session;
+  }
+
+  async addVote(sessionId: string, vote: ParliamentVote): Promise<ParliamentSession | undefined> {
+    const session = this.parliamentSessions.get(sessionId);
+    if (!session) return undefined;
+    session.votes.push(vote);
+    return session;
+  }
+
+  // Agent Evolutions
+  private agentEvolutions: Map<string, AgentEvolution> = new Map();
+
+  async getAgentEvolutions(filters?: { agentId?: string; generation?: number; parentAgentId?: string }): Promise<AgentEvolution[]> {
+    let results = Array.from(this.agentEvolutions.values());
+    if (filters?.agentId) results = results.filter(e => e.agentId === filters.agentId);
+    if (filters?.generation !== undefined) results = results.filter(e => e.generation === filters.generation);
+    if (filters?.parentAgentId) results = results.filter(e => e.parentAgentId === filters.parentAgentId);
+    results.sort((a, b) => b.spawnedAt - a.spawnedAt);
+    return results;
+  }
+
+  async getAgentEvolution(id: string): Promise<AgentEvolution | undefined> {
+    return this.agentEvolutions.get(id);
+  }
+
+  async createAgentEvolution(evolution: InsertAgentEvolution): Promise<AgentEvolution> {
+    const fullEvolution: AgentEvolution = {
+      ...evolution,
+      id: evolution.id || randomUUID(),
+      mutations: evolution.mutations || [],
+      inheritedTraits: evolution.inheritedTraits || [],
+      spawnedAt: Date.now(),
+    };
+    this.agentEvolutions.set(fullEvolution.id, fullEvolution);
+    return fullEvolution;
+  }
+
+  async updateAgentEvolution(id: string, updates: Partial<AgentEvolution>): Promise<AgentEvolution | undefined> {
+    const existing = this.agentEvolutions.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.agentEvolutions.set(id, updated);
+    return updated;
+  }
+
+  // Dream Sessions
+  private dreamSessions: Map<string, DreamSession> = new Map();
+
+  async getDreamSessions(filters?: { status?: string; limit?: number }): Promise<DreamSession[]> {
+    let results = Array.from(this.dreamSessions.values());
+    if (filters?.status) results = results.filter(s => s.status === filters.status);
+    results.sort((a, b) => b.startedAt - a.startedAt);
+    if (filters?.limit) results = results.slice(0, filters.limit);
+    return results;
+  }
+
+  async getDreamSession(id: string): Promise<DreamSession | undefined> {
+    return this.dreamSessions.get(id);
+  }
+
+  async createDreamSession(session: InsertDreamSession): Promise<DreamSession> {
+    const fullSession: DreamSession = {
+      ...session,
+      id: session.id || randomUUID(),
+      discoveries: [],
+      startedAt: Date.now(),
+    };
+    this.dreamSessions.set(fullSession.id, fullSession);
+    return fullSession;
+  }
+
+  async updateDreamSession(id: string, updates: Partial<DreamSession>): Promise<DreamSession | undefined> {
+    const existing = this.dreamSessions.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.dreamSessions.set(id, updated);
+    return updated;
+  }
+
+  async addDreamDiscovery(sessionId: string, discovery: DreamDiscovery): Promise<DreamSession | undefined> {
+    const session = this.dreamSessions.get(sessionId);
+    if (!session) return undefined;
+    session.discoveries.push(discovery);
+    return session;
+  }
+
+  // Stress Scenarios
+  private stressScenarios: Map<string, StressScenario> = new Map();
+
+  async getStressScenarios(filters?: { category?: string; isTemplate?: boolean }): Promise<StressScenario[]> {
+    let results = Array.from(this.stressScenarios.values());
+    if (filters?.category) results = results.filter(s => s.category === filters.category);
+    if (filters?.isTemplate !== undefined) results = results.filter(s => s.isTemplate === filters.isTemplate);
+    results.sort((a, b) => b.createdAt - a.createdAt);
+    return results;
+  }
+
+  async getStressScenario(id: string): Promise<StressScenario | undefined> {
+    return this.stressScenarios.get(id);
+  }
+
+  async createStressScenario(scenario: InsertStressScenario): Promise<StressScenario> {
+    const fullScenario: StressScenario = {
+      ...scenario,
+      id: scenario.id || randomUUID(),
+      createdAt: Date.now(),
+    };
+    this.stressScenarios.set(fullScenario.id, fullScenario);
+    return fullScenario;
+  }
+
+  // Stress Test Runs
+  private stressTestRuns: Map<string, StressTestRun> = new Map();
+
+  async getStressTestRuns(filters?: { scenarioId?: string; status?: string }): Promise<StressTestRun[]> {
+    let results = Array.from(this.stressTestRuns.values());
+    if (filters?.scenarioId) results = results.filter(r => r.scenarioId === filters.scenarioId);
+    if (filters?.status) results = results.filter(r => r.status === filters.status);
+    results.sort((a, b) => b.startedAt - a.startedAt);
+    return results;
+  }
+
+  async getStressTestRun(id: string): Promise<StressTestRun | undefined> {
+    return this.stressTestRuns.get(id);
+  }
+
+  async createStressTestRun(run: InsertStressTestRun): Promise<StressTestRun> {
+    const fullRun: StressTestRun = {
+      ...run,
+      id: run.id || randomUUID(),
+      agentResponses: [],
+      lessonsLearned: [],
+      startedAt: Date.now(),
+    };
+    this.stressTestRuns.set(fullRun.id, fullRun);
+    return fullRun;
+  }
+
+  async updateStressTestRun(id: string, updates: Partial<StressTestRun>): Promise<StressTestRun | undefined> {
+    const existing = this.stressTestRuns.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.stressTestRuns.set(id, updated);
+    return updated;
+  }
+
+  async addAgentStressResponse(runId: string, response: AgentStressResponse): Promise<StressTestRun | undefined> {
+    const run = this.stressTestRuns.get(runId);
+    if (!run) return undefined;
+    run.agentResponses.push(response);
+    return run;
   }
 }
 
