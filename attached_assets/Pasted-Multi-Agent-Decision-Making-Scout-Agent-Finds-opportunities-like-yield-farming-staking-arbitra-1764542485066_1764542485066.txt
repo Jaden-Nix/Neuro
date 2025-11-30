@@ -1,0 +1,78 @@
+Multi-Agent Decision-Making
+	•	Scout Agent: Finds opportunities like yield farming, staking, arbitrage.
+	•	Risk Agent: Evaluates safety, calculates potential loss, can veto dangerous decisions.
+	•	Execution Agent: Plans transactions, gas, order of actions, success probability.
+	•	Meta Agent: Orchestrates all agents, makes final APPROVE/REJECT decisions.
+Why it matters: Decisions aren’t single-threaded—they’re analyzed from all angles.
+
+⸻
+
+2. Continuous 24/7 Monitoring
+	•	Agents are always active, querying market data and protocol states.
+	•	No downtime; can react faster than human governance ever could.
+
+⸻
+
+3. Real-Time Decision Logging
+	•	Every decision (Scout → Risk → Execution → Meta) is logged and auditable.
+	•	Logs stored in MemoryVault smart contract → fully on-chain transparency.
+Why it matters: You can prove the AI’s reasoning at any time.
+
+⸻
+
+4. Multi-Signature & Safety Controls
+	•	Multi-sig gating: Transactions require approval (e.g., 3/5 signatures).
+	•	Circuit breaker: Pauses agents automatically if risk is high or losses exceed thresholds.
+	•	Safe Mode: Restricts risky trades, ensures conservative execution.
+	•	Human override: Governance can pause or veto any decision instantly.
+
+Why it matters: AI can’t go rogue; all decisions are accountable.
+
+⸻
+
+5. ATP Integration (Agent Tokenization Platform)
+	•	Agents can be tokenized on-chain, published to ATP.
+	•	Live performance metrics feed ATP leaderboard.
+	•	Agents can evolve: top performers spawn new generations.
+	•	Community can stake IQ tokens on agents for passive yield.
+
+Why it matters: Agents become on-chain assets with verifiable performance.
+
+⸻
+
+6. On-Chain Audit Trail
+	•	Each agent’s input/output, reasoning, and execution steps are stored on-chain.
+	•	Historical decisions can be replayed and audited anytime.
+
+Why it matters: Judges or users can verify everything is transparent and trustless.
+
+⸻
+
+7. Portfolio & Risk Management
+	•	Tracks TVL (Total Value Locked), yields, and exposures.
+	•	Real-time dashboards visualize risk across protocols.
+	•	Monte Carlo simulations predict outcomes before committing funds.
+
+Why it matters: It’s not just “find opportunities,” it’s safe capital deployment.
+
+⸻
+
+8. Performance Tracking & Agent Evolution
+	•	Each agent has a credit score: rewards success, punishes failures.
+	•	Poor agents are deprecated; good ones can spawn new versions.
+	•	Continuous improvement over time.
+
+Why it matters: The system self-optimizes and improves without human rewriting code.
+
+⸻
+
+9. Multi-Chain Support
+	•	Works on Ethereum, Base, Fraxtal, Solana, with live RPC connections.
+	•	Can orchestrate transactions and decisions across multiple chains simultaneously.
+
+⸻
+
+10. Real-Time Dashboard & Visualization
+	•	Shows agent status, credit scores, decision flow, and live logs.
+	•	Risk heatmaps highlight danger zones in real time.
+	•	Can filter by agent type, confidence, outcome, or protocol.
