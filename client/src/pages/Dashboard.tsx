@@ -306,13 +306,13 @@ export default function Dashboard() {
             <Card>
               <CardContent className="p-5">
                 <div className="mb-4">
-                  <h3 className="text-base font-semibold mb-2">Active Predictions</h3>
+                  <h3 className="text-base font-semibold mb-2">Future Trading Scenarios</h3>
                   <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm text-muted-foreground mb-4">
-                    <p className="font-mono text-xs mb-2"><strong>What you're seeing:</strong></p>
+                    <p className="text-xs mb-2"><strong>What this shows:</strong></p>
                     <ul className="space-y-1 text-xs list-disc list-inside">
-                      <li><strong>EV Score:</strong> Expected Value (-2 to +2) - Higher = Better profit chance</li>
-                      <li><strong>Viable/Risky/Pending:</strong> Risk assessment of the opportunity</li>
-                      <li><strong>Yield:</strong> Projected annual percentage return if strategy succeeds</li>
+                      <li><strong>EV:</strong> Profit potential score (higher = better opportunity)</li>
+                      <li><strong>Viable/Risky:</strong> How safe this trade is</li>
+                      <li><strong>Yield:</strong> Money you could make if it works</li>
                     </ul>
                   </div>
                 </div>

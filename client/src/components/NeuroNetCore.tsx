@@ -70,6 +70,11 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
               <p className="text-xs text-muted-foreground">
                 {metaAgent?.status || AgentStatus.IDLE}
               </p>
+              {metaAgent?.personality && (
+                <p className="text-xs text-blue-400 mt-1 italic">
+                  {metaAgent.personality.slice(0, 2).join(", ")}
+                </p>
+              )}
             </div>
           </div>
 
@@ -159,9 +164,10 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
                 </div>
 
                 {/* Hover Card */}
-                <div className="absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                  <div className="bg-card border border-border rounded-lg p-3 shadow-lg min-w-[180px]">
-                    <div className="space-y-1 text-xs">
+                <div className="absolute top-full mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <div className="bg-card border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+                    <div className="space-y-2 text-xs">
+                      <p className={`font-semibold capitalize ${colorClass}`}>{agent.type}</p>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Credit:</span>
                         <span className="font-mono font-semibold">{agent.creditScore}</span>
@@ -170,10 +176,10 @@ export function NeuroNetCore({ agents, systemHealth }: NeuroNetCoreProps) {
                         <span className="text-muted-foreground">Version:</span>
                         <span className="font-mono">v{agent.version}</span>
                       </div>
-                      {agent.currentTask && (
+                      {agent.personality && (
                         <div className="pt-1 border-t border-border">
-                          <p className="text-muted-foreground">Task:</p>
-                          <p className="text-foreground mt-0.5">{agent.currentTask}</p>
+                          <p className="text-muted-foreground text-xs">Traits:</p>
+                          <p className="text-blue-400 text-xs mt-0.5">{agent.personality.join(", ")}</p>
                         </div>
                       )}
                     </div>
