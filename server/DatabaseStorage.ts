@@ -18,6 +18,8 @@ import {
   leaderboard,
   solanaWallets,
   sellerProfiles,
+  stressScenarios,
+  stressTestRuns,
   type Agent,
   type LogEntry,
   type LiveMetrics,
@@ -36,11 +38,16 @@ import {
   type LeaderboardEntry,
   type SolanaWallet,
   type SellerProfile,
+  type StressScenario,
+  type StressTestRun,
+  type AgentStressResponse,
   type InsertAgentTemplate,
   type InsertMarketplaceListing,
   type InsertAgentRental,
   type InsertAgentNFT,
   type InsertSellerProfile,
+  type InsertStressScenario,
+  type InsertStressTestRun,
   AgentType,
   ListingStatus,
 } from "@shared/schema";
@@ -1033,5 +1040,65 @@ export class DatabaseStorage implements IStorage {
       createdAt: result.createdAt.getTime(),
       updatedAt: result.updatedAt.getTime(),
     };
+  }
+
+  // Stress Scenarios
+  async getStressScenarios(filters?: { category?: string; isTemplate?: boolean }): Promise<StressScenario[]> {
+    let query = db.select().from(stressScenarios);
+    if (filters?.category) query = query.where(eq(stressScenarios.category, filters.category));
+    if (filters?.isTemplate !== undefined) query = query.where(eq(stressScenarios.isTemplate, filters.isTemplate));
+    const results = await query;
+    return results as StressScenario[];
+  }
+
+  async getStressScenario(id: string): Promise<StressScenario | undefined> {
+    const [result] = await db.select().from(stressScenarios).where(eq(stressScenarios.id, id));
+    return result as StressScenario | undefined;
+  }
+
+  async createStressScenario(scenario: InsertStressScenario): Promise<StressScenario> {
+    const [result] = await db
+      .insert(stressScenarios)
+      .values({ ...scenario, id: scenario.id || randomUUID() })
+      .returning();
+    return result as StressScenario;
+  }
+
+  // Stress Test Runs
+  async getStressTestRuns(filters?: { scenarioId?: string; status?: string }): Promise<StressTestRun[]> {
+    let query = db.select().from(stressTestRuns);
+    if (filters?.scenarioId) query = query.where(eq(stressTestRuns.scenarioId, filters.scenarioId));
+    if (filters?.status) query = query.where(eq(stressTestRuns.status, filters.status));
+    const results = await query;
+    return results as StressTestRun[];
+  }
+
+  async getStressTestRun(id: string): Promise<StressTestRun | undefined> {
+    const [result] = await db.select().from(stressTestRuns).where(eq(stressTestRuns.id, id));
+    return result as StressTestRun | undefined;
+  }
+
+  async createStressTestRun(run: InsertStressTestRun): Promise<StressTestRun> {
+    const [result] = await db
+      .insert(stressTestRuns)
+      .values({ ...run, id: run.id || randomUUID(), agentResponses: [] })
+      .returning();
+    return result as StressTestRun;
+  }
+
+  async updateStressTestRun(id: string, updates: Partial<StressTestRun>): Promise<StressTestRun | undefined> {
+    const [result] = await db
+      .update(stressTestRuns)
+      .set(updates as any)
+      .where(eq(stressTestRuns.id, id))
+      .returning();
+    return result as StressTestRun | undefined;
+  }
+
+  async addAgentStressResponse(runId: string, response: AgentStressResponse): Promise<StressTestRun | undefined> {
+    const run = await this.getStressTestRun(runId);
+    if (!run) return undefined;
+    const updated = { ...run, agentResponses: [...(run.agentResponses || []), response] };
+    return await this.updateStressTestRun(runId, updated);
   }
 }
