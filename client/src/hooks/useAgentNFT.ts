@@ -199,7 +199,7 @@ export function useAgentNFT() {
                   data: log.data,
                   topics: log.topics,
                 });
-                if ((decoded.eventName === "Transfer" || decoded.eventName === "AgentMinted") && decoded.args) {
+                if (decoded.args) {
                   const args = decoded.args as any;
                   tokenId = args.tokenId?.toString() || args.id?.toString() || "";
                   if (tokenId) break;

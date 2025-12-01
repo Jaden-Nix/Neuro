@@ -3324,7 +3324,14 @@ export async function registerRoutes(
         
         statement = statement.substring(0, 500);
         
-        const entry = { agentId: agent.id, agentType: agent.type, position: agent.position, statement, timestamp: Date.now() };
+        const agentTypeMap: Record<string, AgentType> = {
+          "meta": AgentType.META,
+          "scout": AgentType.SCOUT,
+          "risk": AgentType.RISK,
+          "execution": AgentType.EXECUTION,
+        };
+        
+        const entry = { agentId: agent.id, agentType: agentTypeMap[agent.type] || AgentType.META, position: agent.position, statement, timestamp: Date.now() };
         await storage.addDebateEntry(req.params.id, entry);
         
         broadcastToClients({
@@ -3658,26 +3665,28 @@ export async function registerRoutes(
       }
 
       const scenarioPromise = storage.getStressScenario(run.scenarioId);
-      const scenario = await Promise.race([scenarioPromise, timeoutPromise]);
+      const scenario = (await Promise.race([scenarioPromise, timeoutPromise])) as any;
       
       if (!scenario) {
         console.error(`[STRESS] Scenario not found: ${run.scenarioId}`);
         return;
       }
-      console.error(`[STRESS] Processing scenario: ${scenario.name}`);
+      console.error(`[STRESS] Processing scenario: ${scenario.name || scenario.category || 'unknown'}`);
 
       const agentResponses: Record<string, any> = {};
       const agentPerformance: Record<string, any> = {};
 
       // Simulate agent responses instantly (framework ready for real AI integration)
       const agentTypes = ['meta', 'scout', 'risk', 'execution'];
-      const scenarioName = scenario.name || scenario.category;
+      const scenarioName = (scenario.name || scenario.category) as string;
       
       for (const type of agentTypes) {
+        const severity = (scenario.severity || 0) as number;
+        const parameters = (scenario.parameters || {}) as Record<string, any>;
         const reasoning = type === 'meta' 
-          ? `Coordinating full stress test response for ${scenarioName}. Severity: ${scenario.severity}/10. Requesting scout threat assessment, risk quantification, and execution protocols.`
+          ? `Coordinating full stress test response for ${scenarioName}. Severity: ${severity}/10. Requesting scout threat assessment, risk quantification, and execution protocols.`
           : type === 'scout'
-          ? `Detected ${scenarioName} threat. Parameters: ${JSON.stringify(scenario.parameters || {}).substring(0, 100)}... Analyzing market microstructure and exposure vectors.`
+          ? `Detected ${scenarioName} threat. Parameters: ${JSON.stringify(parameters).substring(0, 100)}... Analyzing market microstructure and exposure vectors.`
           : type === 'risk'
           ? `Risk quantification: 95% confidence in scenario impact. VaR exceeded. Recommending position reduction and hedge activation. Liquidation cascade probability: 78%.`
           : `Executing emergency protocols: liquidity consolidation, position closure in priority order, and circuit breaker activation. Estimated completion time: 45 seconds.`;
@@ -3693,8 +3702,9 @@ export async function registerRoutes(
       // Generate REAL vulnerabilities based on scenario parameters
       const detectVulnerabilities = (category: string, params: Record<string, any>, severity: number) => {
         const vulns: any[] = [];
+        const normalizedCategory = (category || "custom") as string;
         
-        if (category === "flash_crash") {
+        if (normalizedCategory === "flash_crash") {
           const priceDropPercent = params.priceDropPercent || 30;
           if (priceDropPercent > 50) {
             vulns.push({ severity: "critical", description: `Catastrophic ${priceDropPercent}% price cascade detected - exceeds worst-case models`, mitigation: "Implement aggressive position liquidation triggers" });
@@ -3706,7 +3716,7 @@ export async function registerRoutes(
             vulns.push({ severity: "critical", description: `Flash crash completed in ${params.durationSeconds}s - too fast for manual intervention`, mitigation: "Use atomic arbitrage defenses" });
           }
         } 
-        else if (category === "high_volatility") {
+        else if (normalizedCategory === "high_volatility") {
           const volatMult = params.volatilityMultiplier || 3;
           vulns.push({ severity: "high", description: `Volatility spike x${volatMult} - delta hedging margin requirements exceeded by ${volatMult * 20}%`, mitigation: "Reduce position sizes by 50%" });
           if (params.marketSentiment === "panic") {
@@ -3716,14 +3726,14 @@ export async function registerRoutes(
             vulns.push({ severity: "high", description: `Extended volatility period (${params.durationMinutes} min) - funding rates diverging`, mitigation: "Close leveraged positions to avoid funding bleed" });
           }
         } 
-        else if (category === "liquidity_crisis") {
+        else if (normalizedCategory === "liquidity_crisis") {
           const liquidityDrop = params.liquidityDropPercent || 80;
           vulns.push({ severity: "critical", description: `Liquidity depleted by ${liquidityDrop}% on ${(params.affectedPools || ["Uniswap V3", "Curve"]).join(", ")}`, mitigation: "Implement circuit breakers with pause mechanics" });
           const spreadIncrease = params.spreadIncrease || 500;
           vulns.push({ severity: "critical", description: `Bid-ask spreads widened by ${spreadIncrease}bps - slippage explosion imminent`, mitigation: "Use TWAP or VWAP execution with timelock" });
           vulns.push({ severity: "high", description: "DEX arbitrage bots exiting simultaneously - no safe liquidity routes", mitigation: "Pre-arrange OTC liquidity with market makers" });
         } 
-        else if (category === "chain_congestion") {
+        else if (normalizedCategory === "chain_congestion") {
           const gasMultiplier = params.gasMultiplier || 5;
           vulns.push({ severity: "high", description: `Gas prices spiked ${gasMultiplier}x - transactions reverting on out-of-gas`, mitigation: "Implement gas optimization and batching" });
           const pendingTx = params.pendingTxCount || 50000;
@@ -3733,7 +3743,7 @@ export async function registerRoutes(
           const confirmDelay = params.confirmationDelay || 30;
           vulns.push({ severity: "medium", description: `Block confirmation delayed by ${confirmDelay}s - stale state risks`, mitigation: "Implement oracle price lag checks" });
         } 
-        else if (category === "oracle_failure") {
+        else if (normalizedCategory === "oracle_failure") {
           const staleMinutes = params.staleTimeMinutes || 15;
           vulns.push({ severity: "critical", description: `${(params.affectedOracles || ["Chainlink"]).join(", ")} oracles stale for ${staleMinutes} minutes - safety invariants violated`, mitigation: "Deploy multi-oracle consensus with circuit breaker" });
           const priceDeviation = params.priceDeviation || 25;
@@ -3742,7 +3752,7 @@ export async function registerRoutes(
           }
           vulns.push({ severity: "high", description: "Fallback oracles also offline - no trusted price feed available", mitigation: "Pre-arrange backup oracle redundancy" });
         } 
-        else if (category === "mev_attack") {
+        else if (normalizedCategory === "mev_attack") {
           const attackerBots = params.attackerBots || 3;
           const frontrunPercent = params.frontrunPercent || 2;
           vulns.push({ severity: "critical", description: `Detected ${attackerBots} coordinated attacker bots front-running ${frontrunPercent}% of transactions`, mitigation: "Route through MEV-resistant pools (Flashbots, MEV-Block)" });
@@ -3757,15 +3767,15 @@ export async function registerRoutes(
       };
 
       console.log(`[STRESS] Detecting vulnerabilities...`);
-      const vulnerabilitiesFound = detectVulnerabilities(scenario.category || "custom", scenario.parameters || {}, scenario.severity || 3);
+      const vulnerabilitiesFound = detectVulnerabilities((scenario.category || "custom") as string, (scenario.parameters || {}) as Record<string, any>, (scenario.severity || 3) as number);
       console.log(`[STRESS] Found ${vulnerabilitiesFound.length} vulnerabilities`);
 
       // Calculate portfolio impact
-      const severityMultiplier = scenario.severity || 3;
+      const severityMultiplier = (scenario.severity || 3) as number;
       const portfolioImpact = -(10 + severityMultiplier * 5 + Math.random() * 10);
 
       const resultData = {
-        scenarioId: scenario.id,
+        scenarioId: (scenario.id || "") as string,
         success: true,
         vulnerabilitiesFound,
         agentPerformance,
@@ -3788,11 +3798,11 @@ export async function registerRoutes(
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter: resultData.systemHealthAfter,
       });
-      const updated = await Promise.race([updatePromise, timeoutPromise]);
+      const updated = (await Promise.race([updatePromise, timeoutPromise])) as any;
       console.error(`[STRESS] Database updated successfully`);
 
       const response = {
-        ...updated,
+        ...(updated || {}),
         resultData,
       };
 
@@ -3830,8 +3840,8 @@ export async function registerRoutes(
       }
 
       // Generate REAL vulnerabilities based on scenario parameters
-      const category = scenario.category || "custom";
-      const params = scenario.parameters || {};
+      const category = (scenario.category || "custom") as string;
+      const params = (scenario.parameters || {}) as Record<string, any>;
       const vulns: any[] = [];
       
       if (category === "flash_crash") {
@@ -3881,7 +3891,7 @@ export async function registerRoutes(
       const systemHealthAfter = Math.round(Math.max(20, 85 - severityMultiplier * 8 - Math.random() * 10));
       const updated = await storage.updateStressTestRun(runId, {
         status: "completed",
-        completedAt: new Date(),
+        completedAt: Date.now(),
         overallOutcome: portfolioImpact < -30 ? "degraded" : "survived",
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter,
