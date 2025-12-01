@@ -214,8 +214,19 @@ export function useAgentNFT() {
             throw new Error("Could not extract token ID from transaction");
           }
 
+          if (!mintingTemplateId) {
+            throw new Error("Template ID not set");
+          }
+
+          // Map chainId to chain name for backend
+          let chainName: "ethereum" | "solana" = "ethereum";
+          if (chainId === 11155111 || chainId === 84532 || chainId === 8453 || chainId === 1) {
+            chainName = "ethereum";
+          } else if (chainId === 900 || chainId === 901) {
+            chainName = "solana";
+          }
+
           // Record the NFT on backend with real blockchain data
-          const chainName = chainId === 11155111 ? "ethereum" : "solana";
           await apiRequest(
             "POST",
             "/api/marketplace/nfts/mint",
@@ -224,8 +235,8 @@ export function useAgentNFT() {
               ownerAddress: userAddress,
               chain: chainName,
               tokenId,
-              contractAddress: contractAddress.toString(),
-              txHash: mintHash,
+              contractAddress: contractAddress || "",
+              txHash: mintHash || "",
             }
           );
 
