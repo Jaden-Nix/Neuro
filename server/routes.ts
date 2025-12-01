@@ -14,7 +14,7 @@ import { selfHealingEngine } from "./selfhealing/SelfHealingEngine";
 import { mlPatternRecognition } from "./ml/MLPatternRecognition";
 import { governanceSystem } from "./governance/GovernanceSystem";
 import { PersonalityTrait, AgentType } from "@shared/schema";
-import type { WSMessage, LogEntry, TrainingDataPoint } from "@shared/schema";
+import type { WSMessage, LogEntry, TrainingDataPoint, ParliamentVote } from "@shared/schema";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
 import { preventInjection, validateContentType } from "./middleware/validation";
@@ -3347,8 +3347,8 @@ export async function registerRoutes(
       const session = await storage.getParliamentSession(req.params.id);
       if (!session) return res.status(404).json({ error: "Session not found" });
       
-      const approves = session.votes.filter(v => v.vote === "approve").length;
-      const rejects = session.votes.filter(v => v.vote === "reject").length;
+      const approves = session.votes.filter((v: ParliamentVote) => v.vote === "approve").length;
+      const rejects = session.votes.filter((v: ParliamentVote) => v.vote === "reject").length;
       const total = session.votes.length;
       
       let outcome: "approved" | "rejected" | "deadlocked" = "deadlocked";
@@ -3781,7 +3781,7 @@ export async function registerRoutes(
       // Update run with results
       const updatePromise = storage.updateStressTestRun(runId, {
         status: "completed",
-        completedAt: new Date(),
+        completedAt: Date.now(),
         overallOutcome: portfolioImpact < -30 ? "degraded" : "survived",
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter: resultData.systemHealthAfter,
