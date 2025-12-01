@@ -288,45 +288,7 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
 
   const simulateDebate = useMutation({
     mutationFn: async () => {
-      const agents: { id: string; type: AgentTypeKey; position: string }[] = [
-        { id: "meta-001", type: "meta", position: "for" },
-        { id: "scout-001", type: "scout", position: "for" },
-        { id: "risk-001", type: "risk", position: "against" },
-        { id: "exec-001", type: "execution", position: "clarification" },
-      ];
-
-      const debateStatements: Record<AgentTypeKey, string[]> = {
-        meta: [
-          "After analyzing system-wide patterns, I support this proposal. The expected value calculations show a 23% improvement in risk-adjusted returns.",
-          "Coordinating with all agents, the consensus shows favorable market conditions for this change.",
-        ],
-        scout: [
-          "Market opportunity analysis indicates 3 high-confidence arbitrage paths that would benefit from this proposal.",
-          "I've identified emerging patterns in the DEX liquidity pools that align with this strategy.",
-        ],
-        risk: [
-          "Caution advised. Historical volatility data shows increased exposure during similar market conditions.",
-          "The proposed threshold changes would increase our VaR by 12%. Recommend additional hedging.",
-        ],
-        execution: [
-          "From an execution perspective, gas optimization is achievable. Estimated savings of 15% on transaction costs.",
-          "Implementation timeline is feasible. Smart contract interactions are within acceptable latency bounds.",
-        ],
-      };
-
-      for (const agent of agents) {
-        const statements = debateStatements[agent.type];
-        const statement = statements[Math.floor(Math.random() * statements.length)];
-        
-        await apiRequest("POST", `/api/parliament/${session.id}/debate`, {
-          agentId: agent.id,
-          agentType: agent.type,
-          position: agent.position,
-          statement,
-        });
-        await new Promise(resolve => setTimeout(resolve, 800));
-      }
-      
+      await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
     },
   });

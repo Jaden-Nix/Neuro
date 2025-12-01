@@ -3288,6 +3288,46 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/parliament/:id/debate-live", writeLimiter, async (req, res) => {
+    try {
+      const session = await storage.getParliamentSession(req.params.id);
+      if (!session) return res.status(404).json({ error: "Session not found" });
+
+      const { adkIntegration } = await import("./adk/ADKIntegration");
+      const agents: { id: string; type: "meta" | "scout" | "risk" | "execution"; agentName: string; position: string }[] = [
+        { id: "meta-001", type: "meta", agentName: "neuronet_meta", position: "for" },
+        { id: "scout-001", type: "scout", agentName: "neuronet_scout", position: "for" },
+        { id: "risk-001", type: "risk", agentName: "neuronet_risk", position: "against" },
+        { id: "exec-001", type: "execution", agentName: "neuronet_execution", position: "clarification" },
+      ];
+
+      const prompt = `This DeFi governance proposal is being debated: "${session.topic}"\n\nDescription: ${session.description}\n\nProvide your concise stance and reasoning (2-3 sentences max) on this proposal as a DeFi AI agent.`;
+      const context = { topic: session.topic, description: session.description };
+
+      for (const agent of agents) {
+        const decision = await adkIntegration.queryAgent(agent.agentName, prompt, context);
+        const statement = typeof decision.reasoning === "string" ? decision.reasoning.substring(0, 500) : JSON.stringify(decision.reasoning).substring(0, 500);
+        
+        const entry = { agentId: agent.id, agentType: agent.type, position: agent.position, statement, timestamp: Date.now() };
+        await storage.addDebateEntry(req.params.id, entry);
+        
+        broadcastToClients({
+          type: "log",
+          data: { event: "parliament_debate", sessionId: req.params.id, entry },
+          timestamp: Date.now(),
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      const updated = await storage.getParliamentSession(req.params.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Live debate error:", error);
+      res.status(500).json({ error: "Failed to generate live debate" });
+    }
+  });
+
   app.post("/api/parliament/:id/conclude", writeLimiter, async (req, res) => {
     try {
       const session = await storage.getParliamentSession(req.params.id);
