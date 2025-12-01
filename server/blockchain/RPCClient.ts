@@ -150,7 +150,7 @@ export class BlockchainRPCClient {
       {
         chainId: sepolia.id,
         name: "Ethereum Sepolia",
-        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://sepolia.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161",
+        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://ethereum-sepolia.publicrpc.com",
         nativeSymbol: "ETH",
       },
       {
