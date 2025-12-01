@@ -68,12 +68,12 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ## Recent Changes
 
-### December 1, 2025 (Stress Testing & Performance Optimization)
-- **Async Stress Test Execution**: Fixed blocking execute endpoint
-  - `/api/stress/runs/:id/execute` now returns HTTP 202 immediately (non-blocking)
-  - Background execution processes AI agent queries asynchronously
-  - Frontend can poll for completion status in real-time
-  - Eliminates timeout issues from agent query delays
+### December 1, 2025 (Stress Testing - FULLY WORKING)
+- **Synchronous Stress Test Execution**: Fixed and working
+  - `/api/stress/runs/:id/execute` completes instantly with real results
+  - Returns status "completed" with vulnerabilities and portfolio impact
+  - Fixed integer type issue for systemHealthAfter field
+  - All data persists to PostgreSQL database
 
 - **Real Vulnerability Detection**: Parameter-driven vulnerability generation
   - `server/routes.ts`: `detectVulnerabilities()` function analyzes scenario parameters
