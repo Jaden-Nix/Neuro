@@ -344,10 +344,10 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
                 variant="outline"
                 onClick={() => simulateDebate.mutate()}
                 disabled={simulateDebate.isPending}
-                data-testid="button-simulate-debate"
+                data-testid="button-start-debate"
               >
                 <MessageCircle className="w-4 h-4 mr-2" />
-                {simulateDebate.isPending ? "Simulating..." : "Simulate Debate"}
+                {simulateDebate.isPending ? "Debating..." : "Start Debate"}
               </Button>
               <Button
                 onClick={() => simulateVoting.mutate()}

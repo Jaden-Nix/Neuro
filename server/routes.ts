@@ -3306,7 +3306,21 @@ export async function registerRoutes(
 
       for (const agent of agents) {
         const decision = await adkIntegration.queryAgent(agent.agentName, prompt, context);
-        const statement = typeof decision.reasoning === "string" ? decision.reasoning.substring(0, 500) : JSON.stringify(decision.reasoning).substring(0, 500);
+        
+        // Parse the response - if it's JSON, extract text; otherwise use as-is
+        let statement = decision.reasoning;
+        if (typeof statement === "string") {
+          try {
+            const parsed = JSON.parse(statement);
+            statement = parsed.analysis || parsed.reasoning || parsed.assessment || JSON.stringify(parsed);
+          } catch {
+            // Not JSON, use as-is
+          }
+        } else {
+          statement = JSON.stringify(statement);
+        }
+        
+        statement = statement.substring(0, 500);
         
         const entry = { agentId: agent.id, agentType: agent.type, position: agent.position, statement, timestamp: Date.now() };
         await storage.addDebateEntry(req.params.id, entry);
