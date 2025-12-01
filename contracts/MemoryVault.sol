@@ -2,16 +2,10 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/**
- * @title MemoryVault
- * @dev On-chain storage for AI agent strategies, patterns, and learning milestones
- * @notice Part of NeuroNet Governor multi-agent DeFi governance system
- */
 contract MemoryVault is Ownable, ReentrancyGuard {
-    using Counters for Counters.Counter;
+    uint256 private _entryIdCounter;
 
     enum StrategyType { SUCCESSFUL, BLOCKED, HIGH_RISK, LEARNED }
     
@@ -32,8 +26,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         uint256 score;
         uint256 lastUpdated;
     }
-
-    Counters.Counter private _entryIds;
     
     mapping(bytes32 => MemoryEntry) public entries;
     mapping(bytes32 => mapping(address => uint256)) public agentScores;
@@ -69,19 +61,11 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor() {
+    constructor() Ownable(msg.sender) {
         isAuthorizedAgent[msg.sender] = true;
         authorizedAgents.push(msg.sender);
     }
 
-    /**
-     * @dev Store a new memory entry
-     * @param strategyType Type of strategy (0: successful, 1: blocked, 2: high-risk, 3: learned)
-     * @param description Human-readable description of the memory
-     * @param riskPattern Identified risk pattern
-     * @param simulationSummary Summary of simulation results
-     * @param tags Array of tags for categorization
-     */
     function storeMemory(
         StrategyType strategyType,
         string calldata description,
@@ -89,11 +73,11 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         string calldata simulationSummary,
         string[] calldata tags
     ) external onlyAuthorizedAgent nonReentrant returns (bytes32) {
-        _entryIds.increment();
+        _entryIdCounter++;
         bytes32 entryId = keccak256(abi.encodePacked(
             block.timestamp,
             msg.sender,
-            _entryIds.current()
+            _entryIdCounter
         ));
 
         MemoryEntry storage entry = entries[entryId];
@@ -116,12 +100,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         return entryId;
     }
 
-    /**
-     * @dev Update agent score for a memory entry
-     * @param entryId The memory entry ID
-     * @param agent The agent address
-     * @param score The score to assign (0-100)
-     */
     function updateAgentScore(
         bytes32 entryId,
         address agent,
@@ -135,10 +113,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         emit AgentScoreUpdated(entryId, agent, score, block.timestamp);
     }
 
-    /**
-     * @dev Deactivate a memory entry
-     * @param entryId The memory entry ID to deactivate
-     */
     function deactivateEntry(bytes32 entryId) external onlyAuthorizedAgent {
         require(entries[entryId].isActive, "Entry already inactive");
         entries[entryId].isActive = false;
@@ -146,10 +120,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         emit EntryDeactivated(entryId, block.timestamp);
     }
 
-    /**
-     * @dev Authorize a new agent
-     * @param agent The agent address to authorize
-     */
     function authorizeAgent(address agent) external onlyOwner {
         require(!isAuthorizedAgent[agent], "Already authorized");
         isAuthorizedAgent[agent] = true;
@@ -158,10 +128,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         emit AgentAuthorized(agent, block.timestamp);
     }
 
-    /**
-     * @dev Revoke an agent's authorization
-     * @param agent The agent address to revoke
-     */
     function revokeAgent(address agent) external onlyOwner {
         require(isAuthorizedAgent[agent], "Not authorized");
         isAuthorizedAgent[agent] = false;
@@ -169,10 +135,6 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         emit AgentRevoked(agent, block.timestamp);
     }
 
-    /**
-     * @dev Get memory entry by ID
-     * @param entryId The memory entry ID
-     */
     function getEntry(bytes32 entryId) external view returns (
         StrategyType strategyType,
         string memory description,
@@ -194,39 +156,22 @@ contract MemoryVault is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Get entries by type
-     * @param strategyType The strategy type to filter by
-     */
     function getEntriesByType(StrategyType strategyType) external view returns (bytes32[] memory) {
         return entriesByType[strategyType];
     }
 
-    /**
-     * @dev Get entries by agent
-     * @param agent The agent address
-     */
     function getEntriesByAgent(address agent) external view returns (bytes32[] memory) {
         return agentEntries[agent];
     }
 
-    /**
-     * @dev Get all entry IDs
-     */
     function getAllEntryIds() external view returns (bytes32[] memory) {
         return allEntryIds;
     }
 
-    /**
-     * @dev Get total entry count
-     */
     function getTotalEntries() external view returns (uint256) {
         return allEntryIds.length;
     }
 
-    /**
-     * @dev Get authorized agents list
-     */
     function getAuthorizedAgents() external view returns (address[] memory) {
         return authorizedAgents;
     }

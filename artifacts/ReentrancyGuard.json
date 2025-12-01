@@ -1,0 +1,13 @@
+{
+  "contractName": "ReentrancyGuard",
+  "sourceName": "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "ReentrancyGuardReentrantCall",
+      "type": "error"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x"
+}

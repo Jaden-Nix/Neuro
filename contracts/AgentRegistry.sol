@@ -2,16 +2,11 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-/**
- * @title AgentRegistry
- * @dev On-chain registry for NeuroNet Governor AI agents with ATP compatibility
- * @notice Manages agent lifecycle, evolution, and credit economy on-chain
- */
 contract AgentRegistry is Ownable, ReentrancyGuard {
-    using Counters for Counters.Counter;
+    uint256 private _agentIdCounter;
+    uint256 private _transactionIdCounter;
 
     enum AgentType { META, SCOUT, RISK, EXECUTION }
     enum AgentStatus { IDLE, ACTIVE, NEGOTIATING, EXECUTING, DEPRECATED }
@@ -41,9 +36,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         string reason;
         uint256 timestamp;
     }
-
-    Counters.Counter private _agentIds;
-    Counters.Counter private _transactionIds;
 
     mapping(bytes32 => Agent) public agents;
     mapping(bytes32 => CreditTransaction[]) public creditHistory;
@@ -100,22 +92,18 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         uint256 timestamp
     );
 
-    /**
-     * @dev Register a new agent
-     * @param agentType Type of agent (0: meta, 1: scout, 2: risk, 3: execution)
-     * @param name Agent name
-     * @param description Agent description
-     */
+    constructor() Ownable(msg.sender) {}
+
     function registerAgent(
         AgentType agentType,
         string calldata name,
         string calldata description
     ) external nonReentrant returns (bytes32) {
-        _agentIds.increment();
+        _agentIdCounter++;
         bytes32 agentId = keccak256(abi.encodePacked(
             block.timestamp,
             msg.sender,
-            _agentIds.current(),
+            _agentIdCounter,
             agentType
         ));
 
@@ -147,11 +135,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         return agentId;
     }
 
-    /**
-     * @dev Update agent status
-     * @param agentId The agent ID
-     * @param newStatus The new status
-     */
     function updateStatus(bytes32 agentId, AgentStatus newStatus) external {
         Agent storage agent = agents[agentId];
         require(agent.id != bytes32(0), "Agent not found");
@@ -165,12 +148,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         emit AgentStatusUpdated(agentId, oldStatus, newStatus, block.timestamp);
     }
 
-    /**
-     * @dev Adjust agent credits
-     * @param agentId The agent ID
-     * @param amount The credit adjustment (positive or negative)
-     * @param reason The reason for adjustment
-     */
     function adjustCredits(
         bytes32 agentId,
         int256 amount,
@@ -208,11 +185,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         }
     }
 
-    /**
-     * @dev Evolve an agent to a new version
-     * @param agentId The agent to evolve
-     * @param improvements Description of improvements
-     */
     function evolveAgent(
         bytes32 agentId,
         string calldata improvements
@@ -221,11 +193,11 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         require(oldAgent.id != bytes32(0), "Agent not found");
         require(oldAgent.owner == msg.sender || msg.sender == owner(), "Not authorized");
 
-        _agentIds.increment();
+        _agentIdCounter++;
         bytes32 newAgentId = keccak256(abi.encodePacked(
             block.timestamp,
             msg.sender,
-            _agentIds.current(),
+            _agentIdCounter,
             oldAgent.agentType,
             "evolved"
         ));
@@ -260,11 +232,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         return newAgentId;
     }
 
-    /**
-     * @dev Set ATP link for tokenized agent
-     * @param agentId The agent ID
-     * @param atpLink The ATP platform link
-     */
     function setATPLink(bytes32 agentId, string calldata atpLink) external {
         Agent storage agent = agents[agentId];
         require(agent.id != bytes32(0), "Agent not found");
@@ -276,10 +243,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         emit AgentTokenized(agentId, atpLink, block.timestamp);
     }
 
-    /**
-     * @dev Check if agent should be deprecated
-     * @param agentId The agent ID
-     */
     function shouldDeprecate(bytes32 agentId) public view returns (bool) {
         Agent storage agent = agents[agentId];
         if (agent.id == bytes32(0) || agent.status == AgentStatus.DEPRECATED) {
@@ -301,9 +264,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         return false;
     }
 
-    /**
-     * @dev Internal function to deprecate an agent
-     */
     function _deprecateAgent(bytes32 agentId, string memory reason) internal {
         Agent storage agent = agents[agentId];
         agent.status = AgentStatus.DEPRECATED;
@@ -312,10 +272,6 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         emit AgentDeprecated(agentId, reason, block.timestamp);
     }
 
-    /**
-     * @dev Get agent details
-     * @param agentId The agent ID
-     */
     function getAgent(bytes32 agentId) external view returns (
         AgentType agentType,
         AgentStatus status,
@@ -341,47 +297,26 @@ contract AgentRegistry is Ownable, ReentrancyGuard {
         );
     }
 
-    /**
-     * @dev Get credit history for an agent
-     * @param agentId The agent ID
-     */
     function getCreditHistory(bytes32 agentId) external view returns (CreditTransaction[] memory) {
         return creditHistory[agentId];
     }
 
-    /**
-     * @dev Get agents by type
-     * @param agentType The agent type
-     */
     function getAgentsByType(AgentType agentType) external view returns (bytes32[] memory) {
         return agentsByType[agentType];
     }
 
-    /**
-     * @dev Get agents by owner
-     * @param agentOwner The owner address
-     */
     function getAgentsByOwner(address agentOwner) external view returns (bytes32[] memory) {
         return ownerAgents[agentOwner];
     }
 
-    /**
-     * @dev Get all agent IDs
-     */
     function getAllAgentIds() external view returns (bytes32[] memory) {
         return allAgentIds;
     }
 
-    /**
-     * @dev Get total agent count
-     */
     function getTotalAgents() external view returns (uint256) {
         return allAgentIds.length;
     }
 
-    /**
-     * @dev Helper function to convert uint to string
-     */
     function _toString(uint256 value) internal pure returns (string memory) {
         if (value == 0) {
             return "0";

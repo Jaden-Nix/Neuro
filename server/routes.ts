@@ -1773,6 +1773,8 @@ export async function registerRoutes(
     }
   });
 
+  // Record an NFT after user mints on-chain via their wallet (frontend wagmi hooks)
+  // This does NOT perform blockchain transactions - user's wallet does that
   app.post("/api/marketplace/nfts/mint", requireWriteAuth, strictLimiter, async (req, res) => {
     try {
       const { z } = await import("zod");
@@ -1780,24 +1782,23 @@ export async function registerRoutes(
         templateId: z.string().min(1, "Template ID is required"),
         ownerAddress: z.string().min(1, "Owner address is required"),
         chain: z.enum(["ethereum", "solana"]),
+        // Real blockchain transaction data from frontend
+        tokenId: z.string().min(1, "Token ID from blockchain is required"),
+        contractAddress: z.string().min(1, "Contract address is required"),
+        txHash: z.string().min(1, "Transaction hash is required"),
       });
       const parsed = mintSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid mint data", details: parsed.error.flatten() });
       }
-      const { templateId, ownerAddress, chain } = parsed.data;
+      const { templateId, ownerAddress, chain, tokenId, contractAddress, txHash } = parsed.data;
       
       const template = await storage.getAgentTemplate(templateId);
       if (!template) {
         return res.status(404).json({ error: "Template not found" });
       }
 
-      // Generate mock NFT data (in production this would interact with blockchain)
-      const tokenId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      const contractAddress = chain === "solana" 
-        ? "AgentNFT" + Math.random().toString(36).substring(7)
-        : "0x" + Array(40).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join("");
-
+      // Record the NFT with real blockchain data (transaction already happened on-chain)
       const nft = await storage.createAgentNFT({
         id: `nft-${tokenId}`,
         templateId,
@@ -1815,6 +1816,7 @@ export async function registerRoutes(
             { trait_type: "Risk Tolerance", value: template.riskTolerance },
             { trait_type: "Performance Score", value: template.performanceScore },
             { trait_type: "Success Rate", value: `${template.successRate}%` },
+            { trait_type: "Transaction Hash", value: txHash },
           ],
         },
       });
@@ -1826,8 +1828,8 @@ export async function registerRoutes(
 
       res.status(201).json(nft);
     } catch (error) {
-      console.error("Failed to mint NFT:", error);
-      res.status(500).json({ error: "Failed to mint NFT" });
+      console.error("Failed to record minted NFT:", error);
+      res.status(500).json({ error: "Failed to record minted NFT" });
     }
   });
 
