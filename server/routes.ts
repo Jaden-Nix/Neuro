@@ -3346,6 +3346,38 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/evolution", writeLimiter, async (req, res) => {
+    try {
+      const { agentId, parentAgentId, generation, performanceScore, survivalScore, reproductionScore, mutations, inheritedTraits } = req.body;
+      
+      if (!agentId) {
+        return res.status(400).json({ error: "agentId is required" });
+      }
+      
+      const evolution = await storage.createAgentEvolution({
+        id: `evolution-${agentId}-${Date.now()}`,
+        agentId,
+        parentAgentId: parentAgentId || null,
+        generation: generation || 1,
+        performanceScore: performanceScore || 50,
+        survivalScore: survivalScore || 50,
+        reproductionScore: reproductionScore || 0,
+        mutations: mutations || [],
+        inheritedTraits: inheritedTraits || [],
+      });
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "agent_evolution_created", evolution },
+        timestamp: Date.now(),
+      });
+      res.status(201).json(evolution);
+    } catch (error) {
+      console.error("Failed to create agent evolution:", error);
+      res.status(500).json({ error: "Failed to create agent evolution" });
+    }
+  });
+
   // Dream Sessions
   app.get("/api/dream", async (req, res) => {
     try {
@@ -3372,23 +3404,44 @@ export async function registerRoutes(
 
   app.post("/api/dream/start", writeLimiter, async (req, res) => {
     try {
-      const { metabolicRate, dreamDepth, realTimeMultiplier } = req.body;
+      const { metabolicRate, dreamDepth, realTimeMultiplier, simulationsRun, duration, discoveries, insights } = req.body;
+      
       const session = await storage.createDreamSession({
         id: `dream-${Date.now()}`,
-        status: "dreaming",
-        simulationsRun: 0,
-        branchesExplored: 0,
+        status: "awake",
+        simulationsRun: simulationsRun || 0,
+        branchesExplored: Math.floor((simulationsRun || 0) / 100),
         metabolicRate: metabolicRate || 10,
         dreamDepth: dreamDepth || 5,
         realTimeMultiplier: realTimeMultiplier || 10,
+        topInsight: insights,
       });
+      
+      // Add discoveries if provided
+      if (discoveries && Array.isArray(discoveries)) {
+        for (const discovery of discoveries) {
+          await storage.addDreamDiscovery(session.id, discovery);
+        }
+      }
+      
+      // Fetch updated session with discoveries
+      const updatedSession = await storage.getDreamSession(session.id);
+      
+      // Format response to match frontend expectations
+      const response = {
+        ...updatedSession,
+        duration: duration || 28800,
+        insights: insights,
+      };
+      
       broadcastToClients({
         type: "log",
-        data: { event: "dream_started", session },
+        data: { event: "dream_completed", session: response },
         timestamp: Date.now(),
       });
-      res.status(201).json(session);
+      res.status(201).json(response);
     } catch (error) {
+      console.error("Failed to start dream session:", error);
       res.status(500).json({ error: "Failed to start dream session" });
     }
   });
@@ -3473,27 +3526,91 @@ export async function registerRoutes(
 
   app.post("/api/stress/runs", writeLimiter, async (req, res) => {
     try {
-      const { scenarioId, systemHealthBefore } = req.body;
-      if (!scenarioId) {
-        return res.status(400).json({ error: "Scenario ID required" });
+      const { name, description, scenarioType, severity, parameters, scenarioId, systemHealthBefore } = req.body;
+      
+      // Support both inline scenario creation and existing scenarioId
+      let resolvedScenarioId = scenarioId;
+      
+      if (!scenarioId && name && description) {
+        // Create inline scenario for frontend convenience
+        const scenario = await storage.createStressScenario({
+          id: `stress-scenario-${Date.now()}`,
+          name,
+          description,
+          category: scenarioType || "custom",
+          severity: typeof severity === "string" ? 3 : (severity || 3),
+          parameters: parameters || {},
+          isTemplate: false,
+          createdBy: "stress-test-ui",
+        });
+        resolvedScenarioId = scenario.id;
       }
+      
+      if (!resolvedScenarioId) {
+        return res.status(400).json({ error: "Either scenarioId or name/description required" });
+      }
+      
       const run = await storage.createStressTestRun({
         id: `stress-run-${Date.now()}`,
-        scenarioId,
-        status: "preparing",
+        scenarioId: resolvedScenarioId,
+        status: "running",
         overallOutcome: "pending",
         portfolioImpact: 0,
         systemHealthBefore: systemHealthBefore || 85,
         systemHealthAfter: systemHealthBefore || 85,
       });
+      
+      // Return with additional fields expected by frontend
+      const response = {
+        ...run,
+        name: name || "Stress Test",
+        description: description || "",
+        scenarioType: scenarioType || "custom",
+        severity: severity || "medium",
+        createdAt: new Date().toISOString(),
+        startedAt: new Date().toISOString(),
+      };
+      
       broadcastToClients({
         type: "log",
-        data: { event: "stress_test_started", run },
+        data: { event: "stress_test_started", run: response },
         timestamp: Date.now(),
       });
-      res.status(201).json(run);
+      res.status(201).json(response);
     } catch (error) {
+      console.error("Failed to create stress test run:", error);
       res.status(500).json({ error: "Failed to create stress test run" });
+    }
+  });
+
+  app.patch("/api/stress/runs/:id", writeLimiter, async (req, res) => {
+    try {
+      const { status, resultData } = req.body;
+      const updates: any = {};
+      
+      if (status) updates.status = status;
+      if (status === "completed") {
+        updates.completedAt = Date.now();
+        updates.overallOutcome = "survived";
+      }
+      
+      const updated = await storage.updateStressTestRun(req.params.id, updates);
+      if (!updated) return res.status(404).json({ error: "Stress test run not found" });
+      
+      // Merge resultData into response for frontend
+      const response = {
+        ...updated,
+        resultData: resultData || updated,
+      };
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "stress_test_updated", run: response },
+        timestamp: Date.now(),
+      });
+      res.json(response);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update stress test run" });
     }
   });
 
