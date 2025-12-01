@@ -3639,20 +3639,30 @@ export async function registerRoutes(
 
   // Helper function to execute stress test in background
   const executeStressTestAsync = async (runId: string) => {
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error("Stress test timeout after 5 seconds")), 5000)
+    );
+
     try {
-      console.log(`[STRESS] Starting execution for run: ${runId}`);
-      const run = await storage.getStressTestRun(runId);
+      console.error(`[STRESS] Starting execution for run: ${runId}`);
+      process.stderr.write(`[STRESS STDERR] Run: ${runId}\n`);
+      
+      const runPromise = storage.getStressTestRun(runId);
+      const run = await Promise.race([runPromise, timeoutPromise]);
+      
       if (!run) {
-        console.log(`[STRESS] Run not found: ${runId}`);
+        console.error(`[STRESS] Run not found: ${runId}`);
         return;
       }
 
-      const scenario = await storage.getStressScenario(run.scenarioId);
+      const scenarioPromise = storage.getStressScenario(run.scenarioId);
+      const scenario = await Promise.race([scenarioPromise, timeoutPromise]);
+      
       if (!scenario) {
-        console.log(`[STRESS] Scenario not found: ${run.scenarioId}`);
+        console.error(`[STRESS] Scenario not found: ${run.scenarioId}`);
         return;
       }
-      console.log(`[STRESS] Processing scenario: ${scenario.name}`);
+      console.error(`[STRESS] Processing scenario: ${scenario.name}`);
 
       const agentResponses: Record<string, any> = {};
       const agentPerformance: Record<string, any> = {};
@@ -3767,16 +3777,17 @@ export async function registerRoutes(
         systemHealthAfter: Math.max(20, 85 - severityMultiplier * 8 - Math.random() * 10),
       };
 
-      console.log(`[STRESS] Updating database with results...`);
+      console.error(`[STRESS] Updating database with results...`);
       // Update run with results
-      const updated = await storage.updateStressTestRun(runId, {
+      const updatePromise = storage.updateStressTestRun(runId, {
         status: "completed",
         completedAt: new Date(),
         overallOutcome: portfolioImpact < -30 ? "degraded" : "survived",
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter: resultData.systemHealthAfter,
       });
-      console.log(`[STRESS] Database updated successfully`);
+      const updated = await Promise.race([updatePromise, timeoutPromise]);
+      console.error(`[STRESS] Database updated successfully`);
 
       const response = {
         ...updated,
@@ -3800,7 +3811,11 @@ export async function registerRoutes(
       if (!run) return res.status(404).json({ error: "Stress test run not found" });
 
       // Start async execution in background - don't wait for it
-      executeStressTestAsync(runId).catch(err => console.error("Background execution failed:", err));
+      console.error(`[EXECUTE] Starting background execution for run: ${runId}`);
+      executeStressTestAsync(runId).catch(err => {
+        console.error(`[EXECUTE] Background execution failed:`, err);
+        process.stderr.write(`[EXECUTE ERROR] ${err.message}\n`);
+      });
 
       // Return immediately with current run status
       res.status(202).json({
