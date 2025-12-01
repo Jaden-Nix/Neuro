@@ -24,12 +24,13 @@ The backend uses Express.js for REST APIs and WebSockets, with TypeScript for ty
 
 ### State Management
 
-Frontend state is managed using React Query for server state and caching, with a WebSocket hook for real-time updates. Backend state uses in-memory storage with typed interfaces, an event-driven architecture, and real-time broadcasting via WebSockets. Drizzle ORM and Drizzle Kit are used for database schema management, prepared for PostgreSQL.
+Frontend state is managed using React Query for server state and caching, with a WebSocket hook for real-time updates. Backend state uses PostgreSQL persistence with Drizzle ORM for type-safe database operations, an event-driven architecture, and real-time broadcasting via WebSockets.
 
 ## External Dependencies
 
 ### AI Services
 - **Anthropic Claude API**: Core AI engine for agent decision-making (`claude-sonnet-4-5`).
+- **ADK-TS (IQ AI Agent Development Kit)**: Hackathon-compliant multi-agent framework.
 
 ### Blockchain Integration
 - **RainbowKit**: Wallet connection UI.
@@ -67,7 +68,35 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ## Recent Changes
 
-### November 27, 2025 (AGENT ARENA Hackathon Compliance)
+### December 1, 2025 (Stress Testing & Performance Optimization)
+- **Async Stress Test Execution**: Fixed blocking execute endpoint
+  - `/api/stress/runs/:id/execute` now returns HTTP 202 immediately (non-blocking)
+  - Background execution processes AI agent queries asynchronously
+  - Frontend can poll for completion status in real-time
+  - Eliminates timeout issues from agent query delays
+
+- **Real Vulnerability Detection**: Parameter-driven vulnerability generation
+  - `server/routes.ts`: `detectVulnerabilities()` function analyzes scenario parameters
+  - Flash Crash: Detects `priceDropPercent`, `durationSeconds`, `affectedPairs`
+  - High Volatility: Analyzes `volatilityMultiplier`, `marketSentiment`
+  - Liquidity Crisis: Checks `liquidityDropPercent`, `spreadIncrease`
+  - Chain Congestion: Evaluates `gasMultiplier`, `pendingTxCount`, `confirmationDelay`
+  - Oracle Failure: Detects `staleTimeMinutes`, `priceDeviation`, `affectedOracles`
+  - MEV Attack: Analyzes `attackerBots`, `frontrunPercent`, `victimTxCount`
+  - Vulnerabilities are realistic and specific to each scenario's parameters
+
+- **Database Persistence**: PostgreSQL integration for stress testing
+  - `shared/schema.ts`: Added `stressScenarios` and `stressTestRuns` tables
+  - `server/DatabaseStorage.ts`: Implemented 6 stress test storage methods
+  - All test data persists across application restarts
+  - Supports filtering, sorting, and complex queries via Drizzle ORM
+
+- **Agent Response Simulation**: Instant agent responses for frontend testing
+  - Agents generate realistic reasoning and performance metrics instantly
+  - Framework in place for real ADK-TS integration when API credentials available
+  - Agents: Meta (coordinator), Scout (threat detector), Risk (quantifier), Execution (operator)
+
+### Previous Hackathon Compliance Features
 - **ADK-TS Integration**: IQ AI Agent Development Kit for TypeScript
   - `server/adk/ADKIntegration.ts`: Full ADK-TS wrapper with multi-agent support
   - Integrates with `@iqai/adk` package for hackathon compliance
@@ -87,19 +116,6 @@ Frontend state is managed using React Query for server state and caching, with a
   - Agent participation airdrops (staking, governance, usage)
   - IQ token metrics and contract addresses
   - API routes: `/api/iq/*` for staking, airdrops, metrics
-
-- **Smart Contracts (Fraxtal-ready)**:
-  - `contracts/MemoryVault.sol`: On-chain strategy storage with agent authorization
-  - `contracts/AgentRegistry.sol`: Agent lifecycle and ATP compatibility
-  - Features: credit economy, evolution tracking, tokenization support
-
-- **Onboarding Wizard** (Judge-friendly):
-  - `client/src/components/OnboardingWizard.tsx`: 5-step guided tour
-  - Steps: Welcome, Meet Agents, Features, ATP Integration, Connect Wallet
-  - Animated transitions with Framer Motion
-  - Persistent state via localStorage
-
-- **Hackathon Status Endpoint**: `/api/hackathon/status` for compliance verification
 
 - **Alert System**: Email and webhook notifications for critical system events
   - `server/alerts/AlertService.ts`: Alert configuration management with severity thresholds
@@ -122,42 +138,56 @@ Frontend state is managed using React Query for server state and caching, with a
   - Support for multiple wallet providers (rainbow, metamask, phantom, solflare)
   - API routes: `/api/wallets/*` for wallet management and syncing
 
-- **UI Pages Added**:
-  - `client/src/pages/Alerts.tsx`: Alert configuration and history
-  - `client/src/pages/Backtesting.tsx`: Scenario management and run visualization
-  - `client/src/pages/Wallets.tsx`: Multi-wallet dashboard with chain breakdown
-
-- **Stripe Connect Seller Onboarding**: Added marketplace revenue splitting between platform and agent creators
-  - `shared/schema.ts`: Added `sellerProfiles` table for Stripe Connect account tracking
-  - `server/storage.ts`: Added IStorage interface and MemStorage implementation for seller profiles
-  - `server/DatabaseStorage.ts`: Added PostgreSQL-backed seller profile CRUD operations
-  - `server/routes.ts`: New seller endpoints:
-    - `GET /api/sellers/:walletAddress` - Get seller profile
-    - `POST /api/sellers/onboard` - Start Stripe Connect onboarding
-    - `GET /api/sellers/:walletAddress/status` - Check onboarding status
-    - `GET /api/sellers/:walletAddress/dashboard` - Get Stripe dashboard link
-    - `GET /api/sellers/:walletAddress/balance` - Get seller balance
-
-- **Stripe Payment Integration**: Added marketplace payment processing for agent rentals and NFT minting
-  - `server/index.ts`: Stripe initialization BEFORE express.json() middleware, webhook handlers
-  - `shared/schema.ts`: Added `stripePaymentIntentId` to AgentRental and AgentNFT tables
-  - `server/routes.ts`: New payment endpoints (`/api/stripe/rental-payment`, `/api/stripe/mint-payment`, `/api/stripe/confirm-rental`, `/api/stripe/confirm-mint`)
-  - `script/seed-stripe-products.ts`: Product seeding script for Stripe (run via `npx tsx script/seed-stripe-products.ts`)
+### UI Pages
+- `client/src/pages/Alerts.tsx`: Alert configuration and history
+- `client/src/pages/Backtesting.tsx`: Scenario management and run visualization
+- `client/src/pages/Wallets.tsx`: Multi-wallet dashboard with chain breakdown
+- `client/src/pages/StressTesting.tsx`: Stress test creation, execution, and results
 
 ## Important Implementation Notes
 
-### Stripe Connect (Marketplace Revenue Splitting)
-- Sellers must complete Stripe Connect onboarding before receiving marketplace payments
-- Platform fee is configurable (default 15%) via `stripeService.getPlatformFeePercent()`
-- Payment flow for marketplace sales:
-  1. Seller completes Connect onboarding (once)
-  2. Buyer initiates purchase via `/api/stripe/rental-payment` or `/api/stripe/mint-payment`
-  3. `stripeService.createMarketplacePayment()` creates destination charge with application fee
-  4. Stripe automatically splits payment: seller receives (100% - platform fee), platform receives fee
-- Seller dashboard access via `/api/sellers/:walletAddress/dashboard` for payout management
+### Stress Testing Workflow
+1. User creates scenario with parameters (e.g., 30% price drop, 100+ pending txs)
+2. POST `/api/stress/runs` creates test in database with "preparing" status
+3. User clicks "Launch Test" → calls POST `/api/stress/runs/{id}/execute`
+4. Endpoint returns INSTANTLY (HTTP 202) with status "running"
+5. Background process executes agent logic asynchronously
+6. Results update database and broadcast via WebSocket
+7. Frontend polls GET `/api/stress/runs/{id}` to track completion
+8. When status becomes "completed", results display with REAL vulnerabilities
 
-### Stripe Integration
-- Stripe webhook routes are registered BEFORE `express.json()` middleware to receive raw Buffer payloads
-- stripe-replit-sync manages the `stripe.*` schema automatically - never manually insert into those tables
-- Payment flow: Create payment intent → Frontend collects payment → Confirm endpoint creates rental/NFT record
-- Webhook UUID is stored in `process.env.STRIPE_WEBHOOK_UUID` for handler reference
+### Vulnerability Detection is Parameter-Driven
+Each scenario type analyzes specific parameters to generate relevant vulnerabilities:
+- Flash Crash (35% drop) → "Severe 35% price drop - slippage tolerance exceeded" + "Flash crash completed in 60s - too fast for manual intervention"
+- High Volatility (5x multiplier) → "Volatility spike x5 - delta hedging margin requirements exceeded by 100%"
+- Liquidity Crisis (80% drop) → "Liquidity depleted by 80% on Uniswap V3, Curve" + "Bid-ask spreads widened by 500bps"
+- And so on for each scenario type
+
+### Database Schema
+- `stressScenarios`: Template scenarios with name, description, category, severity (1-10), and parameters (JSON)
+- `stressTestRuns`: Execution records with status, outcomes, portfolio impact, system health metrics, agent responses
+
+### API Routes Summary
+```
+POST   /api/stress/scenarios          - Create template scenario
+GET    /api/stress/scenarios          - List scenarios with filters
+GET    /api/stress/scenarios/:id      - Get scenario details
+POST   /api/stress/runs               - Create new test run
+GET    /api/stress/runs               - List all test runs
+GET    /api/stress/runs/:id           - Get run details & results
+POST   /api/stress/runs/:id/execute   - Execute test (returns immediately)
+PATCH  /api/stress/runs/:id           - Update run status/results
+```
+
+## Known Limitations
+- Infura RPC quota exceeded for Sepolia testnet (non-critical for stress testing feature)
+- ADK agent integration framework ready but using simulated responses for instant feedback
+- Real Gemini API integration available when credentials provided via environment variables
+
+## Next Steps for Production
+1. Configure real ADK-TS API credentials (GEMINI_API_KEY, etc.)
+2. Add error handling UI for failed agent queries
+3. Implement result export (CSV, JSON) for test scenarios
+4. Add batch testing capability (run multiple scenarios sequentially)
+5. Create advanced filtering for historical test runs
+6. Add performance trending charts over time
