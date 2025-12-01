@@ -216,17 +216,18 @@ export function useAgentNFT() {
 
           // Record the NFT on backend with real blockchain data
           const chainName = chainId === 11155111 ? "ethereum" : "solana";
-          await apiRequest("/api/marketplace/nfts/mint", {
-            method: "POST",
-            body: JSON.stringify({
+          await apiRequest(
+            "POST",
+            "/api/marketplace/nfts/mint",
+            {
               templateId: mintingTemplateId,
               ownerAddress: userAddress,
               chain: chainName,
               tokenId,
-              contractAddress,
+              contractAddress: contractAddress.toString(),
               txHash: mintHash,
-            }),
-          });
+            }
+          );
 
           toast({
             title: "Agent Minted Successfully!",
