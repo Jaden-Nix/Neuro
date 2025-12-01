@@ -183,26 +183,7 @@ function LiveScenarioView({ scenario, onBack }: { scenario: LocalScenario; onBac
 
   const completeScenario = useMutation({
     mutationFn: async () => {
-      const resultData = {
-        scenarioId: scenario.id,
-        success: true,
-        vulnerabilitiesFound: [
-          { severity: "high", description: "Slippage tolerance exceeded during flash crash", mitigation: "Dynamic slippage adjustment" },
-          { severity: "medium", description: "Gas estimation failed during congestion", mitigation: "Fallback gas strategies" },
-        ],
-        agentPerformance: {
-          meta: { decisionTime: 45, accuracy: 92, adaptability: 88 },
-          scout: { decisionTime: 23, accuracy: 85, adaptability: 90 },
-          risk: { decisionTime: 12, accuracy: 98, adaptability: 82 },
-          execution: { decisionTime: 8, accuracy: 78, adaptability: 95 },
-        },
-        recommendations: [
-          "Increase risk buffer during high volatility periods",
-          "Implement circuit breaker for flash crash scenarios",
-          "Add redundant oracle sources",
-        ],
-      };
-      return apiRequest("PATCH", `/api/stress/runs/${scenario.id}`, { status: "completed", resultData });
+      return apiRequest("POST", `/api/stress/runs/${scenario.id}/execute`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stress/runs"] });
