@@ -271,7 +271,10 @@ export async function registerRoutes(
     ];
 
     for (const template of seedTemplates) {
-      await storage.createAgentTemplate(template);
+      await storage.createAgentTemplate({
+        ...template,
+        id: `${template.name.toLowerCase().replace(/\s+/g, '-')}-template`,
+      });
     }
     console.log("[Routes] Seeded marketplace with agent templates");
   }
@@ -3226,6 +3229,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Topic and description required" });
       }
       const session = await storage.createParliamentSession({
+        id: `parliament-${Date.now()}`,
         topic,
         description,
         proposalData: proposalData || {},
@@ -3370,6 +3374,7 @@ export async function registerRoutes(
     try {
       const { metabolicRate, dreamDepth, realTimeMultiplier } = req.body;
       const session = await storage.createDreamSession({
+        id: `dream-${Date.now()}`,
         status: "dreaming",
         simulationsRun: 0,
         branchesExplored: 0,
@@ -3427,6 +3432,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Missing required fields" });
       }
       const scenario = await storage.createStressScenario({
+        id: `stress-scenario-${Date.now()}`,
         name,
         description,
         category,
@@ -3472,6 +3478,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Scenario ID required" });
       }
       const run = await storage.createStressTestRun({
+        id: `stress-run-${Date.now()}`,
         scenarioId,
         status: "preparing",
         overallOutcome: "pending",
