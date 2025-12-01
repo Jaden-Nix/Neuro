@@ -1,0 +1,11 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2025-12-01T13:03:26.400Z",
+  "deployer": "0xe47Dce1b7e31333329734E24089C0472c030d95B",
+  "contracts": {
+    "AgentNFT": "0x8e0b49345c9af9894ca4ab4dd528e28a6b91b078",
+    "AgentRegistry": "0xe7d63c8dcfe109fc617dccde1799f38d13d17398",
+    "MemoryVault": "0x02be5025b416ca3c7e2b5fbc6c9abfe8669ba574"
+  }
+}

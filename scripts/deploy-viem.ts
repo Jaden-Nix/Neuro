@@ -26,9 +26,9 @@ async function deployContract(
   console.log(`Deploying ${artifact.contractName}...`);
   
   const hash = await walletClient.deployContract({
-    abi: artifact.abi,
+    abi: artifact.abi as any,
     bytecode: artifact.bytecode as Hex,
-  });
+  } as any);
   
   console.log(`  Transaction hash: ${hash}`);
   
