@@ -3640,11 +3640,19 @@ export async function registerRoutes(
   // Helper function to execute stress test in background
   const executeStressTestAsync = async (runId: string) => {
     try {
+      console.log(`[STRESS] Starting execution for run: ${runId}`);
       const run = await storage.getStressTestRun(runId);
-      if (!run) return;
+      if (!run) {
+        console.log(`[STRESS] Run not found: ${runId}`);
+        return;
+      }
 
       const scenario = await storage.getStressScenario(run.scenarioId);
-      if (!scenario) return;
+      if (!scenario) {
+        console.log(`[STRESS] Scenario not found: ${run.scenarioId}`);
+        return;
+      }
+      console.log(`[STRESS] Processing scenario: ${scenario.name}`);
 
       const agentResponses: Record<string, any> = {};
       const agentPerformance: Record<string, any> = {};
@@ -3736,7 +3744,9 @@ export async function registerRoutes(
         ];
       };
 
+      console.log(`[STRESS] Detecting vulnerabilities...`);
       const vulnerabilitiesFound = detectVulnerabilities(scenario.category || "custom", scenario.parameters || {}, scenario.severity || 3);
+      console.log(`[STRESS] Found ${vulnerabilitiesFound.length} vulnerabilities`);
 
       // Calculate portfolio impact
       const severityMultiplier = scenario.severity || 3;
@@ -3757,6 +3767,7 @@ export async function registerRoutes(
         systemHealthAfter: Math.max(20, 85 - severityMultiplier * 8 - Math.random() * 10),
       };
 
+      console.log(`[STRESS] Updating database with results...`);
       // Update run with results
       const updated = await storage.updateStressTestRun(runId, {
         status: "completed",
@@ -3765,6 +3776,7 @@ export async function registerRoutes(
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter: resultData.systemHealthAfter,
       });
+      console.log(`[STRESS] Database updated successfully`);
 
       const response = {
         ...updated,
