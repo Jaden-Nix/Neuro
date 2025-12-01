@@ -218,7 +218,7 @@ export class BlockchainRPCClient {
   }
 
   async getTVLInUSD(): Promise<number> {
-    const client = this.clients.get(mainnet.id);
+    const client = this.clients.get(sepolia.id);
     if (!client) return 0;
 
     const POOL_ADDRESS = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640" as `0x${string}`;
@@ -283,7 +283,7 @@ export class BlockchainRPCClient {
   }
 
   async getAaveV3APY(): Promise<number> {
-    const client = this.clients.get(mainnet.id);
+    const client = this.clients.get(sepolia.id);
     if (!client) return 0;
 
     const AAVE_V3_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as `0x${string}`;
@@ -364,7 +364,7 @@ export class BlockchainRPCClient {
       return this.cachedEthPrice.price;
     }
 
-    const client = this.clients.get(mainnet.id);
+    const client = this.clients.get(sepolia.id);
     if (!client) return 2000;
 
     const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" as `0x${string}`;
@@ -402,7 +402,7 @@ export class BlockchainRPCClient {
     }
   }
 
-  async getGasPriceGwei(chainId: number = mainnet.id): Promise<number> {
+  async getGasPriceGwei(chainId: number = sepolia.id): Promise<number> {
     const client = this.clients.get(chainId);
     if (!client) return 20;
 
