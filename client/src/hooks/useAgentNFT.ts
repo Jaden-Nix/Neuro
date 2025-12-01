@@ -1,14 +1,17 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useChainId } from "wagmi";
-import { parseEther, formatEther, type Address } from "viem";
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount, useChainId, usePublicClient } from "wagmi";
+import { parseEther, formatEther, type Address, decodeEventLog, keccak256, toHex } from "viem";
 import { AGENT_NFT_ABI, getContractAddress, isContractDeployed, DEFAULT_MINT_PRICE_ETH } from "@/lib/contracts";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
 
 export function useAgentNFT() {
   const { address: userAddress } = useAccount();
   const chainId = useChainId();
   const { toast } = useToast();
+  const publicClient = usePublicClient();
   const [isDeployed, setIsDeployed] = useState(false);
+  const [mintingTemplateId, setMintingTemplateId] = useState<string>("");
 
   const contractAddress = getContractAddress(chainId, "agentNFT");
 
@@ -93,6 +96,9 @@ export function useAgentNFT() {
     try {
       const priceToUse = mintPrice ?? parseEther(DEFAULT_MINT_PRICE_ETH.toString());
       
+      // Store templateId for use in confirmation handler
+      setMintingTemplateId(templateId);
+      
       writeMint({
         address: contractAddress,
         abi: AGENT_NFT_ABI,
@@ -166,15 +172,83 @@ export function useAgentNFT() {
   };
 
   useEffect(() => {
-    if (isMintConfirmed) {
-      toast({
-        title: "Agent Minted Successfully!",
-        description: `Transaction confirmed. Your agent NFT has been minted.`,
-      });
-      refetchUserTokens();
-      resetMint();
+    if (isMintConfirmed && mintHash && userAddress && contractAddress) {
+      // Extract token ID from transaction receipt
+      (async () => {
+        try {
+          const receipt = await publicClient?.getTransactionReceipt({ hash: mintHash });
+          
+          if (!receipt) {
+            toast({
+              title: "Warning",
+              description: "Transaction confirmed but receipt not found",
+              variant: "destructive",
+            });
+            return;
+          }
+
+          // Decode Transfer event to get token ID
+          const TRANSFER_EVENT_SIG = keccak256(toHex("Transfer(address,address,uint256)"));
+          let tokenId = "";
+          
+          for (const log of receipt.logs) {
+            if (log.topics[0] === TRANSFER_EVENT_SIG && log.address.toLowerCase() === contractAddress.toLowerCase()) {
+              try {
+                const decoded = decodeEventLog({
+                  abi: AGENT_NFT_ABI,
+                  data: log.data,
+                  topics: log.topics,
+                });
+                if (decoded.eventName === "Transfer" && decoded.args) {
+                  const args = decoded.args as any;
+                  tokenId = args.tokenId?.toString() || "";
+                  break;
+                }
+              } catch {
+                continue;
+              }
+            }
+          }
+
+          if (!tokenId) {
+            throw new Error("Could not extract token ID from transaction");
+          }
+
+          // Record the NFT on backend with real blockchain data
+          const chainName = chainId === 11155111 ? "ethereum" : "solana";
+          await apiRequest("/api/marketplace/nfts/mint", {
+            method: "POST",
+            body: JSON.stringify({
+              templateId: mintingTemplateId,
+              ownerAddress: userAddress,
+              chain: chainName,
+              tokenId,
+              contractAddress,
+              txHash: mintHash,
+            }),
+          });
+
+          toast({
+            title: "Agent Minted Successfully!",
+            description: `Transaction confirmed. Token ID: ${tokenId}`,
+          });
+          
+          refetchUserTokens();
+          resetMint();
+          setMintingTemplateId("");
+        } catch (error) {
+          console.error("Error recording minted NFT:", error);
+          toast({
+            title: "Partial Success",
+            description: "NFT minted on-chain but failed to record in database. " + (error instanceof Error ? error.message : ""),
+            variant: "destructive",
+          });
+          resetMint();
+          setMintingTemplateId("");
+        }
+      })();
     }
-  }, [isMintConfirmed]);
+  }, [isMintConfirmed, mintHash, userAddress, contractAddress, publicClient, chainId]);
 
   useEffect(() => {
     if (isRentConfirmed) {
