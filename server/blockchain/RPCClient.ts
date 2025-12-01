@@ -1,5 +1,5 @@
 import { createPublicClient, http, formatEther, parseAbi } from "viem";
-import { sepolia, baseSepolia, fraxtal } from "viem/chains";
+import { sepolia, baseSepolia, fraxtal, mainnet } from "viem/chains";
 
 interface RetryConfig {
   maxRetries: number;
