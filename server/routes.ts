@@ -3760,7 +3760,7 @@ export async function registerRoutes(
       // Update run with results
       const updated = await storage.updateStressTestRun(runId, {
         status: "completed",
-        completedAt: Date.now(),
+        completedAt: new Date(),
         overallOutcome: portfolioImpact < -30 ? "degraded" : "survived",
         portfolioImpact: Math.round(portfolioImpact),
         systemHealthAfter: resultData.systemHealthAfter,
