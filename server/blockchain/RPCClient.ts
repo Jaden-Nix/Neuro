@@ -150,7 +150,7 @@ export class BlockchainRPCClient {
       {
         chainId: sepolia.id,
         name: "Ethereum Sepolia",
-        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://ethereum-sepolia.publicrpc.com",
+        rpcUrl: process.env.ETHEREUM_RPC_URL || "https://gateway.tenderly.co/public/sepolia",
         nativeSymbol: "ETH",
       },
       {
