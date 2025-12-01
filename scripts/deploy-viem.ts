@@ -67,7 +67,9 @@ async function main() {
   console.log(`\nDeploying to ${chain.name} (chainId: ${chain.id})`);
   console.log(`RPC URL: ${rpcUrl}\n`);
   
-  const account = privateKeyToAccount(privateKey as Hex);
+  // Ensure private key has 0x prefix
+  const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
+  const account = privateKeyToAccount(formattedKey as Hex);
   console.log(`Deployer address: ${account.address}`);
   
   const publicClient = createPublicClient({
