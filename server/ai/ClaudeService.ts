@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import pLimit from "p-limit";
 import pRetry from "p-retry";
+import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -45,36 +46,41 @@ async function queryClaudeWithRetry(
   userPrompt: string,
   maxTokens: number = 2048
 ): Promise<string> {
-  return rateLimiter(() =>
-    pRetry(
-      async () => {
-        try {
-          const message = await anthropic.messages.create({
-            model: "claude-sonnet-4-5",
-            max_tokens: maxTokens,
-            system: systemPrompt,
-            messages: [{ role: "user", content: userPrompt }],
-          });
+  return anthropicCircuitBreaker.execute(
+    () => rateLimiter(() =>
+      pRetry(
+        async () => {
+          try {
+            const message = await anthropic.messages.create({
+              model: "claude-sonnet-4-5",
+              max_tokens: maxTokens,
+              system: systemPrompt,
+              messages: [{ role: "user", content: userPrompt }],
+            });
 
-          const content = message.content[0];
-          if (content.type === "text") {
-            return content.text;
+            const content = message.content[0];
+            if (content.type === "text") {
+              return content.text;
+            }
+            throw new Error("Unexpected response type");
+          } catch (error: any) {
+            if (isRateLimitError(error)) {
+              throw error;
+            }
+            const abortError = new Error(error?.message || "Request aborted");
+            (abortError as any).isAbortError = true;
+            throw abortError;
           }
-          throw new Error("Unexpected response type");
-        } catch (error: any) {
-          if (isRateLimitError(error)) {
-            throw error;
-          }
-          throw new pRetry.AbortError(error);
+        },
+        {
+          retries: 5,
+          minTimeout: 2000,
+          maxTimeout: 64000,
+          factor: 2,
         }
-      },
-      {
-        retries: 5,
-        minTimeout: 2000,
-        maxTimeout: 64000,
-        factor: 2,
-      }
-    )
+      )
+    ),
+    () => "" // Fallback returns empty string, methods handle this
   );
 }
 
