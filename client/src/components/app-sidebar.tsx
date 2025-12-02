@@ -22,7 +22,6 @@ import {
   GitBranch,
   Moon,
   Gauge,
-  Settings,
   Beaker
 } from "lucide-react";
 
@@ -56,12 +55,6 @@ const menuItems = [
     url: "/alerts",
     icon: Bell,
     testId: "nav-alerts",
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    testId: "nav-settings",
   },
   {
     title: "Backtesting",
