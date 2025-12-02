@@ -2439,6 +2439,100 @@ export async function registerRoutes(
     }
   });
 
+  // Get DeFi positions for a wallet
+  app.get("/api/wallets/:id/defi", async (req, res) => {
+    try {
+      const positions = walletManager.getDeFiPositions(req.params.id);
+      res.json(positions);
+    } catch (error) {
+      console.error("Failed to get DeFi positions:", error);
+      res.status(500).json({ error: "Failed to get DeFi positions" });
+    }
+  });
+
+  // Get all DeFi positions
+  app.get("/api/wallets-defi", async (req, res) => {
+    try {
+      const positions = walletManager.getAllDeFiPositions();
+      res.json(positions);
+    } catch (error) {
+      console.error("Failed to get all DeFi positions:", error);
+      res.status(500).json({ error: "Failed to get all DeFi positions" });
+    }
+  });
+
+  // Get wallet snapshots for PnL tracking
+  app.get("/api/wallets/:id/snapshots", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const snapshots = walletManager.getSnapshots(req.params.id, limit);
+      res.json(snapshots);
+    } catch (error) {
+      console.error("Failed to get wallet snapshots:", error);
+      res.status(500).json({ error: "Failed to get wallet snapshots" });
+    }
+  });
+
+  // Get PnL summary for a wallet
+  app.get("/api/wallets/:id/pnl", async (req, res) => {
+    try {
+      const pnl = walletManager.getPnLSummary(req.params.id);
+      if (!pnl) {
+        return res.status(404).json({ error: "No PnL data available" });
+      }
+      res.json(pnl);
+    } catch (error) {
+      console.error("Failed to get PnL summary:", error);
+      res.status(500).json({ error: "Failed to get PnL summary" });
+    }
+  });
+
+  // Get wallet settings
+  app.get("/api/wallets/:id/settings", async (req, res) => {
+    try {
+      const settings = walletManager.getWalletSettings(req.params.id);
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to get wallet settings:", error);
+      res.status(500).json({ error: "Failed to get wallet settings" });
+    }
+  });
+
+  // Update wallet settings
+  app.patch("/api/wallets/:id/settings", requireWriteAuth, async (req, res) => {
+    try {
+      const settings = walletManager.updateWalletSettings(req.params.id, req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error("Failed to update wallet settings:", error);
+      res.status(500).json({ error: "Failed to update wallet settings" });
+    }
+  });
+
+  // Get full wallet value (tokens + DeFi)
+  app.get("/api/wallets/:id/value", async (req, res) => {
+    try {
+      const wallet = walletManager.getWallet(req.params.id);
+      if (!wallet) {
+        return res.status(404).json({ error: "Wallet not found" });
+      }
+      const totalValue = walletManager.getFullWalletValue(req.params.id);
+      const defiValue = walletManager.defiTracker.getTotalDeFiValue(req.params.id);
+      const rewardsClaimable = walletManager.defiTracker.getTotalRewardsClaimable(req.params.id);
+      
+      res.json({
+        walletId: req.params.id,
+        tokenBalanceUsd: wallet.balanceUsd,
+        defiPositionsUsd: defiValue,
+        rewardsClaimableUsd: rewardsClaimable,
+        totalValueUsd: totalValue + rewardsClaimable,
+      });
+    } catch (error) {
+      console.error("Failed to get wallet value:", error);
+      res.status(500).json({ error: "Failed to get wallet value" });
+    }
+  });
+
   // ==========================================
   // ADK-TS Integration Routes
   // ==========================================

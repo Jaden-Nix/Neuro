@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import {
   Wallet,
@@ -26,13 +27,31 @@ import {
   PieChart,
   Copy,
   Check,
+  TrendingUp,
+  TrendingDown,
+  Shield,
+  Gift,
+  Landmark,
+  ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
-import type { TrackedWallet, WalletAggregate, WalletTransaction, WalletChain, WalletProvider } from "@shared/schema";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+import type {
+  TrackedWallet,
+  WalletAggregate,
+  WalletTransaction,
+  WalletChain,
+  WalletProvider,
+  DeFiPosition,
+  WalletPnLSummary,
+  WalletSnapshot,
+} from "@shared/schema";
 
 export default function Wallets() {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     address: "",
     label: "",
@@ -60,6 +79,25 @@ export default function Wallets() {
     walletsByChain: Record<WalletChain, number>;
   }>({
     queryKey: ["/api/wallets/stats"],
+  });
+
+  const { data: allDefiPositions = [] } = useQuery<DeFiPosition[]>({
+    queryKey: ["/api/wallets-defi"],
+  });
+
+  const { data: selectedWalletDefi = [] } = useQuery<DeFiPosition[]>({
+    queryKey: ["/api/wallets", selectedWallet, "defi"],
+    enabled: !!selectedWallet,
+  });
+
+  const { data: selectedWalletPnl } = useQuery<WalletPnLSummary>({
+    queryKey: ["/api/wallets", selectedWallet, "pnl"],
+    enabled: !!selectedWallet,
+  });
+
+  const { data: selectedWalletSnapshots = [] } = useQuery<WalletSnapshot[]>({
+    queryKey: ["/api/wallets", selectedWallet, "snapshots"],
+    enabled: !!selectedWallet,
   });
 
   const addMutation = useMutation({
@@ -202,7 +240,7 @@ export default function Wallets() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Wallets</CardTitle>
@@ -215,13 +253,26 @@ export default function Wallets() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Balance</CardTitle>
+            <CardTitle className="text-sm font-medium">Token Balance</CardTitle>
             <Coins className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500" data-testid="text-total-balance">
               ${(aggregate?.totalBalanceUsd ?? 0).toLocaleString()}
             </div>
+            <p className="text-xs text-muted-foreground">Wallet tokens</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">DeFi Value</CardTitle>
+            <Landmark className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-500" data-testid="text-defi-balance">
+              ${(aggregate?.defiPositionsUsd ?? 0).toLocaleString()}
+            </div>
+            <p className="text-xs text-muted-foreground">{allDefiPositions.length} positions</p>
           </CardContent>
         </Card>
         <Card className="md:col-span-2">
@@ -357,6 +408,7 @@ export default function Wallets() {
       <Tabs defaultValue="wallets">
         <TabsList>
           <TabsTrigger value="wallets" data-testid="tab-wallets">Wallets</TabsTrigger>
+          <TabsTrigger value="defi" data-testid="tab-defi">DeFi Positions</TabsTrigger>
           <TabsTrigger value="transactions" data-testid="tab-transactions">Transactions</TabsTrigger>
         </TabsList>
 
@@ -402,6 +454,19 @@ export default function Wallets() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge className={chainColors[wallet.chain]}>{chainIcons[wallet.chain]}</Badge>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant={selectedWallet === wallet.id ? "default" : "outline"}
+                          onClick={() => setSelectedWallet(selectedWallet === wallet.id ? null : wallet.id)}
+                          data-testid={`button-details-${wallet.id}`}
+                        >
+                          <ChevronRight className={`h-4 w-4 transition-transform ${selectedWallet === wallet.id ? "rotate-90" : ""}`} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>View DeFi details</TooltipContent>
+                    </Tooltip>
                     {wallet.isConnected ? (
                       <Button
                         size="icon"
@@ -474,6 +539,145 @@ export default function Wallets() {
                 </CardContent>
               </Card>
             ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="defi" className="space-y-4">
+          {allDefiPositions.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No DeFi positions tracked yet. Sync your wallets to fetch DeFi positions.
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {allDefiPositions.map((position) => {
+                  const wallet = wallets.find(w => w.id === position.walletId);
+                  return (
+                    <Card key={position.id} data-testid={`card-defi-${position.id}`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <CardTitle className="text-sm font-medium">{position.name}</CardTitle>
+                          <Badge variant="secondary" className="text-xs">
+                            {position.protocol.toUpperCase()}
+                          </Badge>
+                        </div>
+                        <CardDescription>
+                          {wallet?.label || "Unknown Wallet"} - {position.chain.toUpperCase()}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-muted-foreground">Type</span>
+                          <Badge
+                            variant="outline"
+                            className={
+                              position.type === "staking" ? "text-blue-500 border-blue-500/30" :
+                              position.type === "lending" ? "text-green-500 border-green-500/30" :
+                              position.type === "borrowing" ? "text-red-500 border-red-500/30" :
+                              position.type === "lp" ? "text-purple-500 border-purple-500/30" :
+                              "text-muted-foreground"
+                            }
+                          >
+                            {position.type === "lp" ? "Liquidity Pool" : position.type.charAt(0).toUpperCase() + position.type.slice(1)}
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-muted-foreground">Value</span>
+                          <span className="font-bold text-green-500">
+                            ${position.stakedValueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+
+                        {position.borrowedValueUsd && position.borrowedValueUsd > 0 && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-muted-foreground">Borrowed</span>
+                            <span className="font-bold text-red-500">
+                              ${position.borrowedValueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
+
+                        {position.apy && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-muted-foreground">APY</span>
+                            <span className="font-medium text-purple-500">{position.apy.toFixed(2)}%</span>
+                          </div>
+                        )}
+
+                        {position.healthFactor && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Shield className="h-3 w-3" />
+                              Health Factor
+                            </span>
+                            <span className={`font-medium ${
+                              position.healthFactor > 2 ? "text-green-500" :
+                              position.healthFactor > 1.5 ? "text-yellow-500" :
+                              "text-red-500"
+                            }`}>
+                              {position.healthFactor.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+
+                        {position.rewardsClaimable > 0 && (
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                            <span className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Gift className="h-3 w-3" />
+                              Rewards
+                            </span>
+                            <span className="font-medium text-green-500">
+                              ${position.rewardsClaimable.toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium">DeFi Summary by Protocol</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      allDefiPositions.reduce((acc, pos) => {
+                        const key = pos.protocol;
+                        if (!acc[key]) acc[key] = { value: 0, count: 0, borrowed: 0 };
+                        acc[key].value += pos.stakedValueUsd;
+                        acc[key].borrowed += pos.borrowedValueUsd || 0;
+                        acc[key].count++;
+                        return acc;
+                      }, {} as Record<string, { value: number; count: number; borrowed: number }>)
+                    ).map(([protocol, data]) => (
+                      <div key={protocol} className="flex items-center justify-between gap-4 p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-purple-500/10">
+                            <Landmark className="h-4 w-4 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium capitalize">{protocol}</p>
+                            <p className="text-xs text-muted-foreground">{data.count} position{data.count > 1 ? "s" : ""}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-green-500">${data.value.toLocaleString()}</p>
+                          {data.borrowed > 0 && (
+                            <p className="text-xs text-red-500">-${data.borrowed.toLocaleString()} borrowed</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 

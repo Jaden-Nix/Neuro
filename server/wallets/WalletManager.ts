@@ -5,9 +5,14 @@ import type {
   WalletAggregate,
   WalletChain,
   WalletProvider,
+  DeFiPosition,
+  WalletSnapshot,
+  WalletPnLSummary,
+  WalletSettings,
 } from "@shared/schema";
 import { createPublicClient, http, formatEther, parseAbi, getAddress } from "viem";
 import { mainnet, base, fraxtal } from "viem/chains";
+import { defiPositionTracker } from "./DeFiPositionTracker";
 
 interface TokenPrice {
   symbol: string;
@@ -42,11 +47,14 @@ export class WalletManager {
   private wallets: Map<string, TrackedWallet> = new Map();
   private transactions: Map<string, WalletTransaction[]> = new Map();
   private tokenPrices: Map<string, number> = new Map();
+  private previousBalances: Map<string, number> = new Map();
   private rpcClients: {
     ethereum: ReturnType<typeof createPublicClient>;
     base: ReturnType<typeof createPublicClient>;
     fraxtal: ReturnType<typeof createPublicClient>;
   };
+  
+  public defiTracker = defiPositionTracker;
 
   constructor() {
     this.initializeDefaultPrices();
@@ -191,17 +199,22 @@ export class WalletManager {
     const wallet = this.wallets.get(id);
     if (!wallet) return null;
 
+    const previousValue = this.previousBalances.get(id) || 0;
+
     try {
       const nativeBalance = await this.fetchNativeBalance(wallet.address, wallet.chain);
       const tokenBalances = await this.fetchTokenBalances(wallet.address, wallet.chain);
 
       const nativePrice = this.getNativeTokenPrice(wallet.chain);
       const nativeBalanceNum = parseFloat(nativeBalance);
-      let totalUsd = nativeBalanceNum * nativePrice;
+      let tokenBalancesUsd = 0;
 
       for (const token of tokenBalances) {
-        totalUsd += token.balanceUsd;
+        tokenBalancesUsd += token.balanceUsd;
       }
+
+      const nativeValueUsd = nativeBalanceNum * nativePrice;
+      const totalUsd = nativeValueUsd + tokenBalancesUsd;
 
       wallet.balanceNative = nativeBalance;
       wallet.tokenBalances = tokenBalances;
@@ -210,7 +223,18 @@ export class WalletManager {
       wallet.lastSyncedAt = Date.now();
       wallet.updatedAt = Date.now();
 
-      console.log(`[WalletManager] Synced wallet ${wallet.label}: $${wallet.balanceUsd}`);
+      await this.defiTracker.fetchPositionsForWallet(id, wallet.address, wallet.chain);
+      
+      await this.defiTracker.createSnapshot(
+        id,
+        nativeBalance,
+        nativeValueUsd,
+        tokenBalancesUsd
+      );
+
+      this.previousBalances.set(id, totalUsd + this.defiTracker.getTotalDeFiValue(id));
+
+      console.log(`[WalletManager] Synced wallet ${wallet.label}: $${wallet.balanceUsd} (+ DeFi: $${this.defiTracker.getTotalDeFiValue(id).toFixed(2)})`);
       return wallet;
     } catch (error: any) {
       console.error(`[WalletManager] Failed to sync wallet ${wallet.label}: ${error.message}`);
@@ -218,6 +242,15 @@ export class WalletManager {
       wallet.updatedAt = Date.now();
       return wallet;
     }
+  }
+
+  checkWalletAlerts(id: string): { shouldAlert: boolean; reason?: string; severity?: "low" | "medium" | "high" | "critical" } {
+    const previousValue = this.previousBalances.get(id) || 0;
+    const wallet = this.wallets.get(id);
+    if (!wallet) return { shouldAlert: false };
+
+    const currentValue = wallet.balanceUsd + this.defiTracker.getTotalDeFiValue(id);
+    return this.defiTracker.checkAlertConditions(id, previousValue, currentValue);
   }
 
   private async fetchNativeBalance(address: string, chain: WalletChain): Promise<string> {
@@ -344,13 +377,46 @@ export class WalletManager {
       .sort((a, b) => b.totalUsd - a.totalUsd)
       .slice(0, 10);
 
+    const defiPositionsUsd = wallets.reduce((sum, w) => sum + this.defiTracker.getTotalDeFiValue(w.id), 0);
+
     return {
       totalWallets: wallets.length,
       totalBalanceUsd: Math.round(totalBalanceUsd * 100) / 100,
       balanceByChain,
       topTokens,
+      defiPositionsUsd: Math.round(defiPositionsUsd * 100) / 100,
       lastUpdated: Date.now(),
     };
+  }
+
+  getDeFiPositions(walletId: string): DeFiPosition[] {
+    return this.defiTracker.getPositions(walletId);
+  }
+
+  getAllDeFiPositions(): DeFiPosition[] {
+    return this.defiTracker.getAllPositions();
+  }
+
+  getSnapshots(walletId: string, limit?: number): WalletSnapshot[] {
+    return this.defiTracker.getSnapshots(walletId, limit);
+  }
+
+  getPnLSummary(walletId: string): WalletPnLSummary | null {
+    return this.defiTracker.getPnLSummary(walletId);
+  }
+
+  getWalletSettings(walletId: string): WalletSettings {
+    return this.defiTracker.getSettings(walletId);
+  }
+
+  updateWalletSettings(walletId: string, updates: Partial<WalletSettings>): WalletSettings {
+    return this.defiTracker.updateSettings(walletId, updates);
+  }
+
+  getFullWalletValue(walletId: string): number {
+    const wallet = this.wallets.get(walletId);
+    if (!wallet) return 0;
+    return wallet.balanceUsd + this.defiTracker.getTotalDeFiValue(walletId);
   }
 
   async addTransaction(

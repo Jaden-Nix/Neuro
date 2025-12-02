@@ -1032,7 +1032,82 @@ export interface WalletAggregate {
   totalBalanceUsd: number;
   balanceByChain: Record<WalletChain, number>;
   topTokens: { symbol: string; totalUsd: number; percentage: number }[];
+  defiPositionsUsd: number;
   lastUpdated: number;
+}
+
+// ==========================================
+// DeFi Position Tracking Types
+// ==========================================
+
+export type DeFiPositionType = "lp" | "staking" | "lending" | "borrowing" | "farming" | "vault" | "locked";
+export type DeFiProtocol = "uniswap" | "aave" | "compound" | "curve" | "lido" | "frax" | "convex" | "marinade" | "raydium" | "orca" | "other";
+
+export interface DeFiPosition {
+  id: string;
+  walletId: string;
+  chain: WalletChain;
+  protocol: DeFiProtocol;
+  type: DeFiPositionType;
+  name: string;
+  poolAddress?: string;
+  token0?: { symbol: string; amount: string; valueUsd: number };
+  token1?: { symbol: string; amount: string; valueUsd: number };
+  stakedAmount?: string;
+  stakedValueUsd: number;
+  rewardsClaimable: number;
+  rewardTokens?: { symbol: string; amount: string; valueUsd: number }[];
+  apy?: number;
+  unlockDate?: number;
+  healthFactor?: number;
+  liquidationPrice?: number;
+  borrowedAmount?: string;
+  borrowedValueUsd?: number;
+  collateralValueUsd?: number;
+  lastUpdatedAt: number;
+  createdAt: number;
+}
+
+export interface WalletSnapshot {
+  id: string;
+  walletId: string;
+  timestamp: number;
+  balanceNative: string;
+  balanceUsd: number;
+  tokenBalancesUsd: number;
+  defiPositionsUsd: number;
+  totalValueUsd: number;
+  pnl24h: number;
+  pnl7d: number;
+  pnl30d: number;
+}
+
+export interface WalletSettings {
+  walletId: string;
+  alertOnLargeChange: boolean;
+  largeChangeThreshold: number;
+  alertOnRewardsClaimable: boolean;
+  rewardsThreshold: number;
+  alertOnHealthFactor: boolean;
+  healthFactorThreshold: number;
+  autoSync: boolean;
+  syncIntervalMinutes: number;
+}
+
+export interface WalletPnLSummary {
+  walletId: string;
+  currentValueUsd: number;
+  costBasis: number;
+  unrealizedPnl: number;
+  realizedPnl: number;
+  totalPnl: number;
+  pnlPercentage: number;
+  pnl24h: number;
+  pnl24hPercentage: number;
+  pnl7d: number;
+  pnl7dPercentage: number;
+  pnl30d: number;
+  pnl30dPercentage: number;
 }
 
 export const trackedWallets = pgTable("tracked_wallets", {
