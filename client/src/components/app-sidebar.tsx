@@ -22,7 +22,8 @@ import {
   GitBranch,
   Moon,
   Gauge,
-  Settings
+  Settings,
+  Beaker
 } from "lucide-react";
 
 const menuItems = [
@@ -91,6 +92,12 @@ const menuItems = [
     url: "/stress-test",
     icon: Gauge,
     testId: "nav-stress-test",
+  },
+  {
+    title: "Stress Lab",
+    url: "/stress-lab",
+    icon: Beaker,
+    testId: "nav-stress-lab",
   },
   {
     title: "Dream Mode",

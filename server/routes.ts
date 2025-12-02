@@ -2459,6 +2459,40 @@ export async function registerRoutes(
     }
   });
 
+  // Get market regime detection (must come before :id route)
+  app.get("/api/insights/regime", async (req, res) => {
+    try {
+      const symbol = req.query.symbol as string | undefined;
+      const regime = aiInsightsEngine.detectMarketRegime(symbol);
+      res.json(regime);
+    } catch (error) {
+      console.error("Failed to detect market regime:", error);
+      res.status(500).json({ error: "Failed to detect market regime" });
+    }
+  });
+
+  // Get agent performance insights (must come before :id route)
+  app.get("/api/insights/agents", async (req, res) => {
+    try {
+      const performance = await aiInsightsEngine.getAgentPerformanceInsights();
+      res.json(performance);
+    } catch (error) {
+      console.error("Failed to get agent performance:", error);
+      res.status(500).json({ error: "Failed to get agent performance" });
+    }
+  });
+
+  // Get insights with performance context (must come before :id route)
+  app.get("/api/insights/enhanced", async (req, res) => {
+    try {
+      const insights = await aiInsightsEngine.getInsightsWithPerformance();
+      res.json(insights);
+    } catch (error) {
+      console.error("Failed to get enhanced insights:", error);
+      res.status(500).json({ error: "Failed to get enhanced insights" });
+    }
+  });
+
   // Get specific insight by ID
   app.get("/api/insights/:id", async (req, res) => {
     try {
@@ -3819,6 +3853,80 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to generate demo dream report:", error);
       res.status(500).json({ error: "Failed to generate demo dream report" });
+    }
+  });
+
+  // Stress Test Engine - Agent Stress Lab
+  app.get("/api/stress/lab/scenarios", async (req, res) => {
+    try {
+      const { stressTestEngine } = await import("./stress/StressTestEngine");
+      const scenarios = stressTestEngine.getScenarios();
+      res.json(scenarios);
+    } catch (error) {
+      console.error("Failed to get stress lab scenarios:", error);
+      res.status(500).json({ error: "Failed to get stress lab scenarios" });
+    }
+  });
+
+  app.get("/api/stress/lab/status", async (req, res) => {
+    try {
+      const { stressTestEngine } = await import("./stress/StressTestEngine");
+      const status = stressTestEngine.getStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Failed to get stress lab status:", error);
+      res.status(500).json({ error: "Failed to get stress lab status" });
+    }
+  });
+
+  app.post("/api/stress/lab/run", writeLimiter, async (req, res) => {
+    try {
+      const { stressTestEngine } = await import("./stress/StressTestEngine");
+      const { scenarioId } = req.body;
+      
+      if (!scenarioId) {
+        return res.status(400).json({ error: "scenarioId is required" });
+      }
+      
+      const result = await stressTestEngine.runStressTest(scenarioId);
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "stress_test_completed", resultId: result.id, outcome: result.outcome },
+        timestamp: Date.now(),
+      });
+      
+      res.json(result);
+    } catch (error: any) {
+      console.error("Failed to run stress test:", error);
+      res.status(400).json({ error: error.message || "Failed to run stress test" });
+    }
+  });
+
+  app.get("/api/stress/lab/results", async (req, res) => {
+    try {
+      const { stressTestEngine } = await import("./stress/StressTestEngine");
+      const results = stressTestEngine.getResults();
+      res.json(results);
+    } catch (error) {
+      console.error("Failed to get stress test results:", error);
+      res.status(500).json({ error: "Failed to get stress test results" });
+    }
+  });
+
+  app.get("/api/stress/lab/results/:id", async (req, res) => {
+    try {
+      const { stressTestEngine } = await import("./stress/StressTestEngine");
+      const result = stressTestEngine.getResult(req.params.id);
+      
+      if (!result) {
+        return res.status(404).json({ error: "Stress test result not found" });
+      }
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to get stress test result:", error);
+      res.status(500).json({ error: "Failed to get stress test result" });
     }
   });
 

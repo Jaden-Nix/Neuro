@@ -25,6 +25,7 @@ import Wallets from "@/pages/Wallets";
 import Parliament from "@/pages/Parliament";
 import Evolution from "@/pages/Evolution";
 import StressTesting from "@/pages/StressTesting";
+import StressLab from "@/pages/StressLab";
 import DreamMode from "@/pages/DreamMode";
 import Insights from "@/pages/Insights";
 import NotFound from "@/pages/not-found";
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/parliament" component={Parliament} />
       <Route path="/evolution" component={Evolution} />
       <Route path="/stress-test" component={StressTesting} />
+      <Route path="/stress-lab" component={StressLab} />
       <Route path="/dream-mode" component={DreamMode} />
       <Route path="/insights" component={Insights} />
       <Route component={NotFound} />
