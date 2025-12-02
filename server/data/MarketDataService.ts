@@ -100,21 +100,106 @@ export class MarketDataService {
     }
   }
 
+  private fallbackPrices: Record<string, number> = {
+    'BTC': 96000,
+    'BTC-USD': 96000,
+    'BTCUSDT': 96000,
+    'ETH': 3600,
+    'ETH-USD': 3600,
+    'ETHUSDT': 3600,
+    'SOL': 230,
+    'SOL-USD': 230,
+    'SOLUSDT': 230,
+    'LINK': 25,
+    'LINK-USD': 25,
+    'LINKUSDT': 25,
+    'UNI': 15,
+    'UNI-USD': 15,
+    'UNIUSDT': 15,
+    'AAVE': 350,
+    'AAVE-USD': 350,
+    'AAVEUSDT': 350,
+  };
+
   async getCurrentPrice(symbol: string): Promise<number> {
+    const upperSymbol = symbol.toUpperCase();
+    
     try {
-      return await binanceClient.getCurrentPrice(symbol);
-    } catch {
-      const prices = await coinGeckoClient.getCurrentPrice([symbol]);
-      return prices[symbol] || 0;
+      const price = await binanceClient.getCurrentPrice(symbol);
+      if (price > 0) {
+        this.fallbackPrices[upperSymbol] = price;
+        return price;
+      }
+    } catch (binanceError) {
+      console.warn(`[MarketData] Binance price fetch failed for ${symbol}`);
     }
+    
+    try {
+      const prices = await coinGeckoClient.getCurrentPrice([symbol]);
+      const price = prices[symbol];
+      if (price && price > 0) {
+        this.fallbackPrices[upperSymbol] = price;
+        return price;
+      }
+    } catch (geckoError) {
+      console.warn(`[MarketData] CoinGecko price fetch failed for ${symbol}`);
+    }
+    
+    const fallback = this.fallbackPrices[upperSymbol] || this.fallbackPrices[upperSymbol.replace('-USD', '')];
+    if (fallback) {
+      console.log(`[MarketData] Using fallback price for ${symbol}: $${fallback}`);
+      return fallback;
+    }
+    
+    console.error(`[MarketData] No price available for ${symbol}`);
+    return 0;
   }
 
   async getMultiplePrices(symbols: string[]): Promise<Record<string, number>> {
+    const result: Record<string, number> = {};
+    
     try {
-      return await binanceClient.getMultiplePrices(symbols);
+      const binancePrices = await binanceClient.getMultiplePrices(symbols);
+      Object.entries(binancePrices).forEach(([symbol, price]) => {
+        if (price > 0) {
+          result[symbol] = price;
+          this.fallbackPrices[symbol.toUpperCase()] = price;
+        }
+      });
+      if (Object.keys(result).length === symbols.length) {
+        return result;
+      }
     } catch {
-      return await coinGeckoClient.getCurrentPrice(symbols);
+      console.warn(`[MarketData] Binance multiple prices fetch failed`);
     }
+    
+    const missingSymbols = symbols.filter(s => !result[s]);
+    if (missingSymbols.length > 0) {
+      try {
+        const geckoPrices = await coinGeckoClient.getCurrentPrice(missingSymbols);
+        Object.entries(geckoPrices).forEach(([symbol, price]) => {
+          if (price > 0) {
+            result[symbol] = price;
+            this.fallbackPrices[symbol.toUpperCase()] = price;
+          }
+        });
+      } catch {
+        console.warn(`[MarketData] CoinGecko multiple prices fetch failed`);
+      }
+    }
+    
+    symbols.forEach(symbol => {
+      if (!result[symbol] || result[symbol] === 0) {
+        const upper = symbol.toUpperCase();
+        const fallback = this.fallbackPrices[upper] || this.fallbackPrices[upper.replace('-USD', '')];
+        if (fallback) {
+          result[symbol] = fallback;
+          console.log(`[MarketData] Using fallback price for ${symbol}: $${fallback}`);
+        }
+      }
+    });
+    
+    return result;
   }
 
   async getMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
