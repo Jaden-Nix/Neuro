@@ -26,6 +26,7 @@ import { backtestingEngine } from "./backtesting/BacktestingEngine";
 import { quickBacktestEngine } from "./backtesting/QuickBacktestEngine";
 import { walletManager } from "./wallets/WalletManager";
 import { rpcClient } from "./blockchain/RPCClient";
+import { aiInsightsEngine } from "./insights/AIInsightsEngine";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -2346,6 +2347,114 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to get backtest summary:", error);
       res.status(500).json({ error: "Failed to get backtest summary" });
+    }
+  });
+
+  // ==========================================
+  // AI Insights Routes (ML Pattern Recognition)
+  // ==========================================
+
+  // Generate new insights by analyzing all symbols
+  app.post("/api/insights/analyze", async (req, res) => {
+    try {
+      const { symbol } = req.body;
+      
+      let insights;
+      if (symbol) {
+        insights = aiInsightsEngine.analyzeSymbol(symbol);
+      } else {
+        insights = aiInsightsEngine.analyzeAllSymbols();
+      }
+      
+      res.json({
+        count: insights.length,
+        insights,
+        analyzedAt: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("Failed to analyze insights:", error);
+      res.status(500).json({ error: error.message || "Failed to analyze insights" });
+    }
+  });
+
+  // Generate demo insights for testing
+  app.post("/api/insights/demo", async (req, res) => {
+    try {
+      const insights = aiInsightsEngine.generateDemoInsights();
+      res.json({
+        count: insights.length,
+        insights,
+        generatedAt: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("Failed to generate demo insights:", error);
+      res.status(500).json({ error: error.message || "Failed to generate demo insights" });
+    }
+  });
+
+  // Get all insights with optional filters
+  app.get("/api/insights", async (req, res) => {
+    try {
+      const { symbol, pattern, minConfidence, limit } = req.query;
+      
+      const insights = aiInsightsEngine.getInsights({
+        symbol: symbol as string,
+        pattern: pattern as any,
+        minConfidence: minConfidence ? parseFloat(minConfidence as string) : undefined,
+        limit: limit ? parseInt(limit as string) : undefined,
+      });
+      
+      res.json(insights);
+    } catch (error) {
+      console.error("Failed to get insights:", error);
+      res.status(500).json({ error: "Failed to get insights" });
+    }
+  });
+
+  // Get insights stats
+  app.get("/api/insights/stats", async (req, res) => {
+    try {
+      const stats = aiInsightsEngine.getStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get insights stats:", error);
+      res.status(500).json({ error: "Failed to get insights stats" });
+    }
+  });
+
+  // Get available symbols for analysis
+  app.get("/api/insights/symbols", async (req, res) => {
+    try {
+      const symbols = aiInsightsEngine.getAvailableSymbols();
+      res.json(symbols);
+    } catch (error) {
+      console.error("Failed to get available symbols:", error);
+      res.status(500).json({ error: "Failed to get available symbols" });
+    }
+  });
+
+  // Get specific insight by ID
+  app.get("/api/insights/:id", async (req, res) => {
+    try {
+      const insight = aiInsightsEngine.getInsight(req.params.id);
+      if (!insight) {
+        return res.status(404).json({ error: "Insight not found" });
+      }
+      res.json(insight);
+    } catch (error) {
+      console.error("Failed to get insight:", error);
+      res.status(500).json({ error: "Failed to get insight" });
+    }
+  });
+
+  // Clear all insights
+  app.delete("/api/insights", async (req, res) => {
+    try {
+      aiInsightsEngine.clearInsights();
+      res.json({ message: "All insights cleared" });
+    } catch (error) {
+      console.error("Failed to clear insights:", error);
+      res.status(500).json({ error: "Failed to clear insights" });
     }
   });
 
