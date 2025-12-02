@@ -1373,12 +1373,36 @@ export const reasoningChains = pgTable("reasoning_chains", {
 });
 
 // Parliament Session - Multi-agent debates with votes and reasoning
+export type ProposalActionType = 
+  | "yield_deployment"
+  | "risk_adjustment"
+  | "portfolio_rebalance"
+  | "protocol_integration"
+  | "strategy_change"
+  | "emergency_action"
+  | "governance_vote"
+  | "custom";
+
+export interface ExpectedOutcome {
+  returnPercent: number;
+  riskScore: number;
+  timeHorizon?: string;
+  confidence: number;
+}
+
 export interface ParliamentVote {
   agentId: string;
   agentType: AgentType;
   vote: "approve" | "reject" | "abstain";
   reasoning: string;
   confidence: number;
+  expectedOutcome?: ExpectedOutcome;
+  alternativeSuggestions?: string[];
+  pros?: string[];
+  cons?: string[];
+  dataSourcesUsed?: string[];
+  creditScore?: number;
+  historicalAccuracy?: number;
   timestamp: number;
 }
 
@@ -1389,6 +1413,25 @@ export interface ParliamentDebateEntry {
   statement: string;
   rebuttalTo?: string;
   reasoningChainId?: string;
+  dataSources?: string[];
+  simulationResults?: {
+    scenarioName: string;
+    outcome: string;
+    confidence: number;
+  };
+  timestamp: number;
+}
+
+export interface MetaSummary {
+  weightedConfidence: number;
+  recommendation: "approve" | "reject" | "needs_review";
+  conflictsDetected: string[];
+  suggestedAmendments: string[];
+  riskAssessment: {
+    overallRisk: "low" | "medium" | "high" | "critical";
+    factors: string[];
+  };
+  synthesisStatement: string;
   timestamp: number;
 }
 
@@ -1397,12 +1440,17 @@ export interface ParliamentSession {
   topic: string;
   description: string;
   proposalData: Record<string, any>;
+  actionType: ProposalActionType;
   status: "deliberating" | "voting" | "concluded";
   debates: ParliamentDebateEntry[];
   votes: ParliamentVote[];
+  metaSummary?: MetaSummary;
   outcome: "approved" | "rejected" | "deadlocked" | null;
   quorum: number;
   requiredMajority: number;
+  executionTriggered?: boolean;
+  alertsSent?: boolean;
+  evolutionUpdated?: boolean;
   startedAt: number;
   concludedAt?: number;
 }
@@ -1412,12 +1460,17 @@ export const parliamentSessions = pgTable("parliament_sessions", {
   topic: varchar("topic").notNull(),
   description: text("description").notNull(),
   proposalData: jsonb("proposal_data").$type<Record<string, any>>().notNull(),
+  actionType: varchar("action_type").$type<ProposalActionType>().notNull().default("custom"),
   status: varchar("status").$type<"deliberating" | "voting" | "concluded">().notNull(),
   debates: jsonb("debates").$type<ParliamentDebateEntry[]>().notNull().default(sql`'[]'::jsonb`),
   votes: jsonb("votes").$type<ParliamentVote[]>().notNull().default(sql`'[]'::jsonb`),
+  metaSummary: jsonb("meta_summary").$type<MetaSummary>(),
   outcome: varchar("outcome").$type<"approved" | "rejected" | "deadlocked">(),
-  quorum: integer("quorum").notNull().default(3),
-  requiredMajority: integer("required_majority").notNull().default(50),
+  quorum: integer("quorum").notNull().default(4),
+  requiredMajority: integer("required_majority").notNull().default(60),
+  executionTriggered: boolean("execution_triggered").default(false),
+  alertsSent: boolean("alerts_sent").default(false),
+  evolutionUpdated: boolean("evolution_updated").default(false),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   concludedAt: timestamp("concluded_at"),
 });
