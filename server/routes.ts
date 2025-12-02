@@ -2542,7 +2542,10 @@ export async function registerRoutes(
     try {
       const { address, label, chain, provider, isPrimary } = req.body;
       const wallet = await walletManager.addWallet(address, label, chain, provider, isPrimary);
-      res.status(201).json(wallet);
+      
+      // Immediately sync the wallet to fetch balances
+      const syncedWallet = await walletManager.syncWallet(wallet.id);
+      res.status(201).json(syncedWallet || wallet);
     } catch (error: any) {
       console.error("Failed to add wallet:", error);
       res.status(400).json({ error: error.message || "Failed to add wallet" });

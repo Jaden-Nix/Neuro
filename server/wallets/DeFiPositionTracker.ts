@@ -134,15 +134,15 @@ export class DeFiPositionTracker {
     this.rpcClients = {
       ethereum: createPublicClient({
         chain: mainnet,
-        transport: http("https://eth.publicrpc.com"),
+        transport: http(process.env.ETHEREUM_MAINNET_RPC_URL || "https://eth.llamarpc.com"),
       }),
       base: createPublicClient({
         chain: base,
-        transport: http("https://base-mainnet.public.blastapi.io"),
+        transport: http(process.env.BASE_MAINNET_RPC_URL || "https://mainnet.base.org"),
       }),
       fraxtal: createPublicClient({
         chain: fraxtal,
-        transport: http("https://rpc.fraxtal.io"),
+        transport: http(process.env.FRAXTAL_RPC_URL || "https://rpc.frax.com"),
       }),
     };
   }
