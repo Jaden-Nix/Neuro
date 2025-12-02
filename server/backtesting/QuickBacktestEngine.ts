@@ -6,6 +6,8 @@ import type {
   BacktestAgentName,
   BacktestInterval,
 } from "@shared/schema";
+import { marketDataService, type BacktestCandle } from "../data/MarketDataService";
+import { claudeService } from "../ai/ClaudeService";
 
 interface PriceCandle {
   timestamp: number;
@@ -279,29 +281,63 @@ export class QuickBacktestEngine {
     return intervals[interval];
   }
   
-  private generateCandles(
+  private async fetchRealCandles(
+    symbol: string,
+    from: Date,
+    to: Date,
+    interval: BacktestInterval
+  ): Promise<PriceCandle[]> {
+    try {
+      console.log(`[Backtest] Fetching real historical data for ${symbol} from ${from.toISOString()} to ${to.toISOString()}`);
+      
+      const binanceInterval = interval as '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+      const candles = await marketDataService.getHistoricalCandles(
+        symbol,
+        binanceInterval,
+        from,
+        to
+      );
+      
+      if (candles.length > 0) {
+        console.log(`[Backtest] Retrieved ${candles.length} real candles for ${symbol}`);
+        return candles;
+      }
+      
+      console.warn(`[Backtest] No candles returned, falling back to simulation`);
+      return this.generateFallbackCandles(symbol, from, to, interval);
+    } catch (error) {
+      console.error(`[Backtest] Failed to fetch real data, using fallback:`, error);
+      return this.generateFallbackCandles(symbol, from, to, interval);
+    }
+  }
+  
+  private generateFallbackCandles(
     symbol: string,
     from: Date,
     to: Date,
     interval: BacktestInterval
   ): PriceCandle[] {
+    console.log(`[Backtest] Generating fallback simulated candles for ${symbol}`);
     const candles: PriceCandle[] = [];
     const intervalMs = this.getIntervalMs(interval);
     
     const basePrice = symbol.includes("BTC") ? 42000 : symbol.includes("ETH") ? 2200 : 100;
-    let price = basePrice * (0.9 + Math.random() * 0.2);
+    const seed = this.hashString(`${symbol}-${from.getTime()}-${to.getTime()}`);
+    let price = basePrice * (0.9 + this.seededRandom(seed) * 0.2);
+    let seedOffset = 0;
     
     for (let timestamp = from.getTime(); timestamp <= to.getTime(); timestamp += intervalMs) {
-      const volatility = 0.005 + Math.random() * 0.015;
-      const drift = (Math.random() - 0.48) * 0.002;
+      seedOffset++;
+      const volatility = 0.005 + this.seededRandom(seed + seedOffset) * 0.015;
+      const drift = (this.seededRandom(seed + seedOffset * 2) - 0.48) * 0.002;
       
       const open = price;
-      const change = price * (drift + (Math.random() - 0.5) * volatility);
+      const change = price * (drift + (this.seededRandom(seed + seedOffset * 3) - 0.5) * volatility);
       price = Math.max(price + change, basePrice * 0.5);
       
-      const high = Math.max(open, price) * (1 + Math.random() * volatility);
-      const low = Math.min(open, price) * (1 - Math.random() * volatility);
-      const volume = 50000 + Math.random() * 200000;
+      const high = Math.max(open, price) * (1 + this.seededRandom(seed + seedOffset * 4) * volatility);
+      const low = Math.min(open, price) * (1 - this.seededRandom(seed + seedOffset * 5) * volatility);
+      const volume = 50000 + this.seededRandom(seed + seedOffset * 6) * 200000;
       
       candles.push({
         timestamp,
@@ -314,6 +350,21 @@ export class QuickBacktestEngine {
     }
     
     return candles;
+  }
+  
+  private hashString(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash);
+  }
+  
+  private seededRandom(seed: number): number {
+    const x = Math.sin(seed) * 10000;
+    return x - Math.floor(x);
   }
   
   async runQuickBacktest(request: QuickBacktestRequest): Promise<QuickBacktestResult> {
@@ -346,7 +397,7 @@ export class QuickBacktestEngine {
     this.results.set(id, result);
     
     try {
-      const candles = this.generateCandles(
+      const candles = await this.fetchRealCandles(
         request.symbol,
         new Date(request.from),
         new Date(request.to),
@@ -404,9 +455,8 @@ export class QuickBacktestEngine {
             
             state.balance += exitValue;
             state.trades.push({ pnl, roi });
-            state.position = null;
             
-            const currentTotal = state.balance + (state.position ? state.position.size * candle.close : 0);
+            const currentTotal = state.balance;
             if (currentTotal > state.peakBalance) {
               state.peakBalance = currentTotal;
             }
@@ -414,6 +464,8 @@ export class QuickBacktestEngine {
             if (drawdown > state.maxDrawdown) {
               state.maxDrawdown = drawdown;
             }
+            
+            state.position = null;
             
             decisions.push({
               timestamp: new Date(candle.timestamp).toISOString(),

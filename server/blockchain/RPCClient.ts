@@ -1,5 +1,6 @@
 import { createPublicClient, http, formatEther, parseAbi } from "viem";
 import { sepolia, baseSepolia, fraxtal, mainnet } from "viem/chains";
+import { marketDataService } from "../data/MarketDataService";
 
 interface RetryConfig {
   maxRetries: number;
@@ -218,7 +219,16 @@ export class BlockchainRPCClient {
   }
 
   async getTVLInUSD(): Promise<number> {
-    const client = this.clients.get(sepolia.id);
+    try {
+      const defiSnapshot = await marketDataService.getDeFiSnapshot();
+      if (defiSnapshot.totalTVL > 0) {
+        return defiSnapshot.totalTVL;
+      }
+    } catch (error) {
+      console.warn("[RPC] MarketDataService TVL fetch failed, trying blockchain fallback");
+    }
+
+    const client = this.clients.get(mainnet.id) || this.clients.get(sepolia.id);
     if (!client) return 0;
 
     const POOL_ADDRESS = "0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640" as `0x${string}`;
@@ -248,17 +258,12 @@ export class BlockchainRPCClient {
         this.getETHUSDPrice(),
       ]);
 
-      // Use formatEther for safe BigInt to decimal conversion (avoids Number overflow)
       const wethEth = parseFloat(formatEther(wethBalance));
       const wethValueUsd = wethEth * ethPrice;
-      
-      // USDC has 6 decimals - safe to use Number since USDC balances < 2^53
-      // But use BigInt-safe conversion anyway for consistency
       const usdcValueUsd = Number(usdcBalance / BigInt(1e6)) + Number(usdcBalance % BigInt(1e6)) / 1e6;
       
       return wethValueUsd + usdcValueUsd;
     } catch (error) {
-      console.error("Failed to fetch TVL in USD:", error);
       return 0;
     }
   }
@@ -283,15 +288,28 @@ export class BlockchainRPCClient {
   }
 
   async getAaveV3APY(): Promise<number> {
-    const client = this.clients.get(sepolia.id);
+    try {
+      const defiSnapshot = await marketDataService.getDeFiSnapshot();
+      const aavePool = defiSnapshot.topYields.find(y => 
+        y.project.toLowerCase().includes('aave') && y.symbol === 'USDC'
+      );
+      if (aavePool && aavePool.apy > 0) {
+        return aavePool.apy;
+      }
+      if (defiSnapshot.topYields.length > 0) {
+        return defiSnapshot.topYields[0].apy;
+      }
+    } catch (error) {
+      console.warn("[RPC] MarketDataService APY fetch failed, trying blockchain fallback");
+    }
+
+    const client = this.clients.get(mainnet.id) || this.clients.get(sepolia.id);
     if (!client) return 0;
 
     const AAVE_V3_POOL = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as `0x${string}`;
     const USDC_ADDRESS = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" as `0x${string}`;
 
     try {
-      // Aave V3 getReserveData returns a struct with position 6 as uint128 (number in JS)
-      // Format: [config, liquidityIndex, currentLiquidityRate, variableBorrowIndex, currentVariableBorrowRate, currentStableBorrowRate, lastUpdateTimestamp, id, ...]
       const reserveData = await withRetry(
         () => client.readContract({
           address: AAVE_V3_POOL,
@@ -309,7 +327,6 @@ export class BlockchainRPCClient {
 
       return apy;
     } catch (error) {
-      console.error("Failed to fetch Aave V3 APY:", error);
       return 0;
     }
   }
@@ -364,8 +381,18 @@ export class BlockchainRPCClient {
       return this.cachedEthPrice.price;
     }
 
-    const client = this.clients.get(sepolia.id);
-    if (!client) return 2000;
+    try {
+      const realPrice = await marketDataService.getCurrentPrice('ETH');
+      if (realPrice > 0) {
+        this.cachedEthPrice = { price: realPrice, timestamp: Date.now() };
+        return realPrice;
+      }
+    } catch (error) {
+      console.warn("[RPC] MarketDataService ETH price fetch failed, trying blockchain fallback");
+    }
+
+    const client = this.clients.get(mainnet.id) || this.clients.get(sepolia.id);
+    if (!client) return this.cachedEthPrice?.price || 2000;
 
     const ETH_USD_FEED = "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419" as `0x${string}`;
 
@@ -382,22 +409,17 @@ export class BlockchainRPCClient {
       const roundData = this.parseChainlinkRoundData(result);
       
       if (this.isChainlinkDataStale(roundData)) {
-        console.warn("Using cached/fallback price due to stale Chainlink data");
         return this.cachedEthPrice?.price || 2000;
       }
       
       if (!this.isChainlinkAnswerValid(roundData.answer)) {
-        console.warn("Using cached/fallback price due to invalid Chainlink answer");
         return this.cachedEthPrice?.price || 2000;
       }
 
       const price = Number(roundData.answer) / 1e8;
-      
       this.cachedEthPrice = { price, timestamp: Date.now() };
-      
       return price;
     } catch (error) {
-      console.error("Failed to fetch Chainlink ETH/USD price:", error);
       return this.cachedEthPrice?.price || 2000;
     }
   }
