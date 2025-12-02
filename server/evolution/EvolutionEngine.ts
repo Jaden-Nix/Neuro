@@ -285,6 +285,50 @@ export class EvolutionEngine {
     return Number((currentValue + (currentValue * mutation)).toFixed(4));
   }
 
+  /**
+   * Get or create the current active version of an agent base name
+   */
+  getLatestAgentVersion(baseName: string): string {
+    const cleanBaseName = baseName.replace(/_v\d+$/, '');
+    let latestVersion = 1;
+    let latestAgent: string | null = null;
+    
+    for (const [agentName, genealogy] of this.genealogy) {
+      if (agentName.startsWith(cleanBaseName + '_v') && genealogy.isActive) {
+        const version = parseInt(agentName.match(/_v(\d+)$/)?.[1] || '0');
+        if (version >= latestVersion) {
+          latestVersion = version;
+          latestAgent = agentName;
+        }
+      }
+    }
+    
+    return latestAgent || `${cleanBaseName}_v1`;
+  }
+
+  /**
+   * Initialize a base agent if it doesn't exist
+   */
+  initializeBaseAgent(baseName: string, initialPerformance: number = 10): void {
+    const cleanBaseName = baseName.replace(/_v\d+$/, '');
+    const agentName = `${cleanBaseName}_v1`;
+    
+    if (!this.genealogy.has(agentName)) {
+      this.genealogy.set(agentName, {
+        agentName,
+        generation: 1,
+        parentName: null,
+        children: [],
+        mutations: [],
+        totalDescendants: 0,
+        lineageStrength: 50,
+        createdAt: Date.now() - 86400000 * 7, // Created a week ago
+        isActive: true,
+        cumulativePerformance: initialPerformance
+      });
+    }
+  }
+
   evolveAgent(
     parentAgentName: string,
     trigger: EvolutionTrigger,
@@ -298,17 +342,34 @@ export class EvolutionEngine {
     reason: string,
     currentParams: Record<string, number> = {}
   ): EvolutionEvent {
-    const parentGenealogy = this.genealogy.get(parentAgentName);
-    const parentGeneration = parentGenealogy?.generation ?? 0;
+    // Get the base name and find/create the latest version
+    const baseName = parentAgentName.replace(/_v\d+$/, '');
+    
+    // Initialize base agent if needed
+    this.initializeBaseAgent(baseName, currentPerformance.roi);
+    
+    // Get the actual latest version of this agent
+    const actualParentName = this.getLatestAgentVersion(baseName);
+    const parentGenealogy = this.genealogy.get(actualParentName);
+    
+    // Use the actual parent's generation, defaulting to 1 if not found
+    const parentGeneration = parentGenealogy?.generation ?? 1;
     const childGeneration = parentGeneration + 1;
     
-    const childAgentName = this.generateChildName(parentAgentName, childGeneration);
+    const childAgentName = `${baseName}_v${childGeneration}`;
+
+    // Calculate performance changes from parent if available
+    const parentPerformance = parentGenealogy?.cumulativePerformance ?? 0;
+    const roiChange = currentPerformance.roi - parentPerformance;
+    const sharpeChange = currentPerformance.sharpe - (parentGenealogy ? 1.0 : 0);
+    const winRateChange = currentPerformance.winRate - 50;
+    const drawdownChange = currentPerformance.drawdown - 10;
 
     const mutationType = this.selectMutationType(trigger, {
-      roiChange: 0,
-      sharpeChange: 0,
-      winRateChange: 0,
-      drawdownChange: 0
+      roiChange,
+      sharpeChange,
+      winRateChange,
+      drawdownChange
     });
 
     const definition = this.getMutationDefinition(mutationType);
@@ -328,7 +389,7 @@ export class EvolutionEngine {
 
     const event: EvolutionEvent = {
       id: this.generateMutationId(),
-      parentAgentName,
+      parentAgentName: actualParentName,
       childAgentName,
       parentGeneration,
       childGeneration,

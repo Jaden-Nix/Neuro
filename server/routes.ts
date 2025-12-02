@@ -2293,6 +2293,32 @@ export async function registerRoutes(
         initialBalance,
       });
       
+      // Trigger evolution for top-performing agents (if performance warrants it)
+      try {
+        const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+        
+        for (const agentResult of result.agentPerformance) {
+          // Only evolve agents with significant performance (positive ROI or high win rate)
+          if (agentResult.totalReturn > 5 || agentResult.winRate > 60) {
+            // Just pass the agent name - EvolutionEngine handles versioning
+            evolutionEngine.evolveAgent(
+              agentResult.agentName,
+              "backtest_completion",
+              {
+                roi: agentResult.totalReturn,
+                sharpe: agentResult.sharpeRatio,
+                winRate: agentResult.winRate,
+                drawdown: agentResult.maxDrawdown,
+                backtestScore: 50 + agentResult.totalReturn + (agentResult.winRate - 50)
+              },
+              `Strong backtest performance: ${agentResult.totalReturn.toFixed(1)}% ROI on ${symbol}`
+            );
+          }
+        }
+      } catch (evolveError) {
+        console.log("[Evolution] Optional evolution trigger skipped:", evolveError);
+      }
+      
       res.status(201).json(result);
     } catch (error: any) {
       console.error("Failed to start quick backtest:", error);
@@ -4010,6 +4036,34 @@ export async function registerRoutes(
         data: { event: "stress_test_completed", run: response, vulnerabilities: vulnerabilitiesFound },
         timestamp: Date.now(),
       });
+
+      // Trigger evolution for agents based on stress test performance
+      try {
+        const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+        
+        for (const [agentType, perf] of Object.entries(agentPerformance)) {
+          const agentPerf = perf as any;
+          // If agent shows adaptability issues during stress, trigger evolution
+          if (agentPerf.adaptability < 85 || agentPerf.accuracy < 80) {
+            // Use proper agent name - let EvolutionEngine handle versioning
+            const agentName = agentType.charAt(0).toUpperCase() + agentType.slice(1);
+            evolutionEngine.evolveAgent(
+              agentName,
+              "stress_test_failure",
+              {
+                roi: 0,
+                sharpe: agentPerf.confidence / 100,
+                winRate: agentPerf.accuracy,
+                drawdown: 100 - agentPerf.adaptability,
+                backtestScore: agentPerf.accuracy
+              },
+              `Stress test revealed vulnerability: ${vulnerabilitiesFound} issues detected`
+            );
+          }
+        }
+      } catch (evolveError) {
+        console.log("[Evolution] Optional stress test evolution trigger skipped:", evolveError);
+      }
     } catch (error) {
       console.error("Stress test execution error:", error);
     }
