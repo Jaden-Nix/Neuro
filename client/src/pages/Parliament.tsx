@@ -608,7 +608,7 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
 
   const simulateDebate = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
+      const response = await apiRequest("POST", `/api/parliament/${session.id}/live-debate`);
       if (response.metaSummary) {
         setMetaSummary(response.metaSummary);
       }
