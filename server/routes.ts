@@ -27,6 +27,7 @@ import { quickBacktestEngine } from "./backtesting/QuickBacktestEngine";
 import { walletManager } from "./wallets/WalletManager";
 import { rpcClient } from "./blockchain/RPCClient";
 import { aiInsightsEngine } from "./insights/AIInsightsEngine";
+import { parliamentEngine } from "./parliament/ParliamentEngine";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -3412,43 +3413,15 @@ export async function registerRoutes(
       const session = await storage.getParliamentSession(req.params.id);
       if (!session) return res.status(404).json({ error: "Session not found" });
 
-      const { adkIntegration } = await import("./adk/ADKIntegration");
-      const agents: { id: string; type: "meta" | "scout" | "risk" | "execution"; agentName: string; position: string }[] = [
-        { id: "meta-001", type: "meta", agentName: "neuronet_meta", position: "for" },
-        { id: "scout-001", type: "scout", agentName: "neuronet_scout", position: "for" },
-        { id: "risk-001", type: "risk", agentName: "neuronet_risk", position: "against" },
-        { id: "exec-001", type: "execution", agentName: "neuronet_execution", position: "clarification" },
-      ];
-
-      const prompt = `This DeFi governance proposal is being debated: "${session.topic}"\n\nDescription: ${session.description}\n\nProvide your concise stance and reasoning (2-3 sentences max) on this proposal as a DeFi AI agent.`;
-      const context = { topic: session.topic, description: session.description };
-
-      for (const agent of agents) {
-        const decision = await adkIntegration.queryAgent(agent.agentName, prompt, context);
-        
-        // Parse the response - if it's JSON, extract text; otherwise use as-is
-        let statement = decision.reasoning;
-        if (typeof statement === "string") {
-          try {
-            const parsed = JSON.parse(statement);
-            statement = parsed.analysis || parsed.reasoning || parsed.assessment || JSON.stringify(parsed);
-          } catch {
-            // Not JSON, use as-is
-          }
-        } else {
-          statement = JSON.stringify(statement);
-        }
-        
-        statement = statement.substring(0, 500);
-        
-        const agentTypeMap: Record<string, AgentType> = {
-          "meta": AgentType.META,
-          "scout": AgentType.SCOUT,
-          "risk": AgentType.RISK,
-          "execution": AgentType.EXECUTION,
-        };
-        
-        const entry = { agentId: agent.id, agentType: agentTypeMap[agent.type] || AgentType.META, position: agent.position, statement, timestamp: Date.now() };
+      const actionType = session.proposalData?.actionType || "governance";
+      
+      const debateResult = await parliamentEngine.runDebate(
+        session.topic,
+        session.description,
+        actionType
+      );
+      
+      for (const entry of debateResult.debates) {
         await storage.addDebateEntry(req.params.id, entry);
         
         broadcastToClients({
@@ -3457,11 +3430,26 @@ export async function registerRoutes(
           timestamp: Date.now(),
         });
         
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      
+      for (const vote of debateResult.votes) {
+        await storage.addVote(req.params.id, vote);
+        
+        broadcastToClients({
+          type: "log",
+          data: { event: "parliament_vote", sessionId: req.params.id, vote },
+          timestamp: Date.now(),
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       const updated = await storage.getParliamentSession(req.params.id);
-      res.json(updated);
+      res.json({
+        ...updated,
+        metaSummary: debateResult.metaSummary,
+      });
     } catch (error) {
       console.error("Live debate error:", error);
       res.status(500).json({ error: "Failed to generate live debate" });
@@ -3473,26 +3461,23 @@ export async function registerRoutes(
       const session = await storage.getParliamentSession(req.params.id);
       if (!session) return res.status(404).json({ error: "Session not found" });
       
-      const approves = session.votes.filter((v: ParliamentVote) => v.vote === "approve").length;
-      const rejects = session.votes.filter((v: ParliamentVote) => v.vote === "reject").length;
-      const total = session.votes.length;
-      
-      let outcome: "approved" | "rejected" | "deadlocked" = "deadlocked";
-      if (total >= session.quorum) {
-        const approvalPct = (approves / total) * 100;
-        if (approvalPct >= session.requiredMajority) outcome = "approved";
-        else if ((rejects / total) * 100 >= session.requiredMajority) outcome = "rejected";
-      }
+      const conclusion = parliamentEngine.concludeSession(session.votes, session.debates || []);
       
       const updated = await storage.updateParliamentSession(req.params.id, {
         status: "concluded",
-        outcome,
+        outcome: conclusion.outcome,
+        metaSummary: conclusion.metaSummary,
         concludedAt: Date.now(),
       });
       
       broadcastToClients({
         type: "log",
-        data: { event: "parliament_concluded", sessionId: req.params.id, outcome },
+        data: { 
+          event: "parliament_concluded", 
+          sessionId: req.params.id, 
+          outcome: conclusion.outcome,
+          metaSummary: conclusion.metaSummary,
+        },
         timestamp: Date.now(),
       });
       res.json(updated);
