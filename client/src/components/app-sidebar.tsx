@@ -21,7 +21,6 @@ import {
   Gavel,
   GitBranch,
   Moon,
-  Gauge,
   Beaker
 } from "lucide-react";
 
@@ -79,12 +78,6 @@ const menuItems = [
     url: "/evolution",
     icon: GitBranch,
     testId: "nav-evolution",
-  },
-  {
-    title: "Stress Testing",
-    url: "/stress-test",
-    icon: Gauge,
-    testId: "nav-stress-test",
   },
   {
     title: "Stress Lab",
