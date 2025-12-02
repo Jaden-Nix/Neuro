@@ -2681,6 +2681,18 @@ export async function registerRoutes(
     }
   });
 
+  // Sync/fetch wallet transactions from blockchain explorer
+  app.post("/api/wallets/:id/transactions/sync", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const transactions = await walletManager.fetchTransactionHistory(req.params.id, limit);
+      res.json(transactions);
+    } catch (error) {
+      console.error("Failed to sync wallet transactions:", error);
+      res.status(500).json({ error: "Failed to sync wallet transactions" });
+    }
+  });
+
   // Get all transactions across wallets
   app.get("/api/wallets-transactions", async (req, res) => {
     try {

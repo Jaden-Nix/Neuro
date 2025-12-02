@@ -57,19 +57,19 @@ export class DeFiPositionTracker {
     },
     aave: {
       ethereum: { pool: "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" },
-      base: {},
+      base: { pool: "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5" },
       fraxtal: {},
       solana: {},
     },
     lido: {
       ethereum: { stETH: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" },
-      base: {},
+      base: { wstETH: "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452" },
       fraxtal: {},
       solana: {},
     },
     compound: {
       ethereum: { comptroller: "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B" },
-      base: {},
+      base: { comet: "0x46e6b214b524310239732D51387075E0e70970bf" },
       fraxtal: {},
       solana: {},
     },
@@ -176,18 +176,21 @@ export class DeFiPositionTracker {
   }
 
   private async fetchLidoPosition(walletId: string, address: string, chain: WalletChain): Promise<DeFiPosition | null> {
-    if (chain !== "ethereum") return null;
+    const contracts = this.protocolContracts.lido[chain];
+    if (!contracts) return null;
+    
+    const tokenAddress = chain === "ethereum" ? contracts.stETH : contracts.wstETH;
+    if (!tokenAddress) return null;
 
     try {
-      const stETHAddress = this.protocolContracts.lido.ethereum.stETH;
-      if (!stETHAddress) return null;
-
-      const client = this.rpcClients.ethereum;
+      const client = this.rpcClients[chain as keyof typeof this.rpcClients];
+      if (!client) return null;
+      
       const checksumAddress = getAddress(address);
 
       const balance = await client.readContract({
-        address: getAddress(stETHAddress),
-        abi: LIDO_STETH_ABI,
+        address: getAddress(tokenAddress),
+        abi: ERC20_ABI,
         functionName: "balanceOf",
         args: [checksumAddress],
       });
@@ -196,7 +199,8 @@ export class DeFiPositionTracker {
       if (balanceNum < 0.001) return null;
 
       const ethPrice = this.tokenPrices.get("ETH") || 2400;
-      const stETHPrice = ethPrice * 0.995;
+      const tokenPrice = chain === "ethereum" ? ethPrice * 0.995 : ethPrice * 1.1;
+      const tokenName = chain === "ethereum" ? "Lido Staked ETH (stETH)" : "Lido Wrapped stETH (wstETH)";
 
       return {
         id: this.generateId(),
@@ -204,28 +208,29 @@ export class DeFiPositionTracker {
         chain,
         protocol: "lido",
         type: "staking",
-        name: "Lido Staked ETH",
+        name: tokenName,
         stakedAmount: balanceNum.toFixed(6),
-        stakedValueUsd: balanceNum * stETHPrice,
+        stakedValueUsd: balanceNum * tokenPrice,
         rewardsClaimable: 0,
         apy: 3.8,
         lastUpdatedAt: Date.now(),
         createdAt: Date.now(),
       };
     } catch (error: any) {
-      console.warn(`[DeFiTracker] Lido fetch failed: ${error.message}`);
+      console.warn(`[DeFiTracker] Lido fetch failed on ${chain}: ${error.message}`);
       return null;
     }
   }
 
   private async fetchAavePositions(walletId: string, address: string, chain: WalletChain): Promise<DeFiPosition[]> {
-    if (chain !== "ethereum") return [];
+    const contracts = this.protocolContracts.aave[chain];
+    const poolAddress = contracts?.pool;
+    if (!poolAddress) return [];
 
     try {
-      const poolAddress = this.protocolContracts.aave.ethereum.pool;
-      if (!poolAddress) return [];
-
-      const client = this.rpcClients.ethereum;
+      const client = this.rpcClients[chain as keyof typeof this.rpcClients];
+      if (!client) return [];
+      
       const checksumAddress = getAddress(address);
 
       const userData = await client.readContract({
@@ -242,6 +247,7 @@ export class DeFiPositionTracker {
       const health = Number(healthFactor) / 1e18;
 
       const positions: DeFiPosition[] = [];
+      const chainLabel = chain === "ethereum" ? "" : ` (${chain.charAt(0).toUpperCase() + chain.slice(1)})`;
 
       if (collateralUsd > 1) {
         positions.push({
@@ -250,12 +256,12 @@ export class DeFiPositionTracker {
           chain,
           protocol: "aave",
           type: "lending",
-          name: "Aave V3 Deposits",
+          name: `Aave V3 Deposits${chainLabel}`,
           stakedValueUsd: collateralUsd,
           rewardsClaimable: 0,
           collateralValueUsd: collateralUsd,
           healthFactor: health > 100 ? undefined : health,
-          apy: 2.5,
+          apy: chain === "base" ? 3.2 : 2.5,
           lastUpdatedAt: Date.now(),
           createdAt: Date.now(),
         });
@@ -268,7 +274,7 @@ export class DeFiPositionTracker {
           chain,
           protocol: "aave",
           type: "borrowing",
-          name: "Aave V3 Borrows",
+          name: `Aave V3 Borrows${chainLabel}`,
           stakedValueUsd: 0,
           borrowedValueUsd: debtUsd,
           rewardsClaimable: 0,
@@ -280,7 +286,7 @@ export class DeFiPositionTracker {
 
       return positions;
     } catch (error: any) {
-      console.warn(`[DeFiTracker] Aave fetch failed: ${error.message}`);
+      console.warn(`[DeFiTracker] Aave fetch failed on ${chain}: ${error.message}`);
       return [];
     }
   }

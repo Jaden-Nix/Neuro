@@ -232,6 +232,10 @@ export class WalletManager {
         tokenBalancesUsd
       );
 
+      this.fetchTransactionHistory(id, 10).catch(err => {
+        console.warn(`[WalletManager] Transaction fetch skipped: ${err.message}`);
+      });
+
       this.previousBalances.set(id, totalUsd + this.defiTracker.getTotalDeFiValue(id));
 
       console.log(`[WalletManager] Synced wallet ${wallet.label}: $${wallet.balanceUsd} (+ DeFi: $${this.defiTracker.getTotalDeFiValue(id).toFixed(2)})`);
@@ -453,6 +457,115 @@ export class WalletManager {
     return allTxs
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
+  }
+
+  async fetchTransactionHistory(walletId: string, limit: number = 20): Promise<WalletTransaction[]> {
+    const wallet = this.wallets.get(walletId);
+    if (!wallet) return [];
+
+    try {
+      const apiUrl = this.getExplorerApiUrl(wallet.chain, wallet.address, limit);
+      if (!apiUrl) {
+        console.log(`[WalletManager] No explorer API for chain ${wallet.chain}`);
+        return [];
+      }
+
+      const etherscanKey = process.env.ETHERSCAN_API_KEY;
+      if (!etherscanKey) {
+        console.log(`[WalletManager] ETHERSCAN_API_KEY not configured - transaction history requires Etherscan API key (free at etherscan.io)`);
+        return this.transactions.get(walletId) || [];
+      }
+
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error(`Explorer API returned ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.status !== "1" || !data.result) {
+        const errorMsg = data.message || data.result || "Unknown error";
+        console.log(`[WalletManager] Transaction fetch for ${wallet.label}: ${errorMsg}`);
+        return this.transactions.get(walletId) || [];
+      }
+
+      const transactions: WalletTransaction[] = [];
+      const walletAddr = wallet.address.toLowerCase();
+
+      for (const tx of data.result.slice(0, limit)) {
+        const isOutgoing = tx.from?.toLowerCase() === walletAddr;
+        const valueEth = Number(tx.value || 0) / 1e18;
+        const ethPrice = this.tokenPrices.get("ETH") || 2400;
+        const gasCostEth = (Number(tx.gasUsed || 0) * Number(tx.gasPrice || 0)) / 1e18;
+        
+        if (valueEth < 0.0001 && !tx.to) continue;
+
+        const transaction: WalletTransaction = {
+          id: `tx-${tx.hash?.slice(0, 12) || Date.now()}`,
+          walletId,
+          hash: tx.hash || "",
+          chain: wallet.chain,
+          type: isOutgoing ? "send" : "receive",
+          from: tx.from || "",
+          to: tx.to || "",
+          value: valueEth.toFixed(6),
+          valueUsd: valueEth * ethPrice,
+          tokenSymbol: wallet.chain === "ethereum" ? "ETH" : "ETH",
+          timestamp: Number(tx.timeStamp || 0) * 1000,
+          status: tx.isError === "0" ? "confirmed" : "failed",
+          gasUsed: tx.gasUsed,
+          gasPriceGwei: (Number(tx.gasPrice || 0) / 1e9).toFixed(2),
+        };
+
+        transactions.push(transaction);
+      }
+
+      const existingTxs = this.transactions.get(walletId) || [];
+      const existingHashes = new Set(existingTxs.map(t => t.hash));
+      const newTxs = transactions.filter(t => !existingHashes.has(t.hash));
+      
+      if (newTxs.length > 0) {
+        const merged = [...existingTxs, ...newTxs].sort((a, b) => b.timestamp - a.timestamp);
+        this.transactions.set(walletId, merged);
+        console.log(`[WalletManager] Fetched ${newTxs.length} new transactions for ${wallet.label}`);
+      }
+
+      return this.transactions.get(walletId) || [];
+    } catch (error: any) {
+      console.warn(`[WalletManager] Transaction fetch failed: ${error.message}`);
+      return this.transactions.get(walletId) || [];
+    }
+  }
+
+  private getExplorerApiUrl(chain: WalletChain, address: string, limit: number): string | null {
+    const etherscanKey = process.env.ETHERSCAN_API_KEY || "";
+    
+    const chainIds: Record<string, number> = {
+      ethereum: 1,
+      base: 8453,
+      fraxtal: 252,
+    };
+    
+    const chainId = chainIds[chain];
+    if (!chainId) return null;
+    
+    const baseUrl = "https://api.etherscan.io/v2/api";
+    const params = new URLSearchParams({
+      chainid: chainId.toString(),
+      module: "account",
+      action: "txlist",
+      address: address,
+      startblock: "0",
+      endblock: "99999999",
+      page: "1",
+      offset: limit.toString(),
+      sort: "desc",
+    });
+    
+    if (etherscanKey) {
+      params.append("apikey", etherscanKey);
+    }
+    
+    return `${baseUrl}?${params.toString()}`;
   }
 
   async connectWallet(id: string): Promise<TrackedWallet | null> {
