@@ -3445,11 +3445,10 @@ export async function registerRoutes(
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const updated = await storage.getParliamentSession(req.params.id);
-      res.json({
-        ...updated,
+      const updated = await storage.updateParliamentSession(req.params.id, {
         metaSummary: debateResult.metaSummary,
       });
+      res.json(updated);
     } catch (error) {
       console.error("Live debate error:", error);
       res.status(500).json({ error: "Failed to generate live debate" });

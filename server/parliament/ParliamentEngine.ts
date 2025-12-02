@@ -140,7 +140,7 @@ class ParliamentEngine {
       agentType: agent.type,
       position,
       statement,
-      dataSources,
+      dataSourcesUsed: dataSources,
       simulationResults,
       timestamp: Date.now(),
     };
@@ -197,6 +197,12 @@ class ParliamentEngine {
     expectedOutcome = this.calculateExpectedOutcome(agent, context, vote);
     alternativeSuggestions = this.generateAlternatives(agent, context, vote);
     
+    const voteWeight = this.calculateVoteWeightFromProfile(
+      agent.creditScore,
+      agent.historicalAccuracy,
+      confidence
+    );
+    
     return {
       agentId: agent.id,
       agentType: agent.type,
@@ -210,60 +216,67 @@ class ParliamentEngine {
       dataSourcesUsed: dataSources,
       creditScore: agent.creditScore,
       historicalAccuracy: agent.historicalAccuracy,
+      voteWeight,
       timestamp: Date.now(),
     };
   }
 
-  synthesizeMetaSummary(votes: ParliamentVote[], debates: ParliamentDebateEntry[]): MetaSummary {
-    const approves = votes.filter(v => v.vote === "approve");
-    const rejects = votes.filter(v => v.vote === "reject");
-    const abstains = votes.filter(v => v.vote === "abstain");
-    
+  private calculateVoteWeightFromProfile(
+    creditScore: number,
+    historicalAccuracy: number,
+    confidence: number
+  ): number {
+    return (creditScore / 100) * historicalAccuracy * (0.5 + (confidence / 100) * 0.5);
+  }
+
+  synthesizeMetaSummary(votes: ParliamentVote[], debates: ParliamentDebateEntry[], quorum: number = 4): MetaSummary {
     let totalWeight = 0;
     let weightedApprove = 0;
     let weightedReject = 0;
     
     for (const vote of votes) {
-      const weight = this.calculateVoteWeight(vote);
+      const weight = vote.voteWeight || this.calculateVoteWeight(vote);
       totalWeight += weight;
       
       if (vote.vote === "approve") {
-        weightedApprove += weight * (vote.confidence / 100);
+        weightedApprove += weight;
       } else if (vote.vote === "reject") {
-        weightedReject += weight * (vote.confidence / 100);
+        weightedReject += weight;
       }
     }
     
-    const normalizedApprove = totalWeight > 0 ? (weightedApprove / totalWeight) * 100 : 0;
-    const normalizedReject = totalWeight > 0 ? (weightedReject / totalWeight) * 100 : 0;
+    const weightedApprovalPct = totalWeight > 0 ? (weightedApprove / totalWeight) * 100 : 0;
     
-    const weightedConfidence = Math.round(
-      votes.reduce((sum, v) => sum + (v.confidence * this.calculateVoteWeight(v)), 0) / 
+    const confidenceScore = Math.round(
+      votes.reduce((sum, v) => sum + (v.confidence * (v.voteWeight || this.calculateVoteWeight(v))), 0) / 
       Math.max(totalWeight, 1)
     );
     
-    const conflictsDetected = this.detectConflicts(votes, debates);
+    const conflicts = this.detectConflicts(votes, debates);
     const suggestedAmendments = this.generateAmendments(votes, debates);
     const riskAssessment = this.assessOverallRisk(votes);
+    const quorumReached = votes.length >= quorum;
     
-    let recommendation: MetaSummary["recommendation"] = "needs_review";
-    if (conflictsDetected.length === 0) {
-      if (normalizedApprove > 60) {
+    let recommendation: MetaSummary["recommendation"] = "defer";
+    if (conflicts.length === 0 && quorumReached) {
+      if (weightedApprovalPct > 60) {
         recommendation = "approve";
-      } else if (normalizedReject > 60) {
+      } else if ((100 - weightedApprovalPct) > 60) {
         recommendation = "reject";
       }
     }
     
-    const synthesisStatement = this.generateSynthesis(votes, debates, recommendation);
+    const synthesis = this.generateSynthesis(votes, debates, recommendation);
     
     return {
-      weightedConfidence,
       recommendation,
-      conflictsDetected,
-      suggestedAmendments,
+      confidenceScore,
+      synthesis,
+      weightedApprovalPct,
+      quorumReached,
       riskAssessment,
-      synthesisStatement,
+      conflicts,
+      suggestedAmendments,
       timestamp: Date.now(),
     };
   }
@@ -303,6 +316,18 @@ class ParliamentEngine {
     }
     
     return "deadlocked";
+  }
+
+  concludeSession(
+    votes: ParliamentVote[],
+    debates: ParliamentDebateEntry[],
+    quorum: number = 4,
+    requiredMajority: number = 60
+  ): { outcome: "approved" | "rejected" | "deadlocked"; metaSummary: MetaSummary } {
+    const metaSummary = this.synthesizeMetaSummary(votes, debates, quorum);
+    const outcome = this.determineOutcome(votes, quorum, requiredMajority, metaSummary);
+    
+    return { outcome, metaSummary };
   }
 
   private calculateVoteWeight(vote: ParliamentVote): number {

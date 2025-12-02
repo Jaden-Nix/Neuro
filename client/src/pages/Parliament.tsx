@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Gavel, 
@@ -24,9 +26,20 @@ import {
   Search,
   Target,
   Play,
-  ChevronRight
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  Lightbulb,
+  Database,
+  Clock,
+  BarChart3,
+  Scale,
+  ThumbsUp,
+  ThumbsDown,
+  ExternalLink
 } from "lucide-react";
-import type { ParliamentSession, ParliamentDebateEntry, ParliamentVote } from "@shared/schema";
+import type { ParliamentSession, ParliamentDebateEntry, ParliamentVote, MetaSummary } from "@shared/schema";
 
 type AgentTypeKey = "meta" | "scout" | "risk" | "execution";
 
@@ -50,6 +63,25 @@ const positionStyles: Record<string, string> = {
   clarification: "border-l-4 border-l-yellow-500",
 };
 
+const dataSourceIcons: Record<string, string> = {
+  "DefiLlama": "bg-emerald-500/20 text-emerald-400",
+  "Coinbase": "bg-blue-500/20 text-blue-400",
+  "Dune": "bg-orange-500/20 text-orange-400",
+  "The Graph": "bg-purple-500/20 text-purple-400",
+  "Nansen": "bg-pink-500/20 text-pink-400",
+  "Token Terminal": "bg-cyan-500/20 text-cyan-400",
+  "L2Beat": "bg-indigo-500/20 text-indigo-400",
+  "Coingecko": "bg-yellow-500/20 text-yellow-400",
+  "Immunefi": "bg-red-500/20 text-red-400",
+  "CertiK": "bg-sky-500/20 text-sky-400",
+  "OpenZeppelin": "bg-teal-500/20 text-teal-400",
+  "Chainalysis": "bg-violet-500/20 text-violet-400",
+  "Flashbots": "bg-amber-500/20 text-amber-400",
+  "BlockNative": "bg-lime-500/20 text-lime-400",
+  "Alchemy": "bg-fuchsia-500/20 text-fuchsia-400",
+  "Etherscan": "bg-slate-500/20 text-slate-400",
+};
+
 function AgentAvatar({ agentType }: { agentType: AgentTypeKey }) {
   const Icon = agentIcons[agentType] || Brain;
   return (
@@ -59,16 +91,101 @@ function AgentAvatar({ agentType }: { agentType: AgentTypeKey }) {
   );
 }
 
-function DebateStream({ debates }: { debates: ParliamentDebateEntry[] }) {
+function DataSourceBadges({ sources }: { sources?: string[] }) {
+  if (!sources || sources.length === 0) return null;
+  
+  return (
+    <div className="flex flex-wrap gap-1 mt-2">
+      {sources.slice(0, 3).map((source, idx) => (
+        <Badge 
+          key={idx} 
+          variant="outline" 
+          className={`text-xs ${dataSourceIcons[source] || "bg-muted"}`}
+        >
+          <Database className="w-2.5 h-2.5 mr-1" />
+          {source}
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function ExpectedOutcomePanel({ outcome }: { outcome?: ParliamentVote["expectedOutcome"] }) {
+  if (!outcome) return null;
+  
+  return (
+    <div className="mt-3 p-3 rounded-lg bg-muted/50 border">
+      <div className="flex items-center gap-2 mb-2">
+        <BarChart3 className="w-4 h-4 text-primary" />
+        <span className="text-sm font-medium">Expected Outcome</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-3 h-3 text-green-400" />
+          <span className="text-muted-foreground">Return:</span>
+          <span className="font-medium text-green-400">+{outcome.returnPercent}%</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="w-3 h-3 text-amber-400" />
+          <span className="text-muted-foreground">Risk:</span>
+          <span className="font-medium text-amber-400">{outcome.riskScore}%</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Clock className="w-3 h-3 text-blue-400" />
+          <span className="text-muted-foreground">Horizon:</span>
+          <span className="font-medium">{outcome.timeHorizon}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Scale className="w-3 h-3 text-purple-400" />
+          <span className="text-muted-foreground">Confidence:</span>
+          <span className="font-medium">{outcome.confidence}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProsConsList({ pros, cons }: { pros?: string[]; cons?: string[] }) {
+  if ((!pros || pros.length === 0) && (!cons || cons.length === 0)) return null;
+  
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-3">
+      {pros && pros.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 text-xs text-green-400 font-medium">
+            <ThumbsUp className="w-3 h-3" />
+            Pros
+          </div>
+          {pros.map((pro, idx) => (
+            <p key={idx} className="text-xs text-muted-foreground pl-4">+ {pro}</p>
+          ))}
+        </div>
+      )}
+      {cons && cons.length > 0 && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-1 text-xs text-red-400 font-medium">
+            <ThumbsDown className="w-3 h-3" />
+            Cons
+          </div>
+          {cons.map((con, idx) => (
+            <p key={idx} className="text-xs text-muted-foreground pl-4">- {con}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DebateStream({ debates, votes }: { debates: ParliamentDebateEntry[]; votes: ParliamentVote[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [debates]);
+  }, [debates, votes]);
 
-  if (debates.length === 0) {
+  if (debates.length === 0 && votes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
         <MessageCircle className="w-12 h-12 mb-3 opacity-50" />
@@ -78,38 +195,176 @@ function DebateStream({ debates }: { debates: ParliamentDebateEntry[] }) {
     );
   }
 
+  const votesByAgent = new Map(votes.map(v => [v.agentType, v]));
+
   return (
-    <ScrollArea ref={scrollRef} className="h-[400px] pr-4">
+    <ScrollArea ref={scrollRef} className="h-[500px] pr-4">
       <div className="space-y-4">
-        {debates.map((entry, idx) => (
-          <div
-            key={idx}
-            className={`p-4 rounded-lg bg-muted/30 ${positionStyles[entry.position]} animate-in fade-in slide-in-from-left-2 duration-300`}
-          >
-            <div className="flex items-start gap-3">
-              <AgentAvatar agentType={entry.agentType as AgentTypeKey} />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="font-semibold capitalize">{entry.agentType} Agent</span>
-                  <Badge variant="outline" className={entry.position === "for" ? "text-green-400" : entry.position === "against" ? "text-red-400" : "text-yellow-400"}>
-                    {entry.position}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {new Date(entry.timestamp).toLocaleTimeString()}
-                  </span>
+        {debates.map((entry, idx) => {
+          const vote = votesByAgent.get(entry.agentType);
+          return (
+            <div
+              key={idx}
+              className={`p-4 rounded-lg bg-muted/30 ${positionStyles[entry.position]} animate-in fade-in slide-in-from-left-2 duration-300`}
+              data-testid={`debate-entry-${idx}`}
+            >
+              <div className="flex items-start gap-3">
+                <AgentAvatar agentType={entry.agentType as AgentTypeKey} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="font-semibold capitalize">{entry.agentType} Agent</span>
+                    <Badge variant="outline" className={entry.position === "for" ? "text-green-400" : entry.position === "against" ? "text-red-400" : "text-yellow-400"}>
+                      {entry.position}
+                    </Badge>
+                    {vote && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Badge variant={vote.vote === "approve" ? "default" : vote.vote === "reject" ? "destructive" : "secondary"}>
+                              {vote.vote} ({vote.confidence}%)
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Weighted Vote Power: {(vote.voteWeight || 1).toFixed(2)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {new Date(entry.timestamp).toLocaleTimeString()}
+                    </span>
+                  </div>
+                  <p className="text-sm leading-relaxed">{entry.statement}</p>
+                  
+                  <DataSourceBadges sources={entry.dataSourcesUsed} />
+                  
+                  {entry.simulationResults && (
+                    <div className="mt-2 p-2 rounded bg-background/50 border text-xs">
+                      <span className="text-muted-foreground">Simulation: </span>
+                      <span className="font-medium">{entry.simulationResults.scenarioName}</span>
+                      <span className="mx-2">-</span>
+                      <span className={entry.simulationResults.outcome.includes("loss") ? "text-red-400" : "text-green-400"}>
+                        {entry.simulationResults.outcome}
+                      </span>
+                    </div>
+                  )}
+
+                  {vote && <ProsConsList pros={vote.pros} cons={vote.cons} />}
+                  {vote && <ExpectedOutcomePanel outcome={vote.expectedOutcome} />}
+                  
+                  {vote?.alternativeSuggestions && vote.alternativeSuggestions.length > 0 && (
+                    <div className="mt-3 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                      <div className="flex items-center gap-1 text-xs text-amber-400 font-medium mb-1">
+                        <Lightbulb className="w-3 h-3" />
+                        Suggested Alternatives
+                      </div>
+                      {vote.alternativeSuggestions.map((alt, i) => (
+                        <p key={i} className="text-xs text-muted-foreground">{i + 1}. {alt}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p className="text-sm leading-relaxed">{entry.statement}</p>
-                {entry.rebuttalTo && (
-                  <p className="text-xs text-muted-foreground mt-2 italic">
-                    Responding to previous argument
-                  </p>
-                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </ScrollArea>
+  );
+}
+
+function MetaSummaryPanel({ summary }: { summary?: MetaSummary }) {
+  if (!summary) return null;
+  
+  const recommendationColors = {
+    approve: "bg-green-500/20 text-green-400 border-green-500/50",
+    reject: "bg-red-500/20 text-red-400 border-red-500/50",
+    defer: "bg-yellow-500/20 text-yellow-400 border-yellow-500/50",
+  };
+  
+  const riskColors = {
+    low: "text-green-400",
+    medium: "text-yellow-400",
+    high: "text-orange-400",
+    critical: "text-red-400",
+  };
+
+  return (
+    <Card className="border-2 border-purple-500/30 bg-purple-500/5">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Brain className="w-5 h-5 text-purple-400" />
+          Meta Orchestration Summary
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${recommendationColors[summary.recommendation]}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold text-lg capitalize">{summary.recommendation}</span>
+            <Badge variant="outline">
+              Confidence: {summary.confidenceScore}%
+            </Badge>
+          </div>
+          <p className="text-sm opacity-90">{summary.synthesis}</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Vote className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium">Voting Analysis</span>
+            </div>
+            <div className="text-sm space-y-1">
+              <p>Weighted Approval: <span className="font-medium">{summary.weightedApprovalPct.toFixed(1)}%</span></p>
+              <p>Quorum Status: <span className={summary.quorumReached ? "text-green-400" : "text-red-400"}>{summary.quorumReached ? "Reached" : "Not Reached"}</span></p>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Shield className={`w-4 h-4 ${riskColors[summary.riskAssessment.overallRisk]}`} />
+              <span className="text-sm font-medium">Risk Assessment</span>
+            </div>
+            <div>
+              <Badge className={riskColors[summary.riskAssessment.overallRisk]}>
+                {summary.riskAssessment.overallRisk.toUpperCase()}
+              </Badge>
+              {summary.riskAssessment.factors.slice(0, 2).map((factor, idx) => (
+                <p key={idx} className="text-xs text-muted-foreground mt-1">{factor}</p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {summary.conflicts.length > 0 && (
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-medium text-amber-400">Detected Conflicts</span>
+            </div>
+            {summary.conflicts.map((conflict, idx) => (
+              <p key={idx} className="text-xs text-muted-foreground">{conflict}</p>
+            ))}
+          </div>
+        )}
+
+        {summary.suggestedAmendments.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm font-medium">Suggested Amendments</span>
+            </div>
+            <div className="space-y-1">
+              {summary.suggestedAmendments.map((amendment, idx) => (
+                <p key={idx} className="text-sm text-muted-foreground pl-4">
+                  {idx + 1}. {amendment}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -119,6 +374,11 @@ function VotingPanel({ votes, quorum }: { votes: ParliamentVote[]; quorum: numbe
   const abstains = votes.filter(v => v.vote === "abstain").length;
   const total = votes.length;
   const progress = (total / quorum) * 100;
+  
+  const totalWeight = votes.reduce((sum, v) => sum + (v.voteWeight || 1), 0);
+  const approveWeight = votes.filter(v => v.vote === "approve").reduce((sum, v) => sum + (v.voteWeight || 1), 0);
+  const rejectWeight = votes.filter(v => v.vote === "reject").reduce((sum, v) => sum + (v.voteWeight || 1), 0);
+  const weightedApprovalPct = totalWeight > 0 ? (approveWeight / totalWeight) * 100 : 0;
 
   return (
     <Card className="border-2">
@@ -156,17 +416,45 @@ function VotingPanel({ votes, quorum }: { votes: ParliamentVote[]; quorum: numbe
         </div>
 
         {votes.length > 0 && (
+          <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+            <p className="text-sm font-medium">Weighted Analysis</p>
+            <div className="flex items-center gap-2">
+              <Scale className="w-4 h-4 text-primary" />
+              <div className="flex-1">
+                <Progress 
+                  value={weightedApprovalPct} 
+                  className="h-2" 
+                />
+              </div>
+              <span className="text-sm font-medium">{weightedApprovalPct.toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Approve Weight: {approveWeight.toFixed(2)}</span>
+              <span>Reject Weight: {rejectWeight.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        {votes.length > 0 && (
           <div className="space-y-2 pt-2">
-            <p className="text-sm font-medium">Recent Votes</p>
-            {votes.slice(-3).map((vote, idx) => (
+            <p className="text-sm font-medium">Vote Details</p>
+            {votes.map((vote, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-muted/50">
                 <div className="flex items-center gap-2">
                   <AgentAvatar agentType={vote.agentType as AgentTypeKey} />
-                  <span className="capitalize">{vote.agentType}</span>
+                  <div>
+                    <span className="capitalize font-medium">{vote.agentType}</span>
+                    <p className="text-xs text-muted-foreground">
+                      Weight: {(vote.voteWeight || 1).toFixed(2)} | Credit: {vote.creditScore || 100}
+                    </p>
+                  </div>
                 </div>
-                <Badge variant={vote.vote === "approve" ? "default" : vote.vote === "reject" ? "destructive" : "secondary"}>
-                  {vote.vote}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant={vote.vote === "approve" ? "default" : vote.vote === "reject" ? "destructive" : "secondary"}>
+                    {vote.vote}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{vote.confidence}%</span>
+                </div>
               </div>
             ))}
           </div>
@@ -216,11 +504,18 @@ function SessionCard({ session, onSelect }: { session: ParliamentSession; onSele
 function NewSessionDialog({ onCreated }: { onCreated: () => void }) {
   const [topic, setTopic] = useState("");
   const [description, setDescription] = useState("");
+  const [actionType, setActionType] = useState("governance");
   const [open, setOpen] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/parliament", { topic, description, proposalData: {} });
+      return apiRequest("POST", "/api/parliament", { 
+        topic, 
+        description, 
+        proposalData: { actionType },
+        quorum: 4,
+        requiredMajority: 60,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parliament"] });
@@ -249,9 +544,24 @@ function NewSessionDialog({ onCreated }: { onCreated: () => void }) {
             <Input
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="e.g., Increase risk threshold for arbitrage"
+              placeholder="e.g., Deploy 50% of treasury to Aave V3"
               data-testid="input-session-topic"
             />
+          </div>
+          <div>
+            <label className="text-sm font-medium">Action Type</label>
+            <select
+              value={actionType}
+              onChange={(e) => setActionType(e.target.value)}
+              className="w-full mt-1 p-2 rounded-md border bg-background"
+              data-testid="select-action-type"
+            >
+              <option value="yield_deployment">Yield Deployment</option>
+              <option value="risk_rebalance">Risk Rebalance</option>
+              <option value="protocol_rotation">Protocol Rotation</option>
+              <option value="governance">Governance Parameter</option>
+              <option value="emergency">Emergency Action</option>
+            </select>
           </div>
           <div>
             <label className="text-sm font-medium">Description</label>
@@ -261,6 +571,10 @@ function NewSessionDialog({ onCreated }: { onCreated: () => void }) {
               placeholder="Detailed proposal description..."
               data-testid="input-session-description"
             />
+          </div>
+          <div className="p-3 rounded-lg bg-muted/50 text-sm">
+            <p className="font-medium mb-1">Session Parameters</p>
+            <p className="text-muted-foreground">Quorum: 4 agents | Majority: 60%</p>
           </div>
           <Button
             onClick={() => createMutation.mutate()}
@@ -277,90 +591,53 @@ function NewSessionDialog({ onCreated }: { onCreated: () => void }) {
 }
 
 function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBack: () => void }) {
+  const [metaSummary, setMetaSummary] = useState<MetaSummary | undefined>(session.metaSummary);
+  
   const concludeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/parliament/${session.id}/conclude`);
+      const response = await apiRequest("POST", `/api/parliament/${session.id}/conclude`);
+      return response;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      if (data.metaSummary) {
+        setMetaSummary(data.metaSummary);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
     },
   });
 
   const simulateDebate = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
-      queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
-    },
-  });
-
-  const simulateVoting = useMutation({
-    mutationFn: async () => {
-      const agents: { id: string; type: AgentTypeKey }[] = [
-        { id: "meta-001", type: "meta" },
-        { id: "scout-001", type: "scout" },
-        { id: "risk-001", type: "risk" },
-        { id: "exec-001", type: "execution" },
-      ];
-
-      for (const agent of agents) {
-        const voteOptions = ["approve", "reject", "abstain"];
-        const weights = agent.type === "risk" ? [0.3, 0.5, 0.2] : [0.6, 0.2, 0.2];
-        const randomVal = Math.random();
-        let cumulative = 0;
-        let vote = "abstain";
-        for (let i = 0; i < weights.length; i++) {
-          cumulative += weights[i];
-          if (randomVal < cumulative) {
-            vote = voteOptions[i];
-            break;
-          }
-        }
-
-        await apiRequest("POST", `/api/parliament/${session.id}/vote`, {
-          agentId: agent.id,
-          agentType: agent.type,
-          vote,
-          reasoning: `Based on my ${agent.type} analysis, I cast my vote as ${vote}.`,
-          confidence: 0.7 + Math.random() * 0.25,
-        });
-        await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
+      if (response.metaSummary) {
+        setMetaSummary(response.metaSummary);
       }
-      
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
+      return response;
     },
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-sessions">
           <ChevronRight className="w-4 h-4 mr-2 rotate-180" />
           Back to Sessions
         </Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {session.status === "deliberating" && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => simulateDebate.mutate()}
-                disabled={simulateDebate.isPending}
-                data-testid="button-start-debate"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                {simulateDebate.isPending ? "Debating..." : "Start Debate"}
-              </Button>
-              <Button
-                onClick={() => simulateVoting.mutate()}
-                disabled={simulateVoting.isPending}
-                data-testid="button-start-voting"
-              >
-                <Vote className="w-4 h-4 mr-2" />
-                Start Voting
-              </Button>
-            </>
-          )}
-          {session.status === "voting" && (
             <Button
+              onClick={() => simulateDebate.mutate()}
+              disabled={simulateDebate.isPending}
+              data-testid="button-start-debate"
+            >
+              <Play className="w-4 h-4 mr-2" />
+              {simulateDebate.isPending ? "Running Debate..." : "Run Full Debate"}
+            </Button>
+          )}
+          {(session.status === "deliberating" || session.status === "voting") && session.votes.length >= session.quorum && (
+            <Button
+              variant="outline"
               onClick={() => concludeMutation.mutate()}
               disabled={concludeMutation.isPending}
               data-testid="button-conclude"
@@ -373,25 +650,53 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-2">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Gavel className="w-5 h-5 text-primary" />
-                  {session.topic}
-                </CardTitle>
-                <CardDescription>{session.description}</CardDescription>
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-2">
+            <CardHeader>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gavel className="w-5 h-5 text-primary" />
+                    {session.topic}
+                  </CardTitle>
+                  <CardDescription>{session.description}</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {(session.proposalData as any)?.actionType || session.actionType || "governance"}
+                  </Badge>
+                  <Badge variant={session.status === "concluded" ? "secondary" : "default"} className="text-sm">
+                    {session.status}
+                  </Badge>
+                </div>
               </div>
-              <Badge variant={session.status === "concluded" ? "secondary" : "default"} className="text-sm">
-                {session.status}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <DebateStream debates={session.debates} />
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="debate">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="debate">
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Debate ({session.debates.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="votes">
+                    <Vote className="w-4 h-4 mr-2" />
+                    Votes ({session.votes.length})
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="debate">
+                  <DebateStream debates={session.debates} votes={session.votes} />
+                </TabsContent>
+                <TabsContent value="votes">
+                  <VotingPanel votes={session.votes} quorum={session.quorum} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {(metaSummary || session.metaSummary) && (
+            <MetaSummaryPanel summary={metaSummary || session.metaSummary} />
+          )}
+        </div>
 
         <div className="space-y-6">
           <VotingPanel votes={session.votes} quorum={session.quorum} />
@@ -405,17 +710,34 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {(["meta", "scout", "risk", "execution"] satisfies AgentTypeKey[]).map((type) => (
-                  <div key={type} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <AgentAvatar agentType={type} />
-                      <span className="capitalize font-medium">{type} Agent</span>
+                {(["meta", "scout", "risk", "execution"] satisfies AgentTypeKey[]).map((type) => {
+                  const vote = session.votes.find(v => v.agentType === type);
+                  return (
+                    <div key={type} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <AgentAvatar agentType={type} />
+                        <div>
+                          <span className="capitalize font-medium">{type} Agent</span>
+                          {vote && (
+                            <p className="text-xs text-muted-foreground">
+                              Credit: {vote.creditScore || 100}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="outline" className="text-xs">
+                          {session.debates.filter(d => d.agentType === type).length} statements
+                        </Badge>
+                        {vote && (
+                          <Badge variant={vote.vote === "approve" ? "default" : vote.vote === "reject" ? "destructive" : "secondary"} className="text-xs">
+                            {vote.vote}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {session.debates.filter(d => d.agentType === type).length} statements
-                    </Badge>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -474,14 +796,14 @@ export default function Parliament() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3" data-testid="text-parliament-title">
             <Gavel className="w-8 h-8 text-primary" />
             Agent Parliament
           </h1>
           <p className="text-muted-foreground mt-1">
-            Multi-agent governance with real-time debates and voting
+            Multi-agent governance with weighted voting and Meta orchestration
           </p>
         </div>
         <NewSessionDialog onCreated={() => queryClient.invalidateQueries({ queryKey: ["/api/parliament"] })} />
@@ -582,7 +904,7 @@ export default function Parliament() {
               <Gavel className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
               <h3 className="text-lg font-semibold mb-2">No Parliament Sessions Yet</h3>
               <p className="text-muted-foreground mb-4">
-                Start a new session to watch agents debate and vote on governance proposals
+                Start a new session to watch agents debate and vote with weighted voting power
               </p>
               <NewSessionDialog onCreated={() => queryClient.invalidateQueries({ queryKey: ["/api/parliament"] })} />
             </div>

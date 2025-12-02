@@ -1403,6 +1403,7 @@ export interface ParliamentVote {
   dataSourcesUsed?: string[];
   creditScore?: number;
   historicalAccuracy?: number;
+  voteWeight?: number;
   timestamp: number;
 }
 
@@ -1413,7 +1414,7 @@ export interface ParliamentDebateEntry {
   statement: string;
   rebuttalTo?: string;
   reasoningChainId?: string;
-  dataSources?: string[];
+  dataSourcesUsed?: string[];
   simulationResults?: {
     scenarioName: string;
     outcome: string;
@@ -1423,15 +1424,17 @@ export interface ParliamentDebateEntry {
 }
 
 export interface MetaSummary {
-  weightedConfidence: number;
-  recommendation: "approve" | "reject" | "needs_review";
-  conflictsDetected: string[];
-  suggestedAmendments: string[];
+  recommendation: "approve" | "reject" | "defer";
+  confidenceScore: number;
+  synthesis: string;
+  weightedApprovalPct: number;
+  quorumReached: boolean;
   riskAssessment: {
     overallRisk: "low" | "medium" | "high" | "critical";
     factors: string[];
   };
-  synthesisStatement: string;
+  conflicts: string[];
+  suggestedAmendments: string[];
   timestamp: number;
 }
 
