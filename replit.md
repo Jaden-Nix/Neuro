@@ -28,6 +28,7 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ### Feature Specifications
 
+- **AI Insights Engine**: Advanced ML pattern recognition system that detects 8 pattern types (momentum shifts, whale accumulation, volatility clusters, trend reversals, breakout signals, divergence detection, liquidity squeezes, correlation movements) using technical indicators (RSI, MACD, Bollinger Bands, volume analysis). Each insight includes confidence scores, impact levels, and suggested actions for agent decision-making.
 - **Quick Backtest System**: Simulates historical data for various trading agents (Atlas, Vega, Nova, Sentinel, Arbiter) and tracks performance metrics like trades, win rate, return, Sharpe, and drawdown.
 - **Enhanced Wallet Tracking**: Comprehensive multi-protocol DeFi monitoring for Lido stETH, Aave V3, Frax sfrxETH, Uniswap, Compound, Curve, and Convex, including historical snapshots, PnL analysis, and configurable alerts.
 - **Stress Testing**: Allows creation and execution of scenarios (e.g., Flash Crash, High Volatility, Liquidity Crisis, Chain Congestion, Oracle Failure, MEV Attack) to detect realistic vulnerabilities and evaluate portfolio impact.
