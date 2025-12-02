@@ -3498,6 +3498,148 @@ export async function registerRoutes(
     }
   });
 
+  // Evolution Engine - Advanced endpoints
+  app.get("/api/evolution/engine/stats", async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const stats = evolutionEngine.getEvolutionStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Failed to get evolution stats:", error);
+      res.status(500).json({ error: "Failed to get evolution stats" });
+    }
+  });
+
+  app.get("/api/evolution/engine/history", async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const history = evolutionEngine.getEvolutionHistory(limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get evolution history:", error);
+      res.status(500).json({ error: "Failed to get evolution history" });
+    }
+  });
+
+  app.get("/api/evolution/engine/genealogy", async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const tree = evolutionEngine.getGenealogyTree();
+      res.json(tree);
+    } catch (error) {
+      console.error("Failed to get genealogy tree:", error);
+      res.status(500).json({ error: "Failed to get genealogy tree" });
+    }
+  });
+
+  app.get("/api/evolution/engine/genealogy/:agentName", async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const genealogy = evolutionEngine.getAgentGenealogy(req.params.agentName);
+      if (!genealogy) {
+        return res.status(404).json({ error: "Agent genealogy not found" });
+      }
+      res.json(genealogy);
+    } catch (error) {
+      console.error("Failed to get agent genealogy:", error);
+      res.status(500).json({ error: "Failed to get agent genealogy" });
+    }
+  });
+
+  app.get("/api/evolution/engine/heatmap", async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const heatmap = evolutionEngine.getMutationHeatmap();
+      res.json(heatmap);
+    } catch (error) {
+      console.error("Failed to get mutation heatmap:", error);
+      res.status(500).json({ error: "Failed to get mutation heatmap" });
+    }
+  });
+
+  app.post("/api/evolution/engine/evolve", writeLimiter, async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const { parentAgentName, trigger, currentPerformance, reason, currentParams } = req.body;
+
+      if (!parentAgentName || !trigger || !currentPerformance || !reason) {
+        return res.status(400).json({ 
+          error: "Missing required fields: parentAgentName, trigger, currentPerformance, reason" 
+        });
+      }
+
+      const event = evolutionEngine.evolveAgent(
+        parentAgentName,
+        trigger,
+        currentPerformance,
+        reason,
+        currentParams || {}
+      );
+
+      const report = evolutionEngine.formatEvolutionReport(event);
+      console.log(report);
+
+      broadcastToClients({
+        type: "log",
+        data: { event: "agent_evolved", evolution: event, report },
+        timestamp: Date.now(),
+      });
+
+      res.status(201).json({ event, report });
+    } catch (error) {
+      console.error("Failed to evolve agent:", error);
+      res.status(500).json({ error: "Failed to evolve agent" });
+    }
+  });
+
+  app.post("/api/evolution/engine/retire", writeLimiter, async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const { agentName, reason } = req.body;
+
+      if (!agentName || !reason) {
+        return res.status(400).json({ error: "Missing required fields: agentName, reason" });
+      }
+
+      evolutionEngine.retireAgent(agentName, reason);
+
+      broadcastToClients({
+        type: "log",
+        data: { event: "agent_retired", agentName, reason },
+        timestamp: Date.now(),
+      });
+
+      res.json({ success: true, agentName, reason });
+    } catch (error) {
+      console.error("Failed to retire agent:", error);
+      res.status(500).json({ error: "Failed to retire agent" });
+    }
+  });
+
+  app.post("/api/evolution/engine/demo", writeLimiter, async (req, res) => {
+    try {
+      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      const events = evolutionEngine.generateDemoEvolutions();
+      const stats = evolutionEngine.getEvolutionStats();
+
+      broadcastToClients({
+        type: "log",
+        data: { event: "demo_evolutions_generated", count: events.length },
+        timestamp: Date.now(),
+      });
+
+      res.json({ 
+        count: events.length, 
+        events: events.slice(-10),
+        stats 
+      });
+    } catch (error) {
+      console.error("Failed to generate demo evolutions:", error);
+      res.status(500).json({ error: "Failed to generate demo evolutions" });
+    }
+  });
+
   // Dream Sessions
   app.get("/api/dream", async (req, res) => {
     try {
