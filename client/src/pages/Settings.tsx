@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -41,7 +41,6 @@ const ALERT_TRIGGERS: { id: AlertTriggerType; label: string; description: string
 
 export default function Settings() {
   const { toast } = useToast();
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const { data: preferences, isLoading } = useQuery({
     queryKey: ["/api/alerts/preferences"],
@@ -63,19 +62,37 @@ export default function Settings() {
   const form = useForm<AlertPreferenceForm>({
     resolver: zodResolver(alertPreferenceSchema),
     defaultValues: {
-      email: preferences?.email || "",
-      webhookUrl: preferences?.webhookUrl || "",
-      rateLimitPerMinute: preferences?.rateLimitPerMinute || 3,
-      transaction_failed: preferences?.enabledTriggers?.includes("transaction_failed") || false,
-      high_risk_strategy: preferences?.enabledTriggers?.includes("high_risk_strategy") || false,
-      agent_conflict: preferences?.enabledTriggers?.includes("agent_conflict") || false,
-      parliament_deadlock: preferences?.enabledTriggers?.includes("parliament_deadlock") || false,
-      opportunity_found: preferences?.enabledTriggers?.includes("opportunity_found") || false,
-      balance_drop: preferences?.enabledTriggers?.includes("balance_drop") || false,
-      system_error: preferences?.enabledTriggers?.includes("system_error") || false,
-      rpc_failure: preferences?.enabledTriggers?.includes("rpc_failure") || false,
+      email: "",
+      webhookUrl: "",
+      rateLimitPerMinute: 3,
+      transaction_failed: false,
+      high_risk_strategy: false,
+      agent_conflict: false,
+      parliament_deadlock: false,
+      opportunity_found: false,
+      balance_drop: false,
+      system_error: false,
+      rpc_failure: false,
     },
   });
+
+  useEffect(() => {
+    if (preferences) {
+      form.reset({
+        email: preferences.email || "",
+        webhookUrl: preferences.webhookUrl || "",
+        rateLimitPerMinute: preferences.rateLimitPerMinute || 3,
+        transaction_failed: preferences.enabledTriggers?.includes("transaction_failed") || false,
+        high_risk_strategy: preferences.enabledTriggers?.includes("high_risk_strategy") || false,
+        agent_conflict: preferences.enabledTriggers?.includes("agent_conflict") || false,
+        parliament_deadlock: preferences.enabledTriggers?.includes("parliament_deadlock") || false,
+        opportunity_found: preferences.enabledTriggers?.includes("opportunity_found") || false,
+        balance_drop: preferences.enabledTriggers?.includes("balance_drop") || false,
+        system_error: preferences.enabledTriggers?.includes("system_error") || false,
+        rpc_failure: preferences.enabledTriggers?.includes("rpc_failure") || false,
+      });
+    }
+  }, [preferences, form]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: AlertPreferenceForm) => {

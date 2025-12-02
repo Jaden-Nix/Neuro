@@ -19,6 +19,7 @@ import MLInsights from "@/pages/MLInsights";
 import Governance from "@/pages/Governance";
 // import Marketplace from "@/pages/Marketplace";
 import Alerts from "@/pages/Alerts";
+import Settings from "@/pages/Settings";
 import Backtesting from "@/pages/Backtesting";
 import Wallets from "@/pages/Wallets";
 import Parliament from "@/pages/Parliament";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/governance" component={Governance} />
       {/* <Route path="/marketplace" component={Marketplace} /> */}
       <Route path="/alerts" component={Alerts} />
+      <Route path="/settings" component={Settings} />
       <Route path="/backtesting" component={Backtesting} />
       <Route path="/wallets" component={Wallets} />
       <Route path="/parliament" component={Parliament} />

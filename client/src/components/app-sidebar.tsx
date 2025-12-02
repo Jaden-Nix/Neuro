@@ -21,7 +21,8 @@ import {
   Gavel,
   GitBranch,
   Moon,
-  Gauge
+  Gauge,
+  Settings
 } from "lucide-react";
 
 const menuItems = [
@@ -54,6 +55,12 @@ const menuItems = [
     url: "/alerts",
     icon: Bell,
     testId: "nav-alerts",
+  },
+  {
+    title: "Settings",
+    url: "/settings",
+    icon: Settings,
+    testId: "nav-settings",
   },
   {
     title: "Backtesting",

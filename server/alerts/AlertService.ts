@@ -18,14 +18,15 @@ export class AlertService {
       message: string;
       data?: Record<string, any>;
     }
-  ): Promise<AlertEvent | null> {
+  ): Promise<{ alert: AlertEvent | null; reason?: string }> {
     const prefs = await storage.getAlertPreference(userId);
     if (!prefs || !prefs.enabledTriggers.includes(type)) {
-      return null;
+      return { alert: null, reason: "alert_type_disabled" };
     }
 
     if (!this.checkRateLimit(userId, prefs.rateLimitPerMinute)) {
-      return null;
+      console.log(`[AlertService] Rate limit exceeded for user ${userId}`);
+      return { alert: null, reason: "rate_limited" };
     }
 
     const alertData: InsertAlertEvent = {
@@ -53,7 +54,7 @@ export class AlertService {
       await storage.updateAlertDeliveryStatus(userId, event.id, false, true);
     }
 
-    return event;
+    return { alert: event };
   }
 
   private checkRateLimit(userId: string, limitPerMinute: number): boolean {

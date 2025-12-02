@@ -374,6 +374,37 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/alerts/test", requireWriteAuth, async (req, res) => {
+    try {
+      const userId = "default-user";
+      const { type, title, message, severity } = req.body;
+      
+      const result = await alertService.emitAlert(userId, type || "system_error", {
+        severity: severity || "medium",
+        title: title || "Test Alert",
+        message: message || "This is a test alert to verify the system works",
+        data: { test: true, timestamp: Date.now() },
+      });
+      
+      if (result.alert) {
+        res.json({ success: true, alert: result.alert });
+      } else {
+        const messages: Record<string, string> = {
+          alert_type_disabled: "Alert not sent - this alert type is not enabled in your preferences",
+          rate_limited: "Alert not sent - rate limit exceeded (max alerts per minute reached)",
+        };
+        res.json({ 
+          success: false, 
+          reason: result.reason,
+          message: messages[result.reason || ""] || "Alert not sent"
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send test alert:", error);
+      res.status(500).json({ error: "Failed to send test alert" });
+    }
+  });
+
   // Credits
   app.get("/api/credits", async (_req, res) => {
     try {
