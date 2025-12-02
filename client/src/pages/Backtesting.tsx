@@ -157,7 +157,10 @@ export default function Backtesting() {
   });
 
   const quickBacktestMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("POST", "/api/backtest/start", data),
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/backtest/start", data);
+      return response.json() as Promise<QuickBacktestResult>;
+    },
     onSuccess: (result: QuickBacktestResult) => {
       queryClient.invalidateQueries({ queryKey: ["/api/backtest/results"] });
       setSelectedResult(result);

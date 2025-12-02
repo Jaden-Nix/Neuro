@@ -803,17 +803,27 @@ export class AIInsightsEngine extends EventEmitter {
 
     const data: MarketDataPoint[] = [];
     let price = basePrice[symbol] || 100;
+    let trend = 0;
+    let avgVolume = 3000000;
 
     for (let i = 0; i < 100; i++) {
-      const volatility = 0.02;
-      const change = (Math.random() - 0.48) * volatility;
+      if (i % 15 === 0) {
+        trend = (Math.random() - 0.5) * 0.04;
+      }
+      
+      const volatility = 0.025 + Math.random() * 0.02;
+      const momentumShift = i > 80 ? (Math.random() - 0.3) * 0.03 : 0;
+      const change = trend + momentumShift + (Math.random() - 0.5) * volatility;
       price = price * (1 + change);
 
-      const range = price * (0.005 + Math.random() * 0.015);
+      const range = price * (0.008 + Math.random() * 0.02);
       const open = price - range / 2 + Math.random() * range;
       const close = price;
-      const high = Math.max(open, close) + Math.random() * range * 0.5;
-      const low = Math.min(open, close) - Math.random() * range * 0.5;
+      const high = Math.max(open, close) + Math.random() * range * 0.6;
+      const low = Math.min(open, close) - Math.random() * range * 0.6;
+
+      const volumeSpike = (i > 90 && Math.random() > 0.6) ? 3 + Math.random() * 2 : 1;
+      const volume = avgVolume * (0.7 + Math.random() * 0.6) * volumeSpike;
 
       data.push({
         timestamp: Date.now() - (100 - i) * 3600000,
@@ -821,18 +831,12 @@ export class AIInsightsEngine extends EventEmitter {
         high,
         low,
         close,
-        volume: 1000000 + Math.random() * 5000000,
+        volume,
       });
     }
 
     this.marketDataCache.set(symbol, data);
     console.log(`[AIInsights] Using fallback data for ${symbol}`);
-  }
-
-  async ensureInitialized(): Promise<void> {
-    if (this.initializationPromise) {
-      await this.initializationPromise;
-    }
   }
 
   public analyzeSymbol(symbol: string): AIInsight[] {

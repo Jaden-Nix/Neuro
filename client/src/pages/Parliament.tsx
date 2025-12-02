@@ -596,7 +596,7 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
   const concludeMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", `/api/parliament/${session.id}/conclude`);
-      return response;
+      return response.json();
     },
     onSuccess: (data) => {
       if (data.metaSummary) {
@@ -608,12 +608,13 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
 
   const simulateDebate = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/parliament/${session.id}/live-debate`);
-      if (response.metaSummary) {
-        setMetaSummary(response.metaSummary);
+      const response = await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
+      const data = await response.json();
+      if (data.metaSummary) {
+        setMetaSummary(data.metaSummary);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
-      return response;
+      return data;
     },
   });
 
