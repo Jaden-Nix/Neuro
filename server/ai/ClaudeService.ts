@@ -506,6 +506,24 @@ ${JSON.stringify(trades.slice(-10), null, 2)}`;
     };
   }
 
+  async generateResponse(
+    prompt: string,
+    systemPrompt: string = "You are a helpful DeFi AI assistant. Provide concise, accurate responses."
+  ): Promise<string> {
+    if (!this.isConfigured) {
+      console.warn("[Claude] generateResponse called but service not configured");
+      return "";
+    }
+
+    try {
+      const response = await queryClaudeWithRetry(systemPrompt, prompt, 1024);
+      return response || "";
+    } catch (error) {
+      console.error("[Claude] generateResponse failed:", error);
+      return "";
+    }
+  }
+
   private fallbackScoutDecision(context: MarketContext): AgentDecision {
     const trend = context.priceChange24h && context.priceChange24h > 0 ? "bullish" : "bearish";
     return {

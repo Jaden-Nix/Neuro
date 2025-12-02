@@ -1,4 +1,6 @@
 import { EventEmitter } from "events";
+import { claudeService } from "../ai/ClaudeService";
+import { marketDataService, type BacktestCandle } from "../data/MarketDataService";
 
 export type PatternType =
   | "momentum_shift"
@@ -706,6 +708,17 @@ export class AIInsightsEngine extends EventEmitter {
   private insights: Map<string, AIInsight> = new Map();
   private marketDataCache: Map<string, MarketDataPoint[]> = new Map();
   private analysisInterval: NodeJS.Timer | null = null;
+  private dataInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
+
+  private static readonly SYMBOLS = ["ETH-USD", "BTC-USD", "LINK-USD", "UNI-USD", "AAVE-USD"];
+  private static readonly SYMBOL_MAP: Record<string, string> = {
+    "ETH-USD": "ETHUSDT",
+    "BTC-USD": "BTCUSDT",
+    "LINK-USD": "LINKUSDT",
+    "UNI-USD": "UNIUSDT",
+    "AAVE-USD": "AAVEUSDT",
+  };
 
   constructor() {
     super();
@@ -718,11 +731,68 @@ export class AIInsightsEngine extends EventEmitter {
     this.breakoutDetector = new BreakoutDetector();
     this.divergenceDetector = new DivergenceDetector();
 
-    this.initializeDemoData();
+    this.initializationPromise = this.initializeRealData();
   }
 
-  private initializeDemoData(): void {
-    const symbols = ["ETH-USD", "BTC-USD", "LINK-USD", "UNI-USD", "AAVE-USD"];
+  private async initializeRealData(): Promise<void> {
+    console.log("[AIInsights] Initializing with real market data...");
+    
+    const fetchPromises = AIInsightsEngine.SYMBOLS.map(async (symbol) => {
+      try {
+        const binanceSymbol = AIInsightsEngine.SYMBOL_MAP[symbol];
+        const candles = await marketDataService.getRecentCandles(binanceSymbol, '1h', 100);
+        
+        if (candles.length > 0) {
+          const marketData: MarketDataPoint[] = candles.map((c: BacktestCandle) => ({
+            timestamp: c.timestamp,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+          }));
+          
+          this.marketDataCache.set(symbol, marketData);
+          console.log(`[AIInsights] Loaded ${marketData.length} real candles for ${symbol}`);
+        }
+      } catch (error) {
+        console.warn(`[AIInsights] Failed to fetch real data for ${symbol}, using fallback:`, error);
+        this.initializeFallbackData(symbol);
+      }
+    });
+
+    await Promise.allSettled(fetchPromises);
+    
+    for (const symbol of AIInsightsEngine.SYMBOLS) {
+      if (!this.marketDataCache.has(symbol)) {
+        this.initializeFallbackData(symbol);
+      }
+    }
+    
+    this.dataInitialized = true;
+    console.log("[AIInsights] Real market data initialization complete");
+  }
+
+  public async ensureInitialized(): Promise<void> {
+    if (this.dataInitialized) {
+      return;
+    }
+    
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+    
+    console.log("[AIInsights] ensureInitialized called, starting initialization...");
+    this.initializationPromise = this.initializeRealData();
+    await this.initializationPromise;
+  }
+
+  public isInitialized(): boolean {
+    return this.dataInitialized;
+  }
+
+  private initializeFallbackData(symbol: string): void {
     const basePrice: Record<string, number> = {
       "ETH-USD": 2400,
       "BTC-USD": 42000,
@@ -731,32 +801,37 @@ export class AIInsightsEngine extends EventEmitter {
       "AAVE-USD": 95,
     };
 
-    for (const symbol of symbols) {
-      const data: MarketDataPoint[] = [];
-      let price = basePrice[symbol];
+    const data: MarketDataPoint[] = [];
+    let price = basePrice[symbol] || 100;
 
-      for (let i = 0; i < 100; i++) {
-        const volatility = 0.02;
-        const change = (Math.random() - 0.48) * volatility;
-        price = price * (1 + change);
+    for (let i = 0; i < 100; i++) {
+      const volatility = 0.02;
+      const change = (Math.random() - 0.48) * volatility;
+      price = price * (1 + change);
 
-        const range = price * (0.005 + Math.random() * 0.015);
-        const open = price - range / 2 + Math.random() * range;
-        const close = price;
-        const high = Math.max(open, close) + Math.random() * range * 0.5;
-        const low = Math.min(open, close) - Math.random() * range * 0.5;
+      const range = price * (0.005 + Math.random() * 0.015);
+      const open = price - range / 2 + Math.random() * range;
+      const close = price;
+      const high = Math.max(open, close) + Math.random() * range * 0.5;
+      const low = Math.min(open, close) - Math.random() * range * 0.5;
 
-        data.push({
-          timestamp: Date.now() - (100 - i) * 3600000,
-          open,
-          high,
-          low,
-          close,
-          volume: 1000000 + Math.random() * 5000000,
-        });
-      }
+      data.push({
+        timestamp: Date.now() - (100 - i) * 3600000,
+        open,
+        high,
+        low,
+        close,
+        volume: 1000000 + Math.random() * 5000000,
+      });
+    }
 
-      this.marketDataCache.set(symbol, data);
+    this.marketDataCache.set(symbol, data);
+    console.log(`[AIInsights] Using fallback data for ${symbol}`);
+  }
+
+  async ensureInitialized(): Promise<void> {
+    if (this.initializationPromise) {
+      await this.initializationPromise;
     }
   }
 
@@ -923,35 +998,151 @@ export class AIInsightsEngine extends EventEmitter {
     };
   }
 
-  public generateDemoInsights(): AIInsight[] {
-    this.initializeDemoData();
+  public async generateDemoInsights(): Promise<AIInsight[]> {
+    await this.ensureInitialized();
+    return this.analyzeAllSymbols();
+  }
 
-    for (const symbol of this.marketDataCache.keys()) {
-      const data = this.marketDataCache.get(symbol)!;
-      const lastPoints = data.slice(-10);
-
-      for (let i = 0; i < 3; i++) {
-        const volatility = 0.03 + Math.random() * 0.02;
-        const lastPrice = lastPoints[lastPoints.length - 1].close;
-        const change = (Math.random() - 0.45) * volatility;
-        const newPrice = lastPrice * (1 + change);
-
-        const range = newPrice * (0.01 + Math.random() * 0.02);
-        const open = newPrice - range / 2 + Math.random() * range;
-        const volumeMultiplier = 1 + Math.random() * 2;
-
-        this.updateMarketData(symbol, {
-          timestamp: Date.now() + i * 3600000,
-          open,
-          high: Math.max(open, newPrice) + Math.random() * range,
-          low: Math.min(open, newPrice) - Math.random() * range,
-          close: newPrice,
-          volume: (1000000 + Math.random() * 5000000) * volumeMultiplier,
-        });
+  public async refreshRealData(): Promise<void> {
+    console.log("[AIInsights] Refreshing real market data...");
+    
+    for (const symbol of AIInsightsEngine.SYMBOLS) {
+      try {
+        const binanceSymbol = AIInsightsEngine.SYMBOL_MAP[symbol];
+        const candles = await marketDataService.getRecentCandles(binanceSymbol, '1h', 100);
+        
+        if (candles.length > 0) {
+          const marketData: MarketDataPoint[] = candles.map((c: BacktestCandle) => ({
+            timestamp: c.timestamp,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+          }));
+          
+          this.marketDataCache.set(symbol, marketData);
+        }
+      } catch (error) {
+        console.warn(`[AIInsights] Failed to refresh data for ${symbol}`);
       }
     }
+    
+    console.log("[AIInsights] Real market data refresh complete");
+  }
 
-    return this.analyzeAllSymbols();
+  public async generateAIEnhancedInsights(): Promise<AIInsight[]> {
+    await this.ensureInitialized();
+    
+    const technicalInsights = this.analyzeAllSymbols();
+    const marketRegime = this.detectMarketRegime();
+    
+    if (technicalInsights.length === 0) {
+      return [];
+    }
+
+    const topInsights = technicalInsights
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 5);
+
+    try {
+      const marketContext = this.buildMarketContext();
+      
+      const enhancedInsights = await Promise.all(
+        topInsights.map(async (insight) => {
+          try {
+            const enhanced = await this.enhanceInsightWithClaude(insight, marketContext, marketRegime);
+            return enhanced;
+          } catch {
+            return insight;
+          }
+        })
+      );
+
+      return enhancedInsights;
+    } catch (error) {
+      console.warn("[AIInsights] Claude enhancement failed, returning technical insights:", error);
+      return topInsights;
+    }
+  }
+
+  private buildMarketContext(): string {
+    const snapshots: string[] = [];
+    
+    for (const [symbol, data] of this.marketDataCache) {
+      if (data.length < 10) continue;
+      
+      const recentData = data.slice(-10);
+      const firstPrice = recentData[0].close;
+      const lastPrice = recentData[recentData.length - 1].close;
+      const change = ((lastPrice - firstPrice) / firstPrice) * 100;
+      const avgVolume = recentData.reduce((sum, d) => sum + d.volume, 0) / recentData.length;
+      
+      snapshots.push(`${symbol}: $${lastPrice.toFixed(2)} (${change >= 0 ? '+' : ''}${change.toFixed(2)}%), Vol: ${(avgVolume / 1e6).toFixed(2)}M`);
+    }
+    
+    return snapshots.join('\n');
+  }
+
+  private async enhanceInsightWithClaude(
+    insight: AIInsight,
+    marketContext: string,
+    marketRegime: { regime: MarketRegime; confidence: number; description: string }
+  ): Promise<AIInsight> {
+    const prompt = `You are an expert DeFi analyst. Analyze this trading signal and provide enhanced reasoning.
+
+MARKET CONTEXT:
+${marketContext}
+
+MARKET REGIME: ${marketRegime.regime} (${(marketRegime.confidence * 100).toFixed(0)}% confidence)
+${marketRegime.description}
+
+DETECTED SIGNAL:
+- Pattern: ${insight.pattern}
+- Symbol: ${insight.symbol}
+- Confidence: ${(insight.confidence * 100).toFixed(0)}%
+- Impact: ${insight.impact}
+- Current Analysis: ${insight.reason}
+
+Provide a brief (2-3 sentences) enhanced analysis that:
+1. Validates or challenges the signal based on market context
+2. Identifies any additional risk factors or opportunities
+3. Suggests optimal timing or position sizing
+
+Response format: Just the analysis text, no headers.`;
+
+    try {
+      const response = await claudeService.generateResponse(prompt);
+      
+      if (!response || response.trim().length === 0) {
+        return {
+          ...insight,
+          metadata: {
+            ...insight.metadata,
+            marketRegime: marketRegime.regime,
+          } as AIInsight["metadata"],
+        };
+      }
+      
+      return {
+        ...insight,
+        reason: `${insight.reason}\n\n[AI Enhanced]: ${response.trim()}`,
+        metadata: {
+          ...insight.metadata,
+          aiEnhanced: true,
+          marketRegime: marketRegime.regime,
+        } as AIInsight["metadata"],
+      };
+    } catch (error) {
+      console.warn("[AIInsights] Claude enhancement failed for insight:", insight.id);
+      return {
+        ...insight,
+        metadata: {
+          ...insight.metadata,
+          marketRegime: marketRegime.regime,
+        } as AIInsight["metadata"],
+      };
+    }
   }
 
   public getAvailableSymbols(): string[] {

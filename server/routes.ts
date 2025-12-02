@@ -2303,7 +2303,7 @@ export async function registerRoutes(
           if (agentResult.totalReturn > 5 || agentResult.winRate > 60) {
             // Just pass the agent name - EvolutionEngine handles versioning
             evolutionEngine.evolveAgent(
-              agentResult.agentName,
+              agentResult.agent,
               "backtest_completion",
               {
                 roi: agentResult.totalReturn,
@@ -2404,10 +2404,10 @@ export async function registerRoutes(
     }
   });
 
-  // Generate demo insights for testing
+  // Generate demo insights for testing (uses real market data)
   app.post("/api/insights/demo", async (req, res) => {
     try {
-      const insights = aiInsightsEngine.generateDemoInsights();
+      const insights = await aiInsightsEngine.generateDemoInsights();
       res.json({
         count: insights.length,
         insights,
@@ -2416,6 +2416,40 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Failed to generate demo insights:", error);
       res.status(500).json({ error: error.message || "Failed to generate demo insights" });
+    }
+  });
+
+  // Generate AI-enhanced insights with Claude analysis
+  app.post("/api/insights/ai-enhanced", async (req, res) => {
+    try {
+      await aiInsightsEngine.ensureInitialized();
+      const insights = await aiInsightsEngine.generateAIEnhancedInsights();
+      res.json({
+        count: insights.length,
+        insights,
+        generatedAt: Date.now(),
+        aiEnhanced: true,
+      });
+    } catch (error: any) {
+      console.error("Failed to generate AI-enhanced insights:", error);
+      res.status(500).json({ error: error.message || "Failed to generate AI-enhanced insights" });
+    }
+  });
+
+  // Refresh real market data
+  app.post("/api/insights/refresh", async (req, res) => {
+    try {
+      await aiInsightsEngine.ensureInitialized();
+      await aiInsightsEngine.refreshRealData();
+      const insights = aiInsightsEngine.analyzeAllSymbols();
+      res.json({
+        count: insights.length,
+        insights,
+        refreshedAt: Date.now(),
+      });
+    } catch (error: any) {
+      console.error("Failed to refresh insights:", error);
+      res.status(500).json({ error: error.message || "Failed to refresh insights" });
     }
   });
 
@@ -4059,7 +4093,7 @@ export async function registerRoutes(
       process.stderr.write(`[STRESS STDERR] Run: ${runId}\n`);
       
       const runPromise = storage.getStressTestRun(runId);
-      const run = await Promise.race([runPromise, timeoutPromise]);
+      const run = await Promise.race([runPromise, timeoutPromise]) as any;
       
       if (!run) {
         console.error(`[STRESS] Run not found: ${runId}`);

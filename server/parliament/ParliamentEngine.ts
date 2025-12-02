@@ -7,6 +7,8 @@ import {
   type ExpectedOutcome,
   type ProposalActionType 
 } from "@shared/schema";
+import { claudeService } from "../ai/ClaudeService";
+import { marketDataService } from "../data/MarketDataService";
 
 interface AgentProfile {
   id: string;
@@ -111,27 +113,21 @@ class ParliamentEngine {
     let position = agent.defaultPosition;
     let simulationResults: ParliamentDebateEntry["simulationResults"];
     
-    if (this.adkIntegration) {
-      const prompt = this.buildDebatePrompt(agent, context);
-      const agentName = `neuronet_${agent.type}`;
+    try {
+      const marketData = await this.fetchMarketContext();
+      const prompt = this.buildClaudeDebatePrompt(agent, context, marketData);
       
-      try {
-        const decision = await this.adkIntegration.queryAgent(agentName, prompt, {
-          topic: context.topic,
-          actionType: context.actionType,
-          previousDebates: context.previousDebates.slice(-3),
-        });
-        
-        statement = this.parseResponse(decision.reasoning);
-        position = this.inferPosition(statement, agent.type);
-      } catch (error) {
-        statement = this.generateSimulatedDebate(agent, context);
-      }
-    } else {
+      const response = await claudeService.generateResponse(prompt);
+      statement = this.parseClaudeDebateResponse(response, agent, context);
+      position = this.inferPosition(statement, agent.type);
+      
+      console.log(`[Parliament] ${agent.name} debate generated via Claude AI`);
+    } catch (error) {
+      console.warn(`[Parliament] Claude debate failed for ${agent.name}, using fallback:`, error);
       statement = this.generateSimulatedDebate(agent, context);
     }
     
-    if (agent.type === "risk") {
+    if (agent.type === AgentType.RISK) {
       simulationResults = this.runRiskSimulation(context);
     }
     
@@ -144,6 +140,73 @@ class ParliamentEngine {
       simulationResults,
       timestamp: Date.now(),
     };
+  }
+
+  private async fetchMarketContext(): Promise<string> {
+    try {
+      const [ethPrice, btcPrice, defiSnapshot] = await Promise.all([
+        marketDataService.getCurrentPrice("ETHUSDT").catch(() => 2400),
+        marketDataService.getCurrentPrice("BTCUSDT").catch(() => 42000),
+        marketDataService.getDeFiSnapshot().catch(() => null),
+      ]);
+      
+      let context = `Current Market Data:\n- ETH: $${ethPrice.toFixed(2)}\n- BTC: $${btcPrice.toFixed(2)}`;
+      
+      if (defiSnapshot) {
+        context += `\n- Total DeFi TVL: $${(defiSnapshot.totalTVL / 1e9).toFixed(2)}B`;
+        if (defiSnapshot.topYields && defiSnapshot.topYields.length > 0) {
+          const topYield = defiSnapshot.topYields[0];
+          context += `\n- Top Yield: ${topYield.symbol} at ${topYield.apy?.toFixed(2) || 'N/A'}% APY`;
+        }
+      }
+      
+      return context;
+    } catch {
+      return "Market data temporarily unavailable";
+    }
+  }
+
+  private buildClaudeDebatePrompt(agent: AgentProfile, context: DebateContext, marketData: string): string {
+    const previousPoints = context.previousDebates.length > 0
+      ? context.previousDebates.map(d => `- ${d.agentType.toUpperCase()}: ${d.statement}`).join("\n")
+      : "No previous debate points.";
+
+    return `You are ${agent.name} in a DeFi governance parliament. You must provide your analysis on a proposal.
+
+YOUR ROLE: ${agent.specialization.join(", ")}
+YOUR CREDIT SCORE: ${agent.creditScore}/100
+YOUR HISTORICAL ACCURACY: ${(agent.historicalAccuracy * 100).toFixed(0)}%
+DATA SOURCES: ${this.getDataSources(agent.type).join(", ")}
+
+${marketData}
+
+PROPOSAL: "${context.topic}"
+DESCRIPTION: ${context.description}
+ACTION TYPE: ${context.actionType}
+
+PREVIOUS DEBATE POINTS:
+${previousPoints}
+
+Provide your analysis in 2-3 concise sentences. Focus on:
+${agent.type === AgentType.SCOUT ? "- Opportunity assessment, yield potential, market timing" : ""}
+${agent.type === AgentType.RISK ? "- Security concerns, liquidity risks, smart contract vulnerabilities" : ""}
+${agent.type === AgentType.EXECUTION ? "- Transaction feasibility, gas costs, MEV protection, slippage" : ""}
+${agent.type === AgentType.META ? "- Synthesis of all agent views, conflict resolution, strategic alignment" : ""}
+
+Be specific with numbers and data. Respond with just your analysis statement.`;
+  }
+
+  private parseClaudeDebateResponse(response: string, agent: AgentProfile, context: DebateContext): string {
+    if (!response || response.trim().length === 0) {
+      console.warn(`[Parliament] Empty Claude response for ${agent.name}, using fallback`);
+      return this.generateSimulatedDebate(agent, context);
+    }
+    
+    const cleaned = response.trim();
+    if (cleaned.length > 500) {
+      return cleaned.substring(0, 497) + "...";
+    }
+    return cleaned;
   }
 
   async generateVote(
@@ -160,32 +223,21 @@ class ParliamentEngine {
     let expectedOutcome: ExpectedOutcome | undefined;
     let alternativeSuggestions: string[] = [];
     
-    if (this.adkIntegration) {
-      const prompt = this.buildVotePrompt(agent, context);
-      const agentName = `neuronet_${agent.type}`;
+    try {
+      const marketData = await this.fetchMarketContext();
+      const prompt = this.buildClaudeVotePrompt(agent, context, marketData);
       
-      try {
-        const decision = await this.adkIntegration.queryAgent(agentName, prompt, {
-          topic: context.topic,
-          actionType: context.actionType,
-          debates: context.previousDebates,
-        });
-        
-        const parsed = this.parseVoteResponse(decision);
-        vote = parsed.vote;
-        confidence = parsed.confidence;
-        reasoning = parsed.reasoning;
-        pros = parsed.pros;
-        cons = parsed.cons;
-      } catch (error) {
-        const simulated = this.generateSimulatedVote(agent, context);
-        vote = simulated.vote;
-        confidence = simulated.confidence;
-        reasoning = simulated.reasoning;
-        pros = simulated.pros;
-        cons = simulated.cons;
-      }
-    } else {
+      const response = await claudeService.generateResponse(prompt);
+      const parsed = this.parseClaudeVoteResponse(response, agent);
+      vote = parsed.vote;
+      confidence = parsed.confidence;
+      reasoning = parsed.reasoning;
+      pros = parsed.pros;
+      cons = parsed.cons;
+      
+      console.log(`[Parliament] ${agent.name} vote generated via Claude AI: ${vote} (${confidence}% confidence)`);
+    } catch (error) {
+      console.warn(`[Parliament] Claude vote failed for ${agent.name}, using fallback:`, error);
       const simulated = this.generateSimulatedVote(agent, context);
       vote = simulated.vote;
       confidence = simulated.confidence;
@@ -218,6 +270,82 @@ class ParliamentEngine {
       historicalAccuracy: agent.historicalAccuracy,
       voteWeight,
       timestamp: Date.now(),
+    };
+  }
+
+  private buildClaudeVotePrompt(agent: AgentProfile, context: DebateContext, marketData: string): string {
+    const debateSummary = context.previousDebates.length > 0
+      ? context.previousDebates.map(d => `- ${d.agentType.toUpperCase()} (${d.position}): ${d.statement}`).join("\n")
+      : "No debate entries yet.";
+
+    return `You are ${agent.name} casting your vote on a DeFi governance proposal.
+
+YOUR ROLE: ${agent.specialization.join(", ")}
+YOUR CREDIT SCORE: ${agent.creditScore}/100
+YOUR HISTORICAL ACCURACY: ${(agent.historicalAccuracy * 100).toFixed(0)}%
+
+${marketData}
+
+PROPOSAL: "${context.topic}"
+DESCRIPTION: ${context.description}
+ACTION TYPE: ${context.actionType}
+
+DEBATE SUMMARY:
+${debateSummary}
+
+Cast your vote by responding in this exact JSON format:
+{
+  "vote": "approve" | "reject" | "abstain",
+  "confidence": <number 0-100>,
+  "reasoning": "<2-3 sentence explanation>",
+  "pros": ["<pro 1>", "<pro 2>"],
+  "cons": ["<con 1>", "<con 2>"]
+}
+
+Base your decision on your specialization:
+${agent.type === AgentType.SCOUT ? "Focus on opportunity quality and market timing" : ""}
+${agent.type === AgentType.RISK ? "Focus on security, liquidity, and downside protection" : ""}
+${agent.type === AgentType.EXECUTION ? "Focus on transaction feasibility and execution risks" : ""}
+${agent.type === AgentType.META ? "Synthesize all perspectives and strategic alignment" : ""}`;
+  }
+
+  private parseClaudeVoteResponse(response: string, agent: AgentProfile): {
+    vote: "approve" | "reject" | "abstain";
+    confidence: number;
+    reasoning: string;
+    pros: string[];
+    cons: string[];
+  } {
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          vote: ["approve", "reject", "abstain"].includes(parsed.vote) ? parsed.vote : "abstain",
+          confidence: Math.min(100, Math.max(0, Number(parsed.confidence) || 50)),
+          reasoning: String(parsed.reasoning || "").substring(0, 500),
+          pros: Array.isArray(parsed.pros) ? parsed.pros.slice(0, 3).map(String) : [],
+          cons: Array.isArray(parsed.cons) ? parsed.cons.slice(0, 3).map(String) : [],
+        };
+      }
+    } catch (error) {
+      console.warn("[Parliament] Failed to parse Claude vote response:", error);
+    }
+    
+    const lowerResponse = response.toLowerCase();
+    let vote: "approve" | "reject" | "abstain" = "abstain";
+    if (lowerResponse.includes("approve") || lowerResponse.includes("support")) {
+      vote = "approve";
+    } else if (lowerResponse.includes("reject") || lowerResponse.includes("oppose")) {
+      vote = "reject";
+    }
+    
+    return {
+      vote,
+      confidence: 65,
+      reasoning: response.substring(0, 300),
+      pros: [],
+      cons: [],
     };
   }
 
@@ -664,6 +792,52 @@ Respond in a structured format.`;
       outcome: scenario === "Flash Crash" ? "Portfolio loss: -15%" : "Portfolio gain: +8%",
       confidence: Math.round(60 + Math.random() * 30),
     };
+  }
+
+  async runDebate(
+    topic: string,
+    description: string,
+    actionType: ProposalActionType
+  ): Promise<{
+    debates: ParliamentDebateEntry[];
+    votes: ParliamentVote[];
+    metaSummary: MetaSummary;
+  }> {
+    console.log(`[Parliament] Running full debate on: ${topic}`);
+    
+    const debates: ParliamentDebateEntry[] = [];
+    const votes: ParliamentVote[] = [];
+    const context: DebateContext = {
+      topic,
+      description,
+      actionType,
+      proposalData: {},
+      previousDebates: [],
+      otherAgentVotes: [],
+    };
+
+    for (const agent of AGENT_PROFILES) {
+      const debateEntry = await this.generateDebateEntry(agent, {
+        ...context,
+        previousDebates: debates,
+      });
+      debates.push(debateEntry);
+    }
+
+    for (const agent of AGENT_PROFILES) {
+      const voteEntry = await this.generateVote(agent, {
+        ...context,
+        previousDebates: debates,
+        otherAgentVotes: votes,
+      });
+      votes.push(voteEntry);
+    }
+
+    const { metaSummary } = this.concludeSession(votes, debates);
+
+    console.log(`[Parliament] Debate complete - Recommendation: ${metaSummary.recommendation}`);
+    
+    return { debates, votes, metaSummary };
   }
 }
 

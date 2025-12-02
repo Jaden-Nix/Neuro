@@ -235,7 +235,7 @@ export class MarketDataService {
 
   async getMarketContext(symbol: string): Promise<{
     snapshot: MarketSnapshot;
-    indicators: ReturnType<typeof this.calculateIndicators>;
+    indicators: { sma20: number; sma50: number; rsi: number; volatility: number; trend: 'bullish' | 'bearish' | 'neutral' };
     defi: DeFiSnapshot;
   }> {
     const [candles, snapshot, defi] = await Promise.all([
