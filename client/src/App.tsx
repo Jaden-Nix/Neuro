@@ -16,7 +16,6 @@ import { OnboardingWizard, useOnboarding } from "@/components/OnboardingWizard";
 
 import Dashboard from "@/pages/Dashboard";
 import MLInsights from "@/pages/MLInsights";
-import Governance from "@/pages/Governance";
 // import Marketplace from "@/pages/Marketplace";
 import Alerts from "@/pages/Alerts";
 import Backtesting from "@/pages/Backtesting";
@@ -33,7 +32,6 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/ml" component={MLInsights} />
-      <Route path="/governance" component={Governance} />
       {/* <Route path="/marketplace" component={Marketplace} /> */}
       <Route path="/alerts" component={Alerts} />
       <Route path="/backtesting" component={Backtesting} />

@@ -12,7 +12,6 @@ import {
 import { 
   Zap, 
   Brain, 
-  Shield, 
   LayoutDashboard,
   Store,
   Bell,
@@ -36,12 +35,6 @@ const menuItems = [
     url: "/insights",
     icon: Brain,
     testId: "nav-insights",
-  },
-  {
-    title: "Governance",
-    url: "/governance",
-    icon: Shield,
-    testId: "nav-governance",
   },
   // {
   //   title: "Marketplace",
