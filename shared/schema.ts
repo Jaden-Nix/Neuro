@@ -1470,6 +1470,8 @@ export interface DreamDiscovery {
   potentialValue: number;
   relatedMarkets: string[];
   actionable: boolean;
+  timestamp: number;
+  source?: string;
 }
 
 export interface DreamSession {
@@ -1484,6 +1486,58 @@ export interface DreamSession {
   metabolicRate: number; // Credits consumed per hour
   dreamDepth: number; // How speculative (1-10)
   realTimeMultiplier: number; // 10x means 1 hour explores 10 hours of scenarios
+}
+
+// Dream Mode Enhanced - Morning Report Types
+export interface DreamOpportunity {
+  id: string;
+  protocol: string;
+  pool: string;
+  chain: string;
+  yield: number;
+  riskScore: number;
+  confidence: number;
+  reasoning: string;
+  tvl: number;
+  volume24h: number;
+  timestamp: number;
+}
+
+export interface DreamInsight {
+  id: string;
+  type: "yield_opportunity" | "risk_warning" | "anomaly" | "correlation" | "volatility" | "tvl_change";
+  summary: string;
+  details: string;
+  severity: "info" | "warning" | "critical" | "opportunity";
+  confidence: number;
+  timestamp: number;
+  source: string;
+  data?: Record<string, any>;
+}
+
+export interface AgentDreamLog {
+  agentType: AgentType;
+  message: string;
+  action?: string;
+  timestamp: number;
+}
+
+export interface MorningReport {
+  id: string;
+  sessionId: string;
+  generatedAt: number;
+  sleepDuration: number; // minutes
+  summary: {
+    totalScans: number;
+    opportunitiesFound: number;
+    passedRiskFilter: number;
+    highConfidence: number;
+  };
+  topOpportunities: DreamOpportunity[];
+  insights: DreamInsight[];
+  agentLogs: AgentDreamLog[];
+  recommendedAction: string;
+  marketCondition: "bullish" | "bearish" | "sideways" | "volatile";
 }
 
 export const dreamSessions = pgTable("dream_sessions", {
