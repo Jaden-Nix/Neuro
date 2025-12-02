@@ -68,6 +68,45 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ## Recent Changes
 
+### December 2, 2025 (Enhanced Wallet Tracking - 100% COMPLETE)
+- **DeFi Position Tracking**: Comprehensive multi-protocol DeFi monitoring
+  - `server/wallets/DeFiPositionTracker.ts`: Tracks Lido stETH, Aave V3, Frax sfrxETH
+  - Supports LP positions, staking, lending, borrowing, farming, vaults
+  - Protocol support: Uniswap, Aave, Compound, Curve, Lido, Frax, Convex
+  - Automatic position value and APY tracking
+
+- **Historical Snapshots & PnL Analysis**: Track portfolio performance over time
+  - `WalletSnapshot` type for point-in-time portfolio value recording
+  - `WalletPnLSummary` type for 24h, 7d, 30d profit/loss tracking
+  - Automatic snapshot creation on wallet sync
+  - Value history chart with Recharts visualization
+
+- **Wallet Alert Settings**: Per-wallet configurable alerts
+  - `WalletSettings` type for alert thresholds (large change, health factor, rewards)
+  - Integration with main AlertService for notifications
+  - Configurable sync intervals and auto-sync preferences
+
+- **Schema Extensions** (`shared/schema.ts`):
+  - Added `DeFiPosition`, `DeFiPositionType`, `DeFiProtocol` types
+  - Added `WalletSnapshot`, `WalletSettings`, `WalletPnLSummary` types
+  - Extended `WalletAggregate` with `defiPositionsUsd` field
+
+- **API Routes** (`server/routes.ts`):
+  - `GET /api/wallets/:id/defi` - Get wallet DeFi positions
+  - `GET /api/wallets-defi` - Get all DeFi positions
+  - `GET /api/wallets/:id/snapshots` - Get wallet value history
+  - `GET /api/wallets/:id/pnl` - Get PnL summary
+  - `GET /api/wallets/:id/settings` - Get wallet alert settings
+  - `PATCH /api/wallets/:id/settings` - Update wallet alert settings
+  - `GET /api/wallets/:id/value` - Get full wallet value (tokens + DeFi)
+
+- **Frontend Enhancements** (`client/src/pages/Wallets.tsx`):
+  - DeFi Value stats card showing total DeFi positions
+  - New "DeFi Positions" tab with position cards and protocol summary
+  - Expandable wallet cards with per-wallet DeFi details and PnL
+  - Value history chart using Recharts for trend visualization
+  - Health factor warnings for lending positions
+
 ### December 1, 2025 (Stress Testing - FULLY WORKING)
 - **Synchronous Stress Test Execution**: Fixed and working
   - `/api/stress/runs/:id/execute` completes instantly with real results
@@ -141,7 +180,7 @@ Frontend state is managed using React Query for server state and caching, with a
 ### UI Pages
 - `client/src/pages/Alerts.tsx`: Alert configuration and history
 - `client/src/pages/Backtesting.tsx`: Scenario management and run visualization
-- `client/src/pages/Wallets.tsx`: Multi-wallet dashboard with chain breakdown
+- `client/src/pages/Wallets.tsx`: Multi-wallet dashboard with DeFi positions, PnL tracking, and expandable wallet details
 - `client/src/pages/StressTesting.tsx`: Stress test creation, execution, and results
 
 ## Important Implementation Notes

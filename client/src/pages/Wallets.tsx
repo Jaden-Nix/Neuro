@@ -536,6 +536,99 @@ export default function Wallets() {
                       </div>
                     </div>
                   )}
+                  
+                  {selectedWallet === wallet.id && (
+                    <div className="mt-4 pt-4 border-t space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-medium flex items-center gap-2">
+                            <Landmark className="h-4 w-4 text-purple-500" />
+                            DeFi Positions
+                          </h4>
+                          {selectedWalletDefi.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No DeFi positions found</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {selectedWalletDefi.map((pos) => (
+                                <div key={pos.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50">
+                                  <div>
+                                    <p className="text-sm font-medium">{pos.name}</p>
+                                    <p className="text-xs text-muted-foreground">{pos.protocol.toUpperCase()} - {pos.type}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-sm font-bold text-green-500">${pos.stakedValueUsd.toFixed(2)}</p>
+                                    {pos.apy && <p className="text-xs text-purple-500">{pos.apy.toFixed(1)}% APY</p>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-medium flex items-center gap-2">
+                            {selectedWalletPnl && selectedWalletPnl.pnl24h >= 0 ? (
+                              <TrendingUp className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 text-red-500" />
+                            )}
+                            PnL Summary
+                          </h4>
+                          {!selectedWalletPnl ? (
+                            <p className="text-sm text-muted-foreground">No PnL data yet. Sync wallet to track.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50">
+                                <span className="text-sm text-muted-foreground">24h</span>
+                                <span className={`text-sm font-bold ${selectedWalletPnl.pnl24h >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                  {selectedWalletPnl.pnl24h >= 0 ? "+" : ""}{selectedWalletPnl.pnl24h.toFixed(2)} ({selectedWalletPnl.pnl24hPercentage.toFixed(2)}%)
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50">
+                                <span className="text-sm text-muted-foreground">7d</span>
+                                <span className={`text-sm font-bold ${selectedWalletPnl.pnl7d >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                  {selectedWalletPnl.pnl7d >= 0 ? "+" : ""}{selectedWalletPnl.pnl7d.toFixed(2)} ({selectedWalletPnl.pnl7dPercentage.toFixed(2)}%)
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50">
+                                <span className="text-sm text-muted-foreground">30d</span>
+                                <span className={`text-sm font-bold ${selectedWalletPnl.pnl30d >= 0 ? "text-green-500" : "text-red-500"}`}>
+                                  {selectedWalletPnl.pnl30d >= 0 ? "+" : ""}{selectedWalletPnl.pnl30d.toFixed(2)} ({selectedWalletPnl.pnl30dPercentage.toFixed(2)}%)
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-purple-500/10">
+                                <span className="text-sm font-medium">Total Value</span>
+                                <span className="text-sm font-bold">${selectedWalletPnl.currentValueUsd.toFixed(2)}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {selectedWalletSnapshots.length > 1 && (
+                        <div className="pt-2">
+                          <h4 className="text-sm font-medium mb-2">Value History</h4>
+                          <div className="h-[150px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <LineChart data={selectedWalletSnapshots.slice(-20).map(s => ({
+                                time: new Date(s.timestamp).toLocaleDateString(),
+                                value: s.totalValueUsd,
+                              }))}>
+                                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                <XAxis dataKey="time" tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                                <YAxis tick={{ fontSize: 10 }} className="text-muted-foreground" />
+                                <RechartsTooltip 
+                                  contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                                  labelStyle={{ color: 'hsl(var(--foreground))' }}
+                                />
+                                <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))
