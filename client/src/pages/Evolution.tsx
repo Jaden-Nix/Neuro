@@ -23,158 +23,429 @@ import {
   Target,
   Skull,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Activity,
+  BarChart3,
+  Flame,
+  LineChart,
+  ArrowRight,
+  RefreshCw,
+  AlertCircle
 } from "lucide-react";
-type AgentTypeKey = "meta" | "scout" | "risk" | "execution";
 
-interface AgentMutation {
-  trait: string;
-  previousValue: unknown;
-  newValue: unknown;
-  reason: string;
-  performanceImpact?: number;
+interface MutationType {
+  type: string;
+  parameterName: string;
+  previousValue: number | string | boolean;
+  newValue: number | string | boolean;
+  mutationStrength: number;
 }
 
-interface AgentEvolution {
+interface PerformanceImpact {
+  roiBefore: number;
+  roiAfter: number;
+  roiChange: number;
+  sharpeBefore: number;
+  sharpeAfter: number;
+  sharpeChange: number;
+  winRateBefore: number;
+  winRateAfter: number;
+  winRateChange: number;
+  drawdownBefore: number;
+  drawdownAfter: number;
+  drawdownChange: number;
+}
+
+interface EvolutionEvent {
   id: string;
-  agentId: string;
-  parentAgentId?: string | null;
-  generation: number;
-  mutations: AgentMutation[];
-  inheritedTraits: string[];
-  performanceScore: number;
-  survivalScore: number;
-  reproductionScore: number;
-  spawnedAt: string | number;
-  retiredAt?: string | number;
-  retirementReason?: string;
+  parentAgentName: string;
+  childAgentName: string;
+  parentGeneration: number;
+  childGeneration: number;
+  mutation: MutationType;
+  trigger: string;
+  reason: string;
+  performanceImpact: PerformanceImpact;
+  backtestScores: { before: number; after: number };
+  timestamp: number;
 }
+
+interface MutationStats {
+  type: string;
+  totalApplications: number;
+  successfulApplications: number;
+  averagePerformanceImpact: number;
+  successRate: number;
+  lastApplied: number;
+}
+
+interface EvolutionStats {
+  totalGenerations: number;
+  totalMutations: number;
+  totalAgents: number;
+  activeAgents: number;
+  retiredAgents: number;
+  averageLineageStrength: number;
+  mostSuccessfulMutation: string | null;
+  mutationHeatmap: Record<string, MutationStats>;
+  generationDistribution: Record<number, number>;
+  performanceTrend: number[];
+}
+
+interface AgentGenealogy {
+  agentName: string;
+  generation: number;
+  parentName: string | null;
+  children: string[];
+  totalDescendants: number;
+  lineageStrength: number;
+  createdAt: number;
+  isActive: boolean;
+  retiredAt?: number;
+  retirementReason?: string;
+  cumulativePerformance: number;
+}
+
+interface GenealogyTree {
+  nodes: AgentGenealogy[];
+  edges: { from: string; to: string }[];
+}
+
+const mutationTypeLabels: Record<string, string> = {
+  threshold_adjustment: "Threshold Adjustment",
+  risk_rebalancing: "Risk Rebalancing",
+  source_weight_shift: "Source Weight Shift",
+  new_signal_enabled: "New Signal Enabled",
+  signal_disabled: "Signal Disabled",
+  latency_penalty_reduction: "Latency Optimization",
+  failover_strategy_update: "Failover Strategy",
+  confidence_calibration: "Confidence Calibration",
+  volatility_adaptation: "Volatility Adaptation",
+  slippage_optimization: "Slippage Optimization"
+};
 
 const agentColors: Record<string, string> = {
-  meta: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  scout: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  risk: "bg-red-500/20 text-red-400 border-red-500/30",
-  execution: "bg-green-500/20 text-green-400 border-green-500/30",
+  Atlas: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  Vega: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  Nova: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  Sentinel: "bg-green-500/20 text-green-400 border-green-500/30",
+  Arbiter: "bg-red-500/20 text-red-400 border-red-500/30"
 };
 
 const agentIcons: Record<string, typeof Brain> = {
-  meta: Brain,
-  scout: Search,
-  risk: Shield,
-  execution: Target,
+  Atlas: Brain,
+  Vega: Search,
+  Nova: Target,
+  Sentinel: Shield,
+  Arbiter: Activity
 };
 
-function getAgentTypeFromId(agentId: string): string {
-  if (agentId.includes("meta")) return "meta";
-  if (agentId.includes("scout")) return "scout";
-  if (agentId.includes("risk")) return "risk";
-  if (agentId.includes("exec")) return "execution";
-  return "meta";
+function getAgentBaseName(agentName: string): string {
+  return agentName.replace(/_v\d+$/, '');
 }
 
-function EvolutionNode({ evolution, isRoot, onClick }: { evolution: AgentEvolution; isRoot?: boolean; onClick: () => void }) {
-  const agentType = getAgentTypeFromId(evolution.agentId);
-  const Icon = agentIcons[agentType] || Brain;
-  const isRetired = !!evolution.retiredAt;
+function getAgentColor(agentName: string): string {
+  const baseName = getAgentBaseName(agentName);
+  return agentColors[baseName] || "bg-primary/20 text-primary border-primary/30";
+}
 
+function getAgentIcon(agentName: string): typeof Brain {
+  const baseName = getAgentBaseName(agentName);
+  return agentIcons[baseName] || Brain;
+}
+
+function StatCard({ icon: Icon, label, value, subValue, color }: {
+  icon: typeof Brain;
+  label: string;
+  value: string | number;
+  subValue?: string;
+  color: string;
+}) {
   return (
-    <div 
-      className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all hover-elevate ${
-        isRetired ? "opacity-60 border-dashed" : ""
-      } ${agentColors[agentType]}`}
-      onClick={onClick}
-      data-testid={`card-evolution-${evolution.agentId}`}
-    >
-      {!isRoot && (
-        <div className="absolute -top-8 left-1/2 w-px h-8 bg-border" />
-      )}
-      
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`p-2 rounded-full ${agentColors[agentType]}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold truncate">{evolution.agentId}</span>
-            <Badge variant="outline" className="text-xs">Gen {evolution.generation}</Badge>
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${color}`}>
+            <Icon className="w-5 h-5" />
           </div>
-          {isRetired && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Skull className="w-3 h-3" /> Retired
-            </span>
-          )}
+          <div>
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {subValue && (
+              <p className="text-xs text-muted-foreground">{subValue}</p>
+            )}
+          </div>
         </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <div className="p-2 rounded bg-background/50">
-          <Trophy className="w-4 h-4 mx-auto mb-1 text-yellow-400" />
-          <p className="font-medium">{evolution.performanceScore}</p>
-          <p className="text-muted-foreground">Perf</p>
-        </div>
-        <div className="p-2 rounded bg-background/50">
-          <Shield className="w-4 h-4 mx-auto mb-1 text-green-400" />
-          <p className="font-medium">{evolution.survivalScore}</p>
-          <p className="text-muted-foreground">Surv</p>
-        </div>
-        <div className="p-2 rounded bg-background/50">
-          <GitFork className="w-4 h-4 mx-auto mb-1 text-blue-400" />
-          <p className="font-medium">{evolution.reproductionScore}</p>
-          <p className="text-muted-foreground">Repro</p>
-        </div>
-      </div>
-
-      {evolution.mutations.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-border/50">
-          <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-            <Dna className="w-3 h-3" />
-            {evolution.mutations.length} mutations
-          </p>
-        </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function MutationCard({ mutation }: { mutation: AgentMutation }) {
-  const isPositive = (mutation.performanceImpact || 0) > 0;
-  
+function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
+  if (events.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <p>No evolution events yet</p>
+        <p className="text-sm">Generate demo data to see agent evolution</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-3 rounded-lg bg-muted/50 border">
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex items-center gap-2">
-          <Dna className="w-4 h-4 text-primary" />
-          <span className="font-medium capitalize">{mutation.trait}</span>
-        </div>
-        {mutation.performanceImpact !== undefined && (
-          <Badge variant={isPositive ? "default" : "destructive"} className="flex items-center gap-1">
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            {isPositive ? "+" : ""}{mutation.performanceImpact}%
-          </Badge>
-        )}
-      </div>
-      <p className="text-sm text-muted-foreground">{mutation.reason}</p>
-      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-        <span className="line-through opacity-50">{String(mutation.previousValue)}</span>
-        <ChevronRight className="w-3 h-3" />
-        <span className="font-medium text-foreground">{String(mutation.newValue)}</span>
-      </div>
+    <div className="space-y-4">
+      {events.map((event) => {
+        const Icon = getAgentIcon(event.childAgentName);
+        const isPositive = event.performanceImpact.roiChange > 0;
+
+        return (
+          <div 
+            key={event.id} 
+            className={`p-4 rounded-lg border ${getAgentColor(event.childAgentName)}`}
+            data-testid={`card-evolution-event-${event.id}`}
+          >
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-background/50">
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{event.parentAgentName}</span>
+                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-semibold">{event.childAgentName}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(event.timestamp).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-xs">
+                  Gen {event.childGeneration}
+                </Badge>
+                <Badge 
+                  variant={isPositive ? "default" : "destructive"} 
+                  className="flex items-center gap-1"
+                >
+                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  {isPositive ? "+" : ""}{event.performanceImpact.roiChange.toFixed(1)}%
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="p-2 rounded bg-background/30">
+                <p className="text-xs text-muted-foreground mb-1">Mutation</p>
+                <p className="text-sm font-medium flex items-center gap-1">
+                  <Dna className="w-3 h-3" />
+                  {mutationTypeLabels[event.mutation.type] || event.mutation.type}
+                </p>
+              </div>
+              <div className="p-2 rounded bg-background/30">
+                <p className="text-xs text-muted-foreground mb-1">Trigger</p>
+                <p className="text-sm font-medium capitalize">
+                  {event.trigger.replace(/_/g, ' ')}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-2 rounded bg-background/30">
+              <p className="text-xs text-muted-foreground mb-1">Parameter Change</p>
+              <p className="text-sm flex items-center gap-2">
+                <span className="opacity-60 line-through">{String(event.mutation.previousValue)}</span>
+                <ChevronRight className="w-3 h-3" />
+                <span className="font-medium">{String(event.mutation.newValue)}</span>
+                <span className="text-xs text-muted-foreground">
+                  ({event.mutation.parameterName})
+                </span>
+              </p>
+            </div>
+
+            <p className="text-sm text-muted-foreground mt-2 italic">
+              "{event.reason}"
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onBack: () => void }) {
-  const agentType = getAgentTypeFromId(evolution.agentId);
-  const Icon = agentIcons[agentType] || Brain;
+function MutationHeatmap({ heatmap }: { heatmap: Record<string, MutationStats> }) {
+  const entries = Object.entries(heatmap).sort((a, b) => 
+    b[1].totalApplications - a[1].totalApplications
+  );
 
-  const { data: children = [] } = useQuery<AgentEvolution[]>({
-    queryKey: ["/api/evolution", { parentAgentId: evolution.agentId }],
+  const maxApplications = Math.max(...entries.map(([, stats]) => stats.totalApplications), 1);
+
+  return (
+    <div className="space-y-3">
+      {entries.map(([type, stats]) => {
+        const intensity = stats.totalApplications / maxApplications;
+        const isSuccessful = stats.successRate > 0.5;
+
+        return (
+          <div key={type} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">
+                {mutationTypeLabels[type] || type}
+              </span>
+              <div className="flex items-center gap-2">
+                <Badge 
+                  variant={stats.totalApplications > 0 ? (isSuccessful ? "default" : "secondary") : "outline"}
+                  className="text-xs"
+                >
+                  {stats.totalApplications} uses
+                </Badge>
+                {stats.totalApplications > 0 && (
+                  <span className={`text-xs ${isSuccessful ? "text-green-400" : "text-muted-foreground"}`}>
+                    {(stats.successRate * 100).toFixed(0)}% success
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+              <div 
+                className={`absolute inset-y-0 left-0 rounded-full transition-all ${
+                  stats.totalApplications === 0 
+                    ? "bg-muted-foreground/20" 
+                    : isSuccessful 
+                      ? "bg-green-500" 
+                      : "bg-orange-500"
+                }`}
+                style={{ width: `${intensity * 100}%` }}
+              />
+            </div>
+            {stats.totalApplications > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Avg impact: {stats.averagePerformanceImpact > 0 ? "+" : ""}{stats.averagePerformanceImpact.toFixed(1)}% ROI
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function GenealogyTreeView({ tree, onSelectAgent }: { 
+  tree: GenealogyTree; 
+  onSelectAgent: (agent: AgentGenealogy) => void;
+}) {
+  const generations = tree.nodes.reduce((acc, node) => {
+    const gen = node.generation;
+    if (!acc[gen]) acc[gen] = [];
+    acc[gen].push(node);
+    return acc;
+  }, {} as Record<number, AgentGenealogy[]>);
+
+  const sortedGens = Object.keys(generations).map(Number).sort((a, b) => a - b);
+
+  if (sortedGens.length === 0) {
+    return (
+      <Card className="border-dashed">
+        <CardContent className="py-12">
+          <div className="text-center">
+            <GitBranch className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+            <h3 className="text-lg font-semibold mb-2">No Genealogy Data Yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Generate demo evolutions to see the agent family tree
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {sortedGens.map((gen) => (
+        <div key={gen} className="relative">
+          <div className="sticky top-0 z-10 bg-background py-2 mb-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-sm">
+                Generation {gen}
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                {generations[gen].length} agent{generations[gen].length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {generations[gen].map((agent) => {
+              const Icon = getAgentIcon(agent.agentName);
+              
+              return (
+                <div
+                  key={agent.agentName}
+                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all hover-elevate ${
+                    !agent.isActive ? "opacity-60 border-dashed" : ""
+                  } ${getAgentColor(agent.agentName)}`}
+                  onClick={() => onSelectAgent(agent)}
+                  data-testid={`card-genealogy-${agent.agentName}`}
+                >
+                  {gen > 1 && (
+                    <div className="absolute -top-6 left-1/2 w-px h-6 bg-border" />
+                  )}
+                  
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="p-2 rounded-full bg-background/50">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{agent.agentName}</p>
+                      {!agent.isActive && (
+                        <span className="text-xs flex items-center gap-1">
+                          <Skull className="w-3 h-3" /> Retired
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                    <div className="p-1.5 rounded bg-background/50">
+                      <Trophy className="w-3 h-3 mx-auto mb-0.5 text-yellow-400" />
+                      <p className="font-medium">{agent.cumulativePerformance.toFixed(1)}%</p>
+                    </div>
+                    <div className="p-1.5 rounded bg-background/50">
+                      <GitFork className="w-3 h-3 mx-auto mb-0.5 text-blue-400" />
+                      <p className="font-medium">{agent.totalDescendants}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">Lineage</span>
+                      <span>{agent.lineageStrength.toFixed(0)}%</span>
+                    </div>
+                    <Progress value={agent.lineageStrength} className="h-1" />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => void }) {
+  const Icon = getAgentIcon(agent.agentName);
+
+  const { data: events = [] } = useQuery<EvolutionEvent[]>({
+    queryKey: ["/api/evolution/engine/history"],
   });
+
+  const agentEvents = events.filter(
+    e => e.parentAgentName === agent.agentName || e.childAgentName === agent.agentName
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" onClick={onBack} data-testid="button-back-evolution">
+        <Button variant="ghost" onClick={onBack} data-testid="button-back-genealogy">
           <ChevronRight className="w-4 h-4 rotate-180 mr-2" />
           Back to Tree
         </Button>
@@ -184,18 +455,23 @@ function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onB
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-full ${agentColors[agentType]}`}>
+              <div className={`p-3 rounded-full ${getAgentColor(agent.agentName)}`}>
                 <Icon className="w-8 h-8" />
               </div>
               <div>
                 <CardTitle className="flex items-center gap-2">
-                  {evolution.agentId}
-                  <Badge variant="outline">Generation {evolution.generation}</Badge>
+                  {agent.agentName}
+                  <Badge variant="outline">Generation {agent.generation}</Badge>
+                  {agent.isActive ? (
+                    <Badge variant="default" className="bg-green-500/20 text-green-400">Active</Badge>
+                  ) : (
+                    <Badge variant="secondary">Retired</Badge>
+                  )}
                 </CardTitle>
                 <CardDescription>
-                  {evolution.retiredAt 
-                    ? `Retired: ${evolution.retirementReason || "Unknown reason"}`
-                    : "Active in the gene pool"
+                  {agent.retiredAt 
+                    ? `Retired: ${agent.retirementReason || "Unknown reason"}`
+                    : "Active in the evolution pool"
                   }
                 </CardDescription>
               </div>
@@ -205,65 +481,36 @@ function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onB
             <div className="grid gap-4 sm:grid-cols-3 mb-6">
               <div className="text-center p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
                 <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-400" />
-                <p className="text-3xl font-bold">{evolution.performanceScore}</p>
-                <p className="text-sm text-muted-foreground">Performance Score</p>
+                <p className="text-3xl font-bold">{agent.cumulativePerformance.toFixed(1)}%</p>
+                <p className="text-sm text-muted-foreground">Cumulative ROI</p>
               </div>
               <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/30">
-                <Shield className="w-8 h-8 mx-auto mb-2 text-green-400" />
-                <p className="text-3xl font-bold">{evolution.survivalScore}</p>
-                <p className="text-sm text-muted-foreground">Survival Score</p>
+                <Sparkles className="w-8 h-8 mx-auto mb-2 text-green-400" />
+                <p className="text-3xl font-bold">{agent.lineageStrength.toFixed(0)}%</p>
+                <p className="text-sm text-muted-foreground">Lineage Strength</p>
               </div>
               <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
                 <GitFork className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-                <p className="text-3xl font-bold">{evolution.reproductionScore}</p>
-                <p className="text-sm text-muted-foreground">Reproduction Score</p>
+                <p className="text-3xl font-bold">{agent.totalDescendants}</p>
+                <p className="text-sm text-muted-foreground">Descendants</p>
               </div>
             </div>
 
-            <Tabs defaultValue="mutations">
-              <TabsList>
-                <TabsTrigger value="mutations">
-                  <Dna className="w-4 h-4 mr-2" />
-                  Mutations ({evolution.mutations.length})
-                </TabsTrigger>
-                <TabsTrigger value="traits">
-                  <Sparkles className="w-4 h-4 mr-2" />
-                  Inherited ({evolution.inheritedTraits.length})
-                </TabsTrigger>
-              </TabsList>
-              <TabsContent value="mutations" className="mt-4">
-                {evolution.mutations.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Dna className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No mutations recorded</p>
-                    <p className="text-sm">This agent is genetically pure</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {evolution.mutations.map((mutation, idx) => (
-                      <MutationCard key={idx} mutation={mutation} />
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="traits" className="mt-4">
-                {evolution.inheritedTraits.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>No inherited traits</p>
-                    <p className="text-sm">First generation agent</p>
-                  </div>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {evolution.inheritedTraits.map((trait, idx) => (
-                      <Badge key={idx} variant="secondary" className="text-sm">
-                        {trait}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            <Separator className="my-4" />
+
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5" />
+              Evolution History
+            </h3>
+
+            {agentEvents.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Dna className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No evolution events for this agent</p>
+              </div>
+            ) : (
+              <EvolutionTimeline events={agentEvents} />
+            )}
           </CardContent>
         </Card>
 
@@ -280,19 +527,19 @@ function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onB
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 rounded-full bg-green-400" />
                   <div>
-                    <p className="text-sm font-medium">Spawned</p>
+                    <p className="text-sm font-medium">Created</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(evolution.spawnedAt).toLocaleString()}
+                      {new Date(agent.createdAt).toLocaleString()}
                     </p>
                   </div>
                 </div>
-                {evolution.retiredAt && (
+                {agent.retiredAt && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-red-400" />
                     <div>
                       <p className="text-sm font-medium">Retired</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(evolution.retiredAt).toLocaleString()}
+                        {new Date(agent.retiredAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
@@ -301,39 +548,37 @@ function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onB
             </CardContent>
           </Card>
 
-          {evolution.parentAgentId && (
+          {agent.parentName && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <GitBranch className="w-5 h-5" />
-                  Lineage
+                  Parent
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-3 rounded-lg bg-muted/50 border">
-                  <p className="text-sm text-muted-foreground">Parent Agent</p>
-                  <p className="font-medium">{evolution.parentAgentId}</p>
+                <div className={`p-3 rounded-lg border ${getAgentColor(agent.parentName)}`}>
+                  <p className="font-medium">{agent.parentName}</p>
+                  <p className="text-xs text-muted-foreground">Previous generation</p>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {children.length > 0 && (
+          {agent.children.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <GitFork className="w-5 h-5" />
-                  Offspring
+                  Children ({agent.children.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {children.map((child) => (
-                    <div key={child.id} className="p-3 rounded-lg bg-muted/50 border">
-                      <p className="font-medium">{child.agentId}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Gen {child.generation} - Score: {child.performanceScore}
-                      </p>
+                  {agent.children.map((child) => (
+                    <div key={child} className={`p-3 rounded-lg border ${getAgentColor(child)}`}>
+                      <p className="font-medium">{child}</p>
+                      <p className="text-xs text-muted-foreground">Evolved offspring</p>
                     </div>
                   ))}
                 </div>
@@ -346,177 +591,198 @@ function EvolutionDetail({ evolution, onBack }: { evolution: AgentEvolution; onB
   );
 }
 
-function EvolutionTree({ evolutions, onSelect }: { evolutions: AgentEvolution[]; onSelect: (e: AgentEvolution) => void }) {
-  const generations = evolutions.reduce((acc, ev) => {
-    const gen = ev.generation;
-    if (!acc[gen]) acc[gen] = [];
-    acc[gen].push(ev);
-    return acc;
-  }, {} as Record<number, AgentEvolution[]>);
-
-  const sortedGens = Object.keys(generations).map(Number).sort((a, b) => a - b);
-
-  if (sortedGens.length === 0) {
-    return (
-      <Card className="border-dashed">
-        <CardContent className="py-12">
-          <div className="text-center">
-            <GitBranch className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-            <h3 className="text-lg font-semibold mb-2">No Evolution Data Yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Agent evolution tracking will appear as agents spawn and evolve
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-8">
-      {sortedGens.map((gen) => (
-        <div key={gen} className="relative">
-          <div className="sticky top-0 z-10 bg-background py-2 mb-4">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-sm">
-                Generation {gen}
-              </Badge>
-              <span className="text-sm text-muted-foreground">
-                {generations[gen].length} agent{generations[gen].length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {generations[gen].map((evolution) => (
-              <EvolutionNode 
-                key={evolution.id} 
-                evolution={evolution} 
-                isRoot={gen === 1}
-                onClick={() => onSelect(evolution)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export default function Evolution() {
-  const [selectedEvolution, setSelectedEvolution] = useState<AgentEvolution | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState<AgentGenealogy | null>(null);
+  const [activeTab, setActiveTab] = useState("timeline");
 
-  const { data: evolutions = [], isLoading } = useQuery<AgentEvolution[]>({
-    queryKey: ["/api/evolution"],
+  const { data: stats, isLoading: statsLoading } = useQuery<EvolutionStats>({
+    queryKey: ["/api/evolution/engine/stats"],
     refetchInterval: 5000,
   });
 
-  const seedMutation = useMutation({
-    mutationFn: async () => {
-      const agents = [
-        { agentId: "meta-001", parentAgentId: null, generation: 1, performanceScore: 85, survivalScore: 90, reproductionScore: 3 },
-        { agentId: "scout-001", parentAgentId: null, generation: 1, performanceScore: 78, survivalScore: 85, reproductionScore: 2 },
-        { agentId: "risk-001", parentAgentId: null, generation: 1, performanceScore: 92, survivalScore: 95, reproductionScore: 4 },
-        { agentId: "exec-001", parentAgentId: null, generation: 1, performanceScore: 70, survivalScore: 75, reproductionScore: 1 },
-        { agentId: "meta-002", parentAgentId: "meta-001", generation: 2, performanceScore: 88, survivalScore: 87, reproductionScore: 1, mutations: [{ trait: "risk_tolerance", previousValue: 0.5, newValue: 0.7, reason: "Adapted to volatile markets", performanceImpact: 5 }], inheritedTraits: ["cautious", "analytical"] },
-        { agentId: "scout-002", parentAgentId: "scout-001", generation: 2, performanceScore: 82, survivalScore: 80, reproductionScore: 0, mutations: [{ trait: "speed", previousValue: 100, newValue: 150, reason: "Optimized for faster arbitrage", performanceImpact: 8 }], inheritedTraits: ["curious", "energetic"] },
-      ];
+  const { data: history = [], isLoading: historyLoading } = useQuery<EvolutionEvent[]>({
+    queryKey: ["/api/evolution/engine/history"],
+    refetchInterval: 5000,
+  });
 
-      for (const agent of agents) {
-        await apiRequest("POST", "/api/evolution", agent);
-      }
+  const { data: tree, isLoading: treeLoading } = useQuery<GenealogyTree>({
+    queryKey: ["/api/evolution/engine/genealogy"],
+    refetchInterval: 5000,
+  });
+
+  const generateDemoMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/evolution/engine/demo");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/evolution"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/genealogy"] });
     },
   });
 
-  if (selectedEvolution) {
-    return <EvolutionDetail evolution={selectedEvolution} onBack={() => setSelectedEvolution(null)} />;
+  if (selectedAgent) {
+    return <AgentDetail agent={selectedAgent} onBack={() => setSelectedAgent(null)} />;
   }
 
-  const totalAgents = evolutions.length;
-  const activeAgents = evolutions.filter(e => !e.retiredAt).length;
-  const totalMutations = evolutions.reduce((sum, e) => sum + e.mutations.length, 0);
-  const avgPerformance = totalAgents > 0 
-    ? Math.round(evolutions.reduce((sum, e) => sum + e.performanceScore, 0) / totalAgents)
-    : 0;
+  const isLoading = statsLoading || historyLoading || treeLoading;
+  const hasData = (stats?.totalMutations ?? 0) > 0;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3" data-testid="text-evolution-title">
             <GitBranch className="w-8 h-8 text-primary" />
-            Agent Evolution Tree
+            Evolution Tree
           </h1>
           <p className="text-muted-foreground mt-1">
             Track agent genealogy, mutations, and performance inheritance
           </p>
         </div>
-        {evolutions.length === 0 && (
-          <Button onClick={() => seedMutation.mutate()} disabled={seedMutation.isPending} data-testid="button-seed-evolution">
+        <Button 
+          onClick={() => generateDemoMutation.mutate()} 
+          disabled={generateDemoMutation.isPending}
+          data-testid="button-generate-demo"
+        >
+          {generateDemoMutation.isPending ? (
+            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
             <Zap className="w-4 h-4 mr-2" />
-            {seedMutation.isPending ? "Seeding..." : "Seed Demo Data"}
-          </Button>
-        )}
+          )}
+          {generateDemoMutation.isPending ? "Generating..." : "Generate Demo Evolutions"}
+        </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <GitBranch className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalAgents}</p>
-                <p className="text-sm text-muted-foreground">Total Agents</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Zap className="w-5 h-5 text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{activeAgents}</p>
-                <p className="text-sm text-muted-foreground">Active</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10">
-                <Dna className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{totalMutations}</p>
-                <p className="text-sm text-muted-foreground">Mutations</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-yellow-500/10">
-                <Trophy className="w-5 h-5 text-yellow-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{avgPerformance}</p>
-                <p className="text-sm text-muted-foreground">Avg Performance</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <StatCard 
+          icon={GitBranch}
+          label="Generations"
+          value={stats?.totalGenerations ?? 0}
+          color="bg-primary/10 text-primary"
+        />
+        <StatCard 
+          icon={Dna}
+          label="Mutations"
+          value={stats?.totalMutations ?? 0}
+          color="bg-purple-500/10 text-purple-400"
+        />
+        <StatCard 
+          icon={Zap}
+          label="Active Agents"
+          value={stats?.activeAgents ?? 0}
+          subValue={`${stats?.retiredAgents ?? 0} retired`}
+          color="bg-green-500/10 text-green-400"
+        />
+        <StatCard 
+          icon={Sparkles}
+          label="Avg Lineage"
+          value={`${stats?.averageLineageStrength ?? 0}%`}
+          color="bg-yellow-500/10 text-yellow-400"
+        />
+        <StatCard 
+          icon={Trophy}
+          label="Best Mutation"
+          value={stats?.mostSuccessfulMutation 
+            ? mutationTypeLabels[stats.mostSuccessfulMutation]?.split(' ')[0] || "-"
+            : "-"
+          }
+          color="bg-orange-500/10 text-orange-400"
+        />
       </div>
 
-      <EvolutionTree evolutions={evolutions} onSelect={setSelectedEvolution} />
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="timeline" className="flex items-center gap-2">
+            <Activity className="w-4 h-4" />
+            Timeline
+          </TabsTrigger>
+          <TabsTrigger value="genealogy" className="flex items-center gap-2">
+            <GitFork className="w-4 h-4" />
+            Genealogy Tree
+          </TabsTrigger>
+          <TabsTrigger value="heatmap" className="flex items-center gap-2">
+            <Flame className="w-4 h-4" />
+            Mutation Heatmap
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="timeline" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="w-5 h-5" />
+                Recent Evolution Events
+              </CardTitle>
+              <CardDescription>
+                Latest mutations and performance changes across all agents
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <ScrollArea className="h-[600px] pr-4">
+                  <EvolutionTimeline events={history} />
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="genealogy" className="mt-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : tree ? (
+            <GenealogyTreeView 
+              tree={tree} 
+              onSelectAgent={setSelectedAgent}
+            />
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="py-12">
+                <div className="text-center">
+                  <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">No genealogy data available</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="heatmap" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="w-5 h-5" />
+                Mutation Success Heatmap
+              </CardTitle>
+              <CardDescription>
+                Track which mutations have been most beneficial across generations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : stats?.mutationHeatmap ? (
+                <MutationHeatmap heatmap={stats.mutationHeatmap} />
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Flame className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No mutation data available</p>
+                  <p className="text-sm">Generate demo evolutions to see the heatmap</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
