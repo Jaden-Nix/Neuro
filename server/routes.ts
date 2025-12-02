@@ -2266,6 +2266,8 @@ export async function registerRoutes(
     }
   });
 
+  */ // END COMMENTED OUT Stripe and marketplace sections
+
   // ==========================================
   // Quick Backtest Routes (Simplified Workflow)
   // ==========================================
@@ -2297,6 +2299,28 @@ export async function registerRoutes(
     }
   });
 
+  // Get all quick backtest results (must come before :id route)
+  app.get("/api/backtest/results", async (req, res) => {
+    try {
+      const results = quickBacktestEngine.getResults();
+      res.json(results);
+    } catch (error) {
+      console.error("Failed to get backtest results:", error);
+      res.status(500).json({ error: "Failed to get backtest results" });
+    }
+  });
+
+  // Get available agents for backtesting (must come before :id route)
+  app.get("/api/backtest/agents", async (req, res) => {
+    try {
+      const agents = quickBacktestEngine.getAvailableAgents();
+      res.json(agents);
+    } catch (error) {
+      console.error("Failed to get available agents:", error);
+      res.status(500).json({ error: "Failed to get available agents" });
+    }
+  });
+
   // Get quick backtest result by ID
   app.get("/api/backtest/:id", async (req, res) => {
     try {
@@ -2324,31 +2348,6 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to get backtest summary" });
     }
   });
-
-  // Get all quick backtest results
-  app.get("/api/backtest/results", async (req, res) => {
-    try {
-      const results = quickBacktestEngine.getResults();
-      res.json(results);
-    } catch (error) {
-      console.error("Failed to get backtest results:", error);
-      res.status(500).json({ error: "Failed to get backtest results" });
-    }
-  });
-
-  // Get available agents for backtesting
-  app.get("/api/backtest/agents", async (req, res) => {
-    try {
-      const agents = quickBacktestEngine.getAvailableAgents();
-      res.json(agents);
-    } catch (error) {
-      console.error("Failed to get available agents:", error);
-      res.status(500).json({ error: "Failed to get available agents" });
-    }
-  });
-
-  // ==========================================
-  */ // END COMMENTED OUT Stripe and marketplace sections
 
   // ==========================================
   // Multi-Wallet Management Routes

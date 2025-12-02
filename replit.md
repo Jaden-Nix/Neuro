@@ -68,6 +68,38 @@ Frontend state is managed using React Query for server state and caching, with a
 
 ## Recent Changes
 
+### December 2, 2025 (Quick Backtest System - 100% COMPLETE)
+- **Named Trading Agents**: Five distinct AI agents with unique strategies
+  - `Atlas`: Aggressive momentum trading with volume surge detection
+  - `Vega`: Risk-aware volatility trading with dynamic position sizing
+  - `Nova`: Disciplined trend-following with MA crossover strategy
+  - `Sentinel`: Conservative defensive strategy with strict risk limits
+  - `Arbiter`: Balanced multi-factor approach combining all signals
+
+- **Quick Backtest Engine** (`server/backtesting/QuickBacktestEngine.ts`):
+  - Simplified workflow: symbol, interval, date range, agent selection
+  - Generates realistic simulated historical data with OHLCV candles
+  - Replays market data through agents and records decisions
+  - Tracks per-agent performance: trades, win rate, return, Sharpe, drawdown
+  - Professional summary output format with best/worst agent ranking
+
+- **API Endpoints** (`server/routes.ts`):
+  - `POST /api/backtest/start` - Start quick backtest with parameters
+  - `GET /api/backtest/results` - Get all backtest results
+  - `GET /api/backtest/agents` - Get available trading agents
+  - `GET /api/backtest/:id` - Get specific backtest by ID
+  - `GET /api/backtest/:id/summary` - Get formatted summary
+
+- **Decision Trace Logging**: Every trade recorded with:
+  - Timestamp, agent name, action (BUY/SELL), entry/exit price
+  - Human-readable reason explaining the decision
+  - Confidence score (0-1) based on signal strength
+
+- **Performance Metrics**:
+  - Total trades, win rate, total return, cumulative return
+  - Sharpe ratio, max drawdown, avg ROI per trade
+  - Per-agent breakdown with ranking
+
 ### December 2, 2025 (Enhanced Wallet Tracking - 100% COMPLETE)
 - **DeFi Position Tracking**: Comprehensive multi-protocol DeFi monitoring
   - `server/wallets/DeFiPositionTracker.ts`: Tracks Lido stETH, Aave V3, Frax sfrxETH
