@@ -45,6 +45,9 @@ import type {
   AlertTriggerType,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { DatabaseStorage } from "./DatabaseStorage";
+
+const dbStorage = new DatabaseStorage();
 
 export interface IStorage {
   // System State
@@ -669,54 +672,29 @@ export class MemStorage implements IStorage {
     return fullChain;
   }
 
-  // Parliament Sessions
-  private parliamentSessions: Map<string, ParliamentSession> = new Map();
-
+  // Parliament Sessions - Delegated to DatabaseStorage for persistence
   async getParliamentSessions(filters?: { status?: string; limit?: number }): Promise<ParliamentSession[]> {
-    let results = Array.from(this.parliamentSessions.values());
-    if (filters?.status) results = results.filter(s => s.status === filters.status);
-    results.sort((a, b) => b.startedAt - a.startedAt);
-    if (filters?.limit) results = results.slice(0, filters.limit);
-    return results;
+    return dbStorage.getParliamentSessions(filters);
   }
 
   async getParliamentSession(id: string): Promise<ParliamentSession | undefined> {
-    return this.parliamentSessions.get(id);
+    return dbStorage.getParliamentSession(id);
   }
 
   async createParliamentSession(session: InsertParliamentSession): Promise<ParliamentSession> {
-    const fullSession: ParliamentSession = {
-      ...session,
-      id: session.id || randomUUID(),
-      debates: [],
-      votes: [],
-      outcome: null,
-      startedAt: Date.now(),
-    };
-    this.parliamentSessions.set(fullSession.id, fullSession);
-    return fullSession;
+    return dbStorage.createParliamentSession(session);
   }
 
   async updateParliamentSession(id: string, updates: Partial<ParliamentSession>): Promise<ParliamentSession | undefined> {
-    const existing = this.parliamentSessions.get(id);
-    if (!existing) return undefined;
-    const updated = { ...existing, ...updates };
-    this.parliamentSessions.set(id, updated);
-    return updated;
+    return dbStorage.updateParliamentSession(id, updates);
   }
 
   async addDebateEntry(sessionId: string, entry: ParliamentDebateEntry): Promise<ParliamentSession | undefined> {
-    const session = this.parliamentSessions.get(sessionId);
-    if (!session) return undefined;
-    session.debates.push(entry);
-    return session;
+    return dbStorage.addDebateEntry(sessionId, entry);
   }
 
   async addVote(sessionId: string, vote: ParliamentVote): Promise<ParliamentSession | undefined> {
-    const session = this.parliamentSessions.get(sessionId);
-    if (!session) return undefined;
-    session.votes.push(vote);
-    return session;
+    return dbStorage.addVote(sessionId, vote);
   }
 
   // Agent Evolutions

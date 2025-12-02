@@ -20,6 +20,7 @@ import {
   sellerProfiles,
   stressScenarios,
   stressTestRuns,
+  parliamentSessions,
   type Agent,
   type LogEntry,
   type LiveMetrics,
@@ -41,6 +42,10 @@ import {
   type StressScenario,
   type StressTestRun,
   type AgentStressResponse,
+  type ParliamentSession,
+  type ParliamentDebateEntry,
+  type ParliamentVote,
+  type InsertParliamentSession,
   type InsertAgentTemplate,
   type InsertMarketplaceListing,
   type InsertAgentRental,
@@ -1100,5 +1105,118 @@ export class DatabaseStorage implements IStorage {
     if (!run) return undefined;
     const updated = { ...run, agentResponses: [...(run.agentResponses || []), response] };
     return await this.updateStressTestRun(runId, updated);
+  }
+
+  // ==========================================
+  // Parliament Sessions - Database-backed persistence
+  // ==========================================
+
+  async getParliamentSessions(filters?: { status?: string; limit?: number }): Promise<ParliamentSession[]> {
+    let query = db.select().from(parliamentSessions).orderBy(desc(parliamentSessions.startedAt));
+    
+    if (filters?.status) {
+      query = query.where(eq(parliamentSessions.status, filters.status as any));
+    }
+    
+    const results = filters?.limit 
+      ? await query.limit(filters.limit)
+      : await query;
+    
+    return results.map((session) => ({
+      ...session,
+      debates: session.debates || [],
+      votes: session.votes || [],
+      metaSummary: session.metaSummary || undefined,
+      outcome: session.outcome || null,
+      concludedAt: session.concludedAt?.getTime() || null,
+      startedAt: session.startedAt.getTime(),
+    })) as ParliamentSession[];
+  }
+
+  async getParliamentSession(id: string): Promise<ParliamentSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(parliamentSessions)
+      .where(eq(parliamentSessions.id, id));
+    
+    if (!session) return undefined;
+    
+    return {
+      ...session,
+      debates: session.debates || [],
+      votes: session.votes || [],
+      metaSummary: session.metaSummary || undefined,
+      outcome: session.outcome || null,
+      concludedAt: session.concludedAt?.getTime() || null,
+      startedAt: session.startedAt.getTime(),
+    } as ParliamentSession;
+  }
+
+  async createParliamentSession(session: InsertParliamentSession): Promise<ParliamentSession> {
+    const [result] = await db
+      .insert(parliamentSessions)
+      .values({
+        ...session,
+        id: session.id || randomUUID(),
+        debates: [],
+        votes: [],
+        startedAt: new Date(),
+      })
+      .returning();
+    
+    return {
+      ...result,
+      debates: result.debates || [],
+      votes: result.votes || [],
+      metaSummary: result.metaSummary || undefined,
+      outcome: result.outcome || null,
+      concludedAt: result.concludedAt?.getTime() || null,
+      startedAt: result.startedAt.getTime(),
+    } as ParliamentSession;
+  }
+
+  async updateParliamentSession(id: string, updates: Partial<ParliamentSession>): Promise<ParliamentSession | undefined> {
+    const updateData: any = { ...updates };
+    
+    if (typeof updates.startedAt === 'number') {
+      updateData.startedAt = new Date(updates.startedAt);
+    }
+    if (typeof updates.concludedAt === 'number') {
+      updateData.concludedAt = new Date(updates.concludedAt);
+    }
+    
+    const [result] = await db
+      .update(parliamentSessions)
+      .set(updateData)
+      .where(eq(parliamentSessions.id, id))
+      .returning();
+    
+    if (!result) return undefined;
+    
+    return {
+      ...result,
+      debates: result.debates || [],
+      votes: result.votes || [],
+      metaSummary: result.metaSummary || undefined,
+      outcome: result.outcome || null,
+      concludedAt: result.concludedAt?.getTime() || null,
+      startedAt: result.startedAt.getTime(),
+    } as ParliamentSession;
+  }
+
+  async addDebateEntry(sessionId: string, entry: ParliamentDebateEntry): Promise<ParliamentSession | undefined> {
+    const session = await this.getParliamentSession(sessionId);
+    if (!session) return undefined;
+    
+    const updatedDebates = [...(session.debates || []), entry];
+    return await this.updateParliamentSession(sessionId, { debates: updatedDebates });
+  }
+
+  async addVote(sessionId: string, vote: ParliamentVote): Promise<ParliamentSession | undefined> {
+    const session = await this.getParliamentSession(sessionId);
+    if (!session) return undefined;
+    
+    const updatedVotes = [...(session.votes || []), vote];
+    return await this.updateParliamentSession(sessionId, { votes: updatedVotes });
   }
 }
