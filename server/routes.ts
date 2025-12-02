@@ -174,124 +174,45 @@ export async function registerRoutes(
     await storage.upsertAgent(agent);
   }
 
-  // Seed marketplace with agent templates if empty
-  const existingTemplates = await storage.getAgentTemplates({});
-  if (existingTemplates.length === 0) {
-    const seedTemplates = [
-      {
-        name: "Alpha Scout Pro",
-        description: "Advanced opportunity detection agent specializing in DeFi arbitrage and yield farming opportunities. Uses ML-powered pattern recognition to identify profitable trades across multiple DEXes.",
-        agentType: "scout" as const,
-        strategyType: "arbitrage" as const,
-        riskTolerance: "moderate" as const,
-        personality: [PersonalityTrait.CURIOUS, PersonalityTrait.PRECISE, PersonalityTrait.CALM],
-        basePrice: 9900,
-        rentalPricePerDay: 499,
-        yieldSharePercent: 15,
-        successRate: 72,
-        avgReturn: 9,
-        featured: true,
-        createdBy: "neuronet-platform",
-      },
-      {
-        name: "Risk Guardian",
-        description: "Conservative risk management agent that protects portfolios from excessive drawdowns. Implements stop-loss strategies and position sizing based on volatility analysis.",
-        agentType: "risk" as const,
-        strategyType: "yield_farming" as const,
-        riskTolerance: "conservative" as const,
-        personality: [PersonalityTrait.CAUTIOUS, PersonalityTrait.PRECISE, PersonalityTrait.COLD],
-        basePrice: 7500,
-        rentalPricePerDay: 349,
-        yieldSharePercent: 10,
-        successRate: 85,
-        avgReturn: 5,
-        featured: true,
-        createdBy: "neuronet-platform",
-      },
-      {
-        name: "Momentum Trader",
-        description: "Aggressive trend-following agent that capitalizes on market momentum. Uses technical indicators and volume analysis to ride price trends.",
-        agentType: "execution" as const,
-        strategyType: "trend_following" as const,
-        riskTolerance: "aggressive" as const,
-        personality: [PersonalityTrait.ENERGETIC, PersonalityTrait.SOVEREIGN, PersonalityTrait.CURIOUS],
-        basePrice: 12500,
-        rentalPricePerDay: 699,
-        yieldSharePercent: 20,
-        successRate: 65,
-        avgReturn: 15,
-        featured: false,
-        createdBy: "neuronet-platform",
-      },
-      {
-        name: "Yield Optimizer",
-        description: "Specializes in finding and optimizing yield farming positions across DeFi protocols. Auto-compounds rewards and rebalances for maximum APY.",
-        agentType: "scout" as const,
-        strategyType: "yield_farming" as const,
-        riskTolerance: "moderate" as const,
-        personality: [PersonalityTrait.CALM, PersonalityTrait.PRECISE, PersonalityTrait.CURIOUS],
-        basePrice: 8500,
-        rentalPricePerDay: 399,
-        yieldSharePercent: 12,
-        successRate: 78,
-        avgReturn: 12,
-        featured: true,
-        createdBy: "neuronet-platform",
-      },
-      {
-        name: "Liquidity Provider",
-        description: "Manages liquidity positions across AMMs. Monitors impermanent loss and optimizes fee earnings through strategic position management.",
-        agentType: "execution" as const,
-        strategyType: "liquidity_provision" as const,
-        riskTolerance: "conservative" as const,
-        personality: [PersonalityTrait.CALM, PersonalityTrait.PRECISE, PersonalityTrait.FORMAL],
-        basePrice: 6500,
-        rentalPricePerDay: 299,
-        yieldSharePercent: 8,
-        successRate: 82,
-        avgReturn: 7,
-        featured: false,
-        createdBy: "neuronet-platform",
-      },
-      {
-        name: "MEV Hunter",
-        description: "Advanced arbitrage agent that identifies and captures MEV opportunities while protecting against sandwich attacks using Flashbots.",
-        agentType: "scout" as const,
-        strategyType: "arbitrage" as const,
-        riskTolerance: "aggressive" as const,
-        personality: [PersonalityTrait.ENERGETIC, PersonalityTrait.SOVEREIGN, PersonalityTrait.COLD],
-        basePrice: 15000,
-        rentalPricePerDay: 899,
-        yieldSharePercent: 25,
-        successRate: 58,
-        avgReturn: 23,
-        featured: true,
-        createdBy: "neuronet-platform",
-      },
-    ];
+  // // Commented out: Marketplace seeding
+  // const existingTemplates = await storage.getAgentTemplates({});
+  // if (existingTemplates.length === 0) {
+  //   const seedTemplates = [
+  //     {
+  //       name: "Alpha Scout Pro",
+  //       description: "Advanced opportunity detection agent specializing in DeFi arbitrage and yield farming opportunities. Uses ML-powered pattern recognition to identify profitable trades across multiple DEXes.",
+  //       agentType: "scout" as const,
+  //       strategyType: "arbitrage" as const,
+  //       riskTolerance: "moderate" as const,
+  //       personality: [PersonalityTrait.CURIOUS, PersonalityTrait.PRECISE, PersonalityTrait.CALM],
+  //       basePrice: 9900,
+  //       rentalPricePerDay: 499,
+  //       yieldSharePercent: 15,
+  //       successRate: 72,
+  //       avgReturn: 9,
+  //       featured: true,
+  //       createdBy: "neuronet-platform",
+  //     },
+  //     // ... other templates commented out
+  //   ];
+  //   for (const template of seedTemplates) {
+  //     await storage.createAgentTemplate({
+  //       ...template,
+  //       id: `${template.name.toLowerCase().replace(/\s+/g, '-')}-template`,
+  //     });
+  //   }
+  //   console.log("[Routes] Seeded marketplace with agent templates");
+  // }
 
-    for (const template of seedTemplates) {
-      await storage.createAgentTemplate({
-        ...template,
-        id: `${template.name.toLowerCase().replace(/\s+/g, '-')}-template`,
-      });
-    }
-    console.log("[Routes] Seeded marketplace with agent templates");
-  }
-
-  // Seed leaderboard with sample data if empty
-  const existingLeaderboard = await storage.getLeaderboard("all_time");
-  if (existingLeaderboard.length === 0) {
-    const seedLeaderboard = [
-      { agentId: "alpha-scout-001", templateId: "scout-template-1", rank: 1, performanceScore: 95, totalReturn: 157, successRate: 78, totalTrades: 342, avgTradeSize: 5000, riskAdjustedReturn: 120, period: "all_time" as const },
-      { agentId: "mev-hunter-002", templateId: "scout-template-2", rank: 2, performanceScore: 88, totalReturn: 134, successRate: 65, totalTrades: 512, avgTradeSize: 8000, riskAdjustedReturn: 95, period: "all_time" as const },
-      { agentId: "yield-optimizer-003", templateId: "scout-template-3", rank: 3, performanceScore: 82, totalReturn: 99, successRate: 82, totalTrades: 156, avgTradeSize: 15000, riskAdjustedReturn: 85, period: "all_time" as const },
-      { agentId: "momentum-004", templateId: "execution-template-1", rank: 4, performanceScore: 75, totalReturn: 87, successRate: 71, totalTrades: 234, avgTradeSize: 3500, riskAdjustedReturn: 65, period: "all_time" as const },
-      { agentId: "risk-guardian-005", templateId: "risk-template-1", rank: 5, performanceScore: 70, totalReturn: 46, successRate: 89, totalTrades: 89, avgTradeSize: 25000, riskAdjustedReturn: 55, period: "all_time" as const },
-    ];
-    await storage.updateLeaderboard(seedLeaderboard);
-    console.log("[Routes] Seeded leaderboard with sample data");
-  }
+  // // Commented out: Leaderboard seeding
+  // const existingLeaderboard = await storage.getLeaderboard("all_time");
+  // if (existingLeaderboard.length === 0) {
+  //   const seedLeaderboard = [
+  //     // ... leaderboard entries commented out
+  //   ];
+  //   await storage.updateLeaderboard(seedLeaderboard);
+  //   console.log("[Routes] Seeded leaderboard with sample data");
+  // }
 
   // WebSocket Setup
   const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -1582,274 +1503,33 @@ export async function registerRoutes(
   });
 
   // ==========================================
-  // Agent Marketplace Endpoints
+  // Agent Marketplace Endpoints (COMMENTED OUT - Marketplace and NFT buying disabled)
   // ==========================================
-
-  // Agent Templates
-  app.get("/api/marketplace/templates", async (req, res) => {
-    try {
-      const filters = {
-        strategyType: req.query.strategyType as string | undefined,
-        riskTolerance: req.query.riskTolerance as string | undefined,
-        featured: req.query.featured === "true" ? true : req.query.featured === "false" ? false : undefined,
-      };
-      const templates = await storage.getAgentTemplates(filters);
-      res.json(templates);
-    } catch (error) {
-      console.error("Failed to get templates:", error);
-      res.status(500).json({ error: "Failed to get agent templates" });
-    }
-  });
-
-  app.get("/api/marketplace/templates/:id", async (req, res) => {
-    try {
-      const template = await storage.getAgentTemplate(req.params.id);
-      if (!template) {
-        return res.status(404).json({ error: "Template not found" });
-      }
-      res.json(template);
-    } catch (error) {
-      console.error("Failed to get template:", error);
-      res.status(500).json({ error: "Failed to get template" });
-    }
-  });
-
-  app.post("/api/marketplace/templates", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertAgentTemplateSchema } = await import("@shared/schema");
-      const parsed = insertAgentTemplateSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid template data", details: parsed.error.flatten() });
-      }
-      const template = await storage.createAgentTemplate(parsed.data);
-      res.status(201).json(template);
-    } catch (error) {
-      console.error("Failed to create template:", error);
-      res.status(500).json({ error: "Failed to create template" });
-    }
-  });
-
-  app.patch("/api/marketplace/templates/:id", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertAgentTemplateSchema } = await import("@shared/schema");
-      const parsed = insertAgentTemplateSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
-      }
-      const template = await storage.updateAgentTemplate(req.params.id, parsed.data as any);
-      if (!template) {
-        return res.status(404).json({ error: "Template not found" });
-      }
-      res.json(template);
-    } catch (error) {
-      console.error("Failed to update template:", error);
-      res.status(500).json({ error: "Failed to update template" });
-    }
-  });
-
-  // Marketplace Listings
-  app.get("/api/marketplace/listings", async (req, res) => {
-    try {
-      const filters = {
-        status: req.query.status as string | undefined,
-        chain: req.query.chain as string | undefined,
-        sellerId: req.query.sellerId as string | undefined,
-      };
-      const listings = await storage.getMarketplaceListings(filters);
-      res.json(listings);
-    } catch (error) {
-      console.error("Failed to get listings:", error);
-      res.status(500).json({ error: "Failed to get marketplace listings" });
-    }
-  });
-
-  app.get("/api/marketplace/listings/:id", async (req, res) => {
-    try {
-      const listing = await storage.getMarketplaceListing(req.params.id);
-      if (!listing) {
-        return res.status(404).json({ error: "Listing not found" });
-      }
-      res.json(listing);
-    } catch (error) {
-      console.error("Failed to get listing:", error);
-      res.status(500).json({ error: "Failed to get listing" });
-    }
-  });
-
-  app.post("/api/marketplace/listings", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertMarketplaceListingSchema } = await import("@shared/schema");
-      const parsed = insertMarketplaceListingSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid listing data", details: parsed.error.flatten() });
-      }
-      const listing = await storage.createMarketplaceListing(parsed.data);
-      res.status(201).json(listing);
-    } catch (error) {
-      console.error("Failed to create listing:", error);
-      res.status(500).json({ error: "Failed to create listing" });
-    }
-  });
-
-  app.patch("/api/marketplace/listings/:id", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertMarketplaceListingSchema } = await import("@shared/schema");
-      const parsed = insertMarketplaceListingSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
-      }
-      const listing = await storage.updateMarketplaceListing(req.params.id, parsed.data as any);
-      if (!listing) {
-        return res.status(404).json({ error: "Listing not found" });
-      }
-      res.json(listing);
-    } catch (error) {
-      console.error("Failed to update listing:", error);
-      res.status(500).json({ error: "Failed to update listing" });
-    }
-  });
-
-  // Agent Rentals
-  app.get("/api/marketplace/rentals", async (req, res) => {
-    try {
-      const filters = {
-        renterId: req.query.renterId as string | undefined,
-        ownerId: req.query.ownerId as string | undefined,
-        status: req.query.status as string | undefined,
-      };
-      const rentals = await storage.getAgentRentals(filters);
-      res.json(rentals);
-    } catch (error) {
-      console.error("Failed to get rentals:", error);
-      res.status(500).json({ error: "Failed to get rentals" });
-    }
-  });
-
-  app.post("/api/marketplace/rentals", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertAgentRentalSchema } = await import("@shared/schema");
-      const parsed = insertAgentRentalSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid rental data", details: parsed.error.flatten() });
-      }
-      const rental = await storage.createAgentRental(parsed.data as any);
-      res.status(201).json(rental);
-    } catch (error) {
-      console.error("Failed to create rental:", error);
-      res.status(500).json({ error: "Failed to create rental" });
-    }
-  });
-
-  app.patch("/api/marketplace/rentals/:id", requireWriteAuth, async (req, res) => {
-    try {
-      const { insertAgentRentalSchema } = await import("@shared/schema");
-      const parsed = insertAgentRentalSchema.partial().safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid update data", details: parsed.error.flatten() });
-      }
-      const rental = await storage.updateAgentRental(req.params.id, parsed.data as any);
-      if (!rental) {
-        return res.status(404).json({ error: "Rental not found" });
-      }
-      res.json(rental);
-    } catch (error) {
-      console.error("Failed to update rental:", error);
-      res.status(500).json({ error: "Failed to update rental" });
-    }
-  });
-
-  // Agent NFTs
-  app.get("/api/marketplace/nfts", async (req, res) => {
-    try {
-      const filters = {
-        ownerAddress: req.query.ownerAddress as string | undefined,
-        chain: req.query.chain as string | undefined,
-      };
-      const nfts = await storage.getAgentNFTs(filters);
-      res.json(nfts);
-    } catch (error) {
-      console.error("Failed to get NFTs:", error);
-      res.status(500).json({ error: "Failed to get NFTs" });
-    }
-  });
-
-  // Record an NFT after user mints on-chain via their wallet (frontend wagmi hooks)
-  // This does NOT perform blockchain transactions - user's wallet does that
-  app.post("/api/marketplace/nfts/mint", requireWriteAuth, strictLimiter, async (req, res) => {
-    try {
-      const { z } = await import("zod");
-      const mintSchema = z.object({
-        templateId: z.string().min(1, "Template ID is required"),
-        ownerAddress: z.string().min(1, "Owner address is required"),
-        chain: z.enum(["ethereum", "solana"]),
-        // Real blockchain transaction data from frontend
-        tokenId: z.string().min(1, "Token ID from blockchain is required"),
-        contractAddress: z.string().min(1, "Contract address is required"),
-        txHash: z.string().min(1, "Transaction hash is required"),
-      });
-      const parsed = mintSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: "Invalid mint data", details: parsed.error.flatten() });
-      }
-      const { templateId, ownerAddress, chain, tokenId, contractAddress, txHash } = parsed.data;
-      
-      const template = await storage.getAgentTemplate(templateId);
-      if (!template) {
-        return res.status(404).json({ error: "Template not found" });
-      }
-
-      // Record the NFT with real blockchain data (transaction already happened on-chain)
-      const nft = await storage.createAgentNFT({
-        id: `nft-${tokenId}`,
-        templateId,
-        tokenId,
-        contractAddress,
-        chain,
-        ownerAddress,
-        metadata: {
-          name: template.name,
-          description: template.description,
-          image: template.imageUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${template.id}`,
-          attributes: [
-            { trait_type: "Agent Type", value: template.agentType },
-            { trait_type: "Strategy", value: template.strategyType },
-            { trait_type: "Risk Tolerance", value: template.riskTolerance },
-            { trait_type: "Performance Score", value: template.performanceScore },
-            { trait_type: "Success Rate", value: `${template.successRate}%` },
-            { trait_type: "Transaction Hash", value: txHash },
-          ],
-        },
-      });
-
-      // Update template deployment count
-      await storage.updateAgentTemplate(templateId, {
-        totalDeployments: template.totalDeployments + 1,
-      });
-
-      res.status(201).json(nft);
-    } catch (error) {
-      console.error("Failed to record minted NFT:", error);
-      res.status(500).json({ error: "Failed to record minted NFT" });
-    }
-  });
-
-  // Leaderboard
-  app.get("/api/marketplace/leaderboard", async (req, res) => {
-    try {
-      const period = req.query.period as "daily" | "weekly" | "monthly" | "all_time" | undefined;
-      const entries = await storage.getLeaderboard(period);
-      res.json(entries);
-    } catch (error) {
-      console.error("Failed to get leaderboard:", error);
-      res.status(500).json({ error: "Failed to get leaderboard" });
-    }
-  });
+  
+  /*
+  // Commented out: Agent Templates, Marketplace Listings, Agent Rentals, Agent NFTs, and Leaderboard endpoints
+  app.get("/api/marketplace/templates", ...)
+  app.get("/api/marketplace/templates/:id", ...)
+  app.post("/api/marketplace/templates", ...)
+  app.patch("/api/marketplace/templates/:id", ...)
+  app.get("/api/marketplace/listings", ...)
+  app.get("/api/marketplace/listings/:id", ...)
+  app.post("/api/marketplace/listings", ...)
+  app.patch("/api/marketplace/listings/:id", ...)
+  app.get("/api/marketplace/rentals", ...)
+  app.post("/api/marketplace/rentals", ...)
+  app.patch("/api/marketplace/rentals/:id", ...)
+  app.get("/api/marketplace/nfts", ...)
+  app.post("/api/marketplace/nfts/mint", ...)
+  app.get("/api/marketplace/leaderboard", ...)
+  */
 
   // =============================================
-  // STRIPE PAYMENT ENDPOINTS
+  // STRIPE PAYMENT ENDPOINTS (COMMENTED OUT - Marketplace and NFT buying disabled)
   // =============================================
   
-  // Get Stripe publishable key for frontend
+  /*
+  // Commented out: Stripe payment endpoints for marketplace/NFT buying
   app.get("/api/stripe/config", async (req, res) => {
     try {
       const publishableKey = await getStripePublishableKey();
@@ -2494,6 +2174,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to get backtest stats" });
     }
   });
+
+  // ==========================================
+  */ // END COMMENTED OUT Stripe and marketplace sections
 
   // ==========================================
   // Multi-Wallet Management Routes

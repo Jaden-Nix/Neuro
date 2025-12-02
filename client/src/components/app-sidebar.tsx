@@ -43,12 +43,12 @@ const menuItems = [
     icon: Shield,
     testId: "nav-governance",
   },
-  {
-    title: "Marketplace",
-    url: "/marketplace",
-    icon: Store,
-    testId: "nav-marketplace",
-  },
+  // {
+  //   title: "Marketplace",
+  //   url: "/marketplace",
+  //   icon: Store,
+  //   testId: "nav-marketplace",
+  // },
   {
     title: "Alerts",
     url: "/alerts",
