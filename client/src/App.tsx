@@ -26,6 +26,7 @@ import Parliament from "@/pages/Parliament";
 import Evolution from "@/pages/Evolution";
 import StressTesting from "@/pages/StressTesting";
 import DreamMode from "@/pages/DreamMode";
+import Insights from "@/pages/Insights";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/evolution" component={Evolution} />
       <Route path="/stress-test" component={StressTesting} />
       <Route path="/dream-mode" component={DreamMode} />
+      <Route path="/insights" component={Insights} />
       <Route component={NotFound} />
     </Switch>
   );

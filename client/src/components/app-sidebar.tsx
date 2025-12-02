@@ -34,9 +34,9 @@ const menuItems = [
   },
   {
     title: "AI Insights",
-    url: "/ml",
+    url: "/insights",
     icon: Brain,
-    testId: "nav-ml",
+    testId: "nav-insights",
   },
   {
     title: "Governance",
