@@ -1,12 +1,7 @@
 import { BaseAgent } from "./BaseAgent";
 import { AgentType, PersonalityTrait, type MLPrediction, type MLFeatureVector } from "@shared/schema";
-import Anthropic from "@anthropic-ai/sdk";
-import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
+import { claudeService, type MarketContext, type AgentDecision } from "../ai/ClaudeService";
 import { mlPatternRecognition } from "../ml/MLPatternRecognition";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 export interface MetaDecisionInput {
   scoutProposal?: any;
@@ -146,72 +141,70 @@ export class MetaAgent extends BaseAgent {
   }
 
   private async makeDecision(input: MetaDecisionInput): Promise<MetaDecision> {
-    const mlInsightsSection = input.mlPrediction 
-      ? `
-ML Pattern Recognition Insights:
-- Success Probability: ${input.mlPrediction.successProbability}%
-- Risk-Adjusted Score: ${input.mlPrediction.riskAdjustedScore}
-- Market Cluster: ${input.mlPrediction.clusterLabel}
-- Expected Return: ${input.mlPrediction.expectedReturn / 100}%
-- Price Volatility: ${input.mlPrediction.features.priceVolatility.toFixed(2)}%
-- Agent Performance Index: ${input.mlPrediction.features.agentPerformance.toFixed(0)}
-- Market Sentiment: ${input.mlPrediction.features.marketSentiment.toFixed(0)}
-- Liquidity Depth: ${input.mlPrediction.features.liquidityDepth.toFixed(0)}`
-      : "ML Prediction: Not available";
+    try {
+      const context: MarketContext = {
+        symbol: input.scoutProposal?.details?.asset || "ETH",
+        currentPrice: input.marketData?.price,
+        priceChange24h: input.marketData?.previousPrice 
+          ? ((input.marketData.price || 0) - input.marketData.previousPrice) / input.marketData.previousPrice * 100
+          : undefined,
+        volume24h: input.marketData?.volume,
+        defiTVL: input.marketData?.tvl,
+      };
 
-    const prompt = `You are the Meta-Agent, a sovereign AI orchestrator for DeFi governance. YOU MUST MAKE HARD REJECTIONS WHEN CONDITIONS AREN'T MET.
-    
-Analyze the following inputs and make a strategic decision:
+      const scoutDecision: AgentDecision = {
+        action: input.scoutProposal?.opportunityType || "HOLD",
+        confidence: input.scoutProposal?.confidence || 50,
+        reasoning: input.scoutProposal?.description || "",
+        details: input.scoutProposal || {},
+        timestamp: Date.now(),
+      };
 
-Scout Proposal: ${JSON.stringify(input.scoutProposal || "None")}
-Risk Assessment: ${JSON.stringify(input.riskAssessment || "None")}
-Execution Plan: ${JSON.stringify(input.executionPlan || "None")}
-${mlInsightsSection}
+      const riskDecision: AgentDecision = {
+        action: input.riskAssessment?.shouldVeto ? "VETO" : "APPROVE",
+        confidence: 100 - (input.riskAssessment?.riskScore || 50),
+        reasoning: input.riskAssessment?.reasoning || "",
+        details: input.riskAssessment || {},
+        timestamp: Date.now(),
+      };
 
-APPROVAL THRESHOLDS - ENFORCE STRICTLY:
-- Risk veto by Risk Agent? → REJECT (shouldVeto=true means NO)
-- Scout confidence < 50%? → REJECT
-- Risk score > 65? → REJECT
-- Expected return < 2%? → REJECT for small positions
-- No clear execution path? → REJECT
+      const executionDecision: AgentDecision = {
+        action: input.executionPlan?.feasible ? "EXECUTE" : "ABORT",
+        confidence: input.executionPlan?.successProbability || 50,
+        reasoning: input.executionPlan?.warnings?.join("; ") || "",
+        details: input.executionPlan || {},
+        timestamp: Date.now(),
+      };
 
-Consider:
-1. Risk veto is FINAL - if shouldVeto is true, you MUST reject
-2. Risk vs reward: Does expected return justify the risk? Calculate it.
-3. Execution feasibility: Can this actually be done?
-4. Scout confidence: Is Scout sure about this opportunity?
+      const decision = await claudeService.metaOrchestration(
+        context,
+        scoutDecision,
+        riskDecision,
+        executionDecision
+      );
 
-Respond with VALID JSON:
-{
-  "approved": boolean,
-  "confidence": number (0-100, reflect uncertainty),
-  "reasoning": "string with specific numbers and rejection reasons if rejected",
-  "modifications": "specific changes to make this acceptable, or null if rejected",
-  "priority": "low" | "medium" | "high" | "critical"
-}`;
+      const metaDecision: MetaDecision = {
+        approved: decision.details?.approved || decision.action === "EXECUTE",
+        confidence: decision.confidence,
+        reasoning: decision.reasoning,
+        modifications: decision.details?.modifications || null,
+        priority: (decision.details?.priority as any) || "medium",
+      };
 
-    return await anthropicCircuitBreaker.execute(
-      async () => {
-        const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 1024,
-          temperature: 0.7,
-          messages: [{ role: "user", content: prompt }],
-        });
+      if (input.mlPrediction) {
+        metaDecision.mlInsights = {
+          successProbability: input.mlPrediction.successProbability,
+          riskAdjustedScore: input.mlPrediction.riskAdjustedScore,
+          clusterLabel: input.mlPrediction.clusterLabel,
+          features: input.mlPrediction.features,
+        };
+      }
 
-        const content = message.content[0];
-        if (content.type === "text") {
-          try {
-            return JSON.parse(content.text) as MetaDecision;
-          } catch {
-            return this.getFallbackDecision(input);
-          }
-        }
-
-        throw new Error("Unexpected response type from Meta-Agent");
-      },
-      () => this.getFallbackDecision(input)
-    );
+      return metaDecision;
+    } catch (error) {
+      console.error("[MetaAgent] Decision failed, using fallback:", error);
+      return this.getFallbackDecision(input);
+    }
   }
 
   public async negotiateWithAgents(proposals: any[], marketData?: MetaDecisionInput["marketData"]): Promise<any> {

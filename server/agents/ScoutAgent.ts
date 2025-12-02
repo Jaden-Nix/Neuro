@@ -1,11 +1,6 @@
 import { BaseAgent } from "./BaseAgent";
 import { AgentType, PersonalityTrait } from "@shared/schema";
-import Anthropic from "@anthropic-ai/sdk";
-import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { claudeService, type MarketContext } from "../ai/ClaudeService";
 
 export interface ScoutInput {
   marketData?: any;
@@ -128,66 +123,33 @@ export class ScoutAgent extends BaseAgent {
   }
 
   private async scanOpportunity(input: ScoutInput): Promise<ScoutOpportunity> {
-    const prompt = `You are the Scout Agent, a curious and energetic AI analyzer for DeFi opportunities.
+    try {
+      const context: MarketContext = {
+        symbol: input.marketData?.symbol || "ETH",
+        currentPrice: input.marketData?.price,
+        priceChange24h: input.marketData?.priceChange24h,
+        volume24h: input.marketData?.volume24h,
+        marketCap: input.marketData?.marketCap,
+        defiTVL: input.marketData?.tvl,
+        yields: input.liquidityPools?.map((pool: any) => ({
+          protocol: pool.protocol || "Unknown",
+          apy: pool.apy || 0,
+        })),
+      };
 
-Market Data: ${JSON.stringify(input.marketData || {})}
-Liquidity Pools: ${JSON.stringify(input.liquidityPools || [])}
-
-YOUR RESPONSE MUST BE BRUTALLY SPECIFIC:
-- Include exact protocol names, APY numbers, token addresses
-- Calculate actual profit/loss with real numbers
-- List specific risk factors (e.g., "Curve admin key", "Lido fee 10%")
-- Compare multiple exchanges with actual price differences
-- Show gas costs, slippage, execution time
-- Be honest: if no opportunity exists, say so with data
-- Confidence should reflect uncertainty, not always 70+
-
-Respond with VALID JSON only:
-{
-  "opportunityType": "arbitrage" | "yield" | "swap" | "stake" | "none",
-  "description": "Extremely detailed: protocol name, exact metrics, specific risk factors, profit calculation",
-  "confidence": number (0-100, can be low),
-  "expectedReturn": number (percentage, can be negative),
-  "volatilityPrediction": number (0-100),
-  "details": {
-    "protocol": "string",
-    "asset": "string",
-    "apy": number,
-    "tvl": number,
-    "riskFactors": ["string", "string"],
-    "contract_audit": "string",
-    "governance": "string"
-  }
-}`;
-
-    return await anthropicCircuitBreaker.execute(
-      async () => {
-        const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 1024,
-          temperature: 0.8,
-          messages: [{ role: "user", content: prompt }],
-        });
-
-        const content = message.content[0];
-        if (content.type === "text") {
-          try {
-            return JSON.parse(content.text) as ScoutOpportunity;
-          } catch {
-            return {
-              opportunityType: "none" as const,
-              description: "No opportunities detected",
-              confidence: 0,
-              expectedReturn: 0,
-              volatilityPrediction: 50,
-              details: {},
-            };
-          }
-        }
-
-        throw new Error("Unexpected response from Scout Agent");
-      },
-      () => this.getFallbackOpportunity()
-    );
+      const decision = await claudeService.scoutAnalysis(context);
+      
+      return {
+        opportunityType: (decision.details?.opportunityType as any) || "none",
+        description: decision.reasoning,
+        confidence: decision.confidence,
+        expectedReturn: decision.details?.expectedReturn || 0,
+        volatilityPrediction: decision.details?.volatility || 50,
+        details: decision.details || {},
+      };
+    } catch (error) {
+      console.error("[ScoutAgent] Analysis failed, using fallback:", error);
+      return this.getFallbackOpportunity();
+    }
   }
 }

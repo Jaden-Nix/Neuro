@@ -4,6 +4,14 @@
 
 NeuroNet Governor is an advanced multi-agent AI system designed for autonomous DeFi protocol governance. It orchestrates specialized AI agents (Meta, Scout, Risk, Execution) through an internal economy based on distinct personalities, credit scores, and responsibilities. The system features real-time market simulation, on-chain memory for continuous learning, 24/7 monitoring via a Sentinel system, and full decision replay capabilities. The project aims to provide an autonomous DeFi governance solution with a cinematic command center interface, supporting multiple chains including Ethereum, Base, and Fraxtal.
 
+## Recent Changes (December 2024)
+
+- **Real Data Integration**: All system components now use real market data sources (Binance, CoinGecko, DefiLlama) instead of simulated data
+- **Backtesting Enhancement**: QuickBacktestEngine now fetches actual historical OHLCV data with deterministic seeded fallback
+- **Claude AI Integration**: All agents now use Replit AI Integrations for Anthropic Claude access (AI_INTEGRATIONS_ANTHROPIC_API_KEY, AI_INTEGRATIONS_ANTHROPIC_BASE_URL)
+- **RPC Client Improvements**: BlockchainRPCClient now uses MarketDataService for ETH prices, TVL, and APY data with blockchain fallbacks
+- **ADK Integration**: ClaudeADKIntegration bridges ADK-TS framework with Claude AI for JARVIS-level agent intelligence
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

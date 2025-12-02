@@ -2,12 +2,7 @@ import { BaseAgent } from "./BaseAgent";
 import { AgentType, PersonalityTrait, MEVRiskMetrics } from "@shared/schema";
 import { flashbotsClient } from "../blockchain/FlashbotsClient";
 import { parseEther } from "viem";
-import Anthropic from "@anthropic-ai/sdk";
-import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
+import { claudeService, type MarketContext } from "../ai/ClaudeService";
 
 export interface RiskInput {
   proposal: any;
@@ -267,57 +262,30 @@ export class RiskAgent extends BaseAgent {
   }
 
   private async assessRisk(input: RiskInput): Promise<any> {
-    const prompt = `You are the Risk Agent, a cautious and formal AI evaluator for DeFi safety. YOU MUST BE BRUTALLY HONEST AND REJECT RISKY OPPORTUNITIES.
+    try {
+      const context: MarketContext = {
+        symbol: input.proposal?.details?.asset || "ETH",
+        currentPrice: input.marketConditions?.price,
+        priceChange24h: input.marketConditions?.priceChange24h,
+        volume24h: input.marketConditions?.volume24h,
+        volatility: input.proposal?.volatilityPrediction,
+      };
 
-Proposal: ${JSON.stringify(input.proposal)}
-Market Conditions: ${JSON.stringify(input.marketConditions || {})}
-
-REJECTION CRITERIA - YOU MUST VETO IF:
-- Confidence < 40% (too uncertain)
-- Volatility > 60% (too risky)
-- Arbitrage with spread < 0.05% (execution risk too high)
-- Low TVL pools (liquidity risk)
-- Unaudited protocols (code risk)
-
-Your task is to:
-1. Identify ALL potential risks and vulnerabilities with specific numbers
-2. Calculate actual loss scenarios (worst case, expected case)
-3. REJECT opportunities that don't meet safety threshold (riskScore > 65)
-4. Explain why you rejected it or what conditions are acceptable
-
-Respond with VALID JSON:
-{
-  "riskScore": number (0-100, be strict),
-  "shouldVeto": boolean (reject if score > 65 OR confidence < 40),
-  "riskFactors": ["specific risk with numbers"],
-  "potentialLoss": number (percentage, worst case),
-  "liquidationRisk": number (0-100),
-  "reasoning": "string with specific numbers",
-  "recommendations": ["concrete actions"]
-}`;
-
-    return await anthropicCircuitBreaker.execute(
-      async () => {
-        const message = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 1024,
-          temperature: 0.3,
-          messages: [{ role: "user", content: prompt }],
-        });
-
-        const content = message.content[0];
-        if (content.type === "text") {
-          try {
-            return JSON.parse(content.text);
-          } catch {
-            return this.fallbackRiskAssessment(input);
-          }
-        }
-        
-        throw new Error("Unexpected response from Risk Agent");
-      },
-      () => this.fallbackRiskAssessment(input)
-    );
+      const decision = await claudeService.riskAssessment(context, input.proposal);
+      
+      return {
+        riskScore: decision.details?.riskScore || 50,
+        shouldVeto: decision.action === "VETO",
+        riskFactors: decision.details?.riskFactors || [],
+        potentialLoss: decision.details?.potentialLoss || 10,
+        liquidationRisk: decision.details?.riskScore ? decision.details.riskScore * 0.6 : 30,
+        reasoning: decision.reasoning,
+        recommendations: decision.details?.mitigations || [],
+      };
+    } catch (error) {
+      console.error("[RiskAgent] Assessment failed, using fallback:", error);
+      return this.fallbackRiskAssessment(input);
+    }
   }
 
   private fallbackRiskAssessment(input: RiskInput): any {
