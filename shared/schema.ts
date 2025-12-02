@@ -1458,3 +1458,59 @@ export type SelectDreamSession = typeof dreamSessions.$inferSelect;
 export type SelectStressScenario = typeof stressScenarios.$inferSelect;
 export type SelectStressTestRun = typeof stressTestRuns.$inferSelect;
 
+// ==========================================
+// Alerts System
+// ==========================================
+
+export type AlertTriggerType = 
+  | "transaction_failed"
+  | "high_risk_strategy"
+  | "agent_conflict"
+  | "parliament_deadlock"
+  | "opportunity_found"
+  | "balance_drop"
+  | "system_error"
+  | "rpc_failure";
+
+export interface AlertPreference {
+  id: string;
+  userId: string;
+  email?: string;
+  webhookUrl?: string;
+  enabledTriggers: AlertTriggerType[];
+  rateLimitPerMinute: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface AlertEvent {
+  id: string;
+  userId: string;
+  type: AlertTriggerType;
+  severity: "low" | "medium" | "high" | "critical";
+  title: string;
+  message: string;
+  data: Record<string, any>;
+  sentViaEmail: boolean;
+  sentViaWebhook: boolean;
+  read: boolean;
+  createdAt: number;
+}
+
+export interface InsertAlertPreference {
+  userId: string;
+  email?: string;
+  webhookUrl?: string;
+  enabledTriggers: AlertTriggerType[];
+  rateLimitPerMinute?: number;
+}
+
+export interface InsertAlertEvent {
+  userId: string;
+  type: AlertTriggerType;
+  severity: "low" | "medium" | "high" | "critical";
+  title: string;
+  message: string;
+  data: Record<string, any>;
+}
+

@@ -315,6 +315,65 @@ export async function registerRoutes(
     }
   });
 
+  // Alerts
+  app.get("/api/alerts/preferences", async (_req, res) => {
+    try {
+      const userId = "default-user";
+      const prefs = await storage.getAlertPreference(userId);
+      res.json(prefs || { userId, enabledTriggers: [], rateLimitPerMinute: 3 });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert preferences" });
+    }
+  });
+
+  app.post("/api/alerts/preferences", requireWriteAuth, async (req, res) => {
+    try {
+      const userId = "default-user";
+      const prefs = await storage.upsertAlertPreference({
+        userId,
+        email: req.body.email,
+        webhookUrl: req.body.webhookUrl,
+        enabledTriggers: req.body.enabledTriggers || [],
+        rateLimitPerMinute: req.body.rateLimitPerMinute || 3,
+      });
+      res.json(prefs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save alert preferences" });
+    }
+  });
+
+  app.get("/api/alerts/unread", async (_req, res) => {
+    try {
+      const userId = "default-user";
+      const unread = await alertService.getUnreadAlerts(userId);
+      res.json(unread);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get unread alerts" });
+    }
+  });
+
+  app.get("/api/alerts/history", async (req, res) => {
+    try {
+      const userId = "default-user";
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const events = await storage.getAlertEvents(userId, limit);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get alert history" });
+    }
+  });
+
+  app.post("/api/alerts/mark-read", requireWriteAuth, async (req, res) => {
+    try {
+      const userId = "default-user";
+      const alertIds = req.body.alertIds || [];
+      await alertService.markAsRead(userId, alertIds);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to mark alerts as read" });
+    }
+  });
+
   // Credits
   app.get("/api/credits", async (_req, res) => {
     try {

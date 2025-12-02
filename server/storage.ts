@@ -38,6 +38,11 @@ import type {
   InsertDreamSession,
   InsertStressScenario,
   InsertStressTestRun,
+  AlertPreference,
+  AlertEvent,
+  InsertAlertPreference,
+  InsertAlertEvent,
+  AlertTriggerType,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -856,6 +861,80 @@ export class MemStorage implements IStorage {
     if (!run) return undefined;
     run.agentResponses.push(response);
     return run;
+  }
+
+  // Alert Preferences
+  private alertPreferences: Map<string, AlertPreference> = new Map();
+
+  async getAlertPreference(userId: string): Promise<AlertPreference | undefined> {
+    return this.alertPreferences.get(userId);
+  }
+
+  async upsertAlertPreference(preference: InsertAlertPreference): Promise<AlertPreference> {
+    const existing = this.alertPreferences.get(preference.userId);
+    const now = Date.now();
+    
+    const fullPreference: AlertPreference = {
+      id: existing?.id || randomUUID(),
+      ...preference,
+      rateLimitPerMinute: preference.rateLimitPerMinute || 3,
+      createdAt: existing?.createdAt || now,
+      updatedAt: now,
+    };
+    
+    this.alertPreferences.set(preference.userId, fullPreference);
+    return fullPreference;
+  }
+
+  // Alert Events
+  private alertEvents: Map<string, AlertEvent[]> = new Map();
+
+  async getAlertEvents(userId: string, limit: number = 50): Promise<AlertEvent[]> {
+    const events = this.alertEvents.get(userId) || [];
+    return events.slice(-limit);
+  }
+
+  async createAlertEvent(alert: InsertAlertEvent): Promise<AlertEvent> {
+    const fullEvent: AlertEvent = {
+      id: randomUUID(),
+      ...alert,
+      sentViaEmail: false,
+      sentViaWebhook: false,
+      read: false,
+      createdAt: Date.now(),
+    };
+
+    if (!this.alertEvents.has(alert.userId)) {
+      this.alertEvents.set(alert.userId, []);
+    }
+    this.alertEvents.get(alert.userId)!.push(fullEvent);
+    
+    return fullEvent;
+  }
+
+  async markAlertAsRead(userId: string, alertId: string): Promise<AlertEvent | undefined> {
+    const events = this.alertEvents.get(userId) || [];
+    const event = events.find(e => e.id === alertId);
+    if (event) {
+      event.read = true;
+    }
+    return event;
+  }
+
+  async updateAlertDeliveryStatus(userId: string, alertId: string, email: boolean, webhook: boolean): Promise<AlertEvent | undefined> {
+    const events = this.alertEvents.get(userId) || [];
+    const event = events.find(e => e.id === alertId);
+    if (event) {
+      event.sentViaEmail = event.sentViaEmail || email;
+      event.sentViaWebhook = event.sentViaWebhook || webhook;
+    }
+    return event;
+  }
+
+  async getRecentAlerts(userId: string, minutesBack: number = 1): Promise<AlertEvent[]> {
+    const events = this.alertEvents.get(userId) || [];
+    const since = Date.now() - minutesBack * 60 * 1000;
+    return events.filter(e => e.createdAt >= since);
   }
 }
 
