@@ -23,6 +23,7 @@ import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 import { alertService } from "./alerts/AlertService";
 import { backtestingEngine } from "./backtesting/BacktestingEngine";
+import { quickBacktestEngine } from "./backtesting/QuickBacktestEngine";
 import { walletManager } from "./wallets/WalletManager";
 import { rpcClient } from "./blockchain/RPCClient";
 
@@ -2262,6 +2263,87 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to get backtest stats:", error);
       res.status(500).json({ error: "Failed to get backtest stats" });
+    }
+  });
+
+  // ==========================================
+  // Quick Backtest Routes (Simplified Workflow)
+  // ==========================================
+
+  // Start a quick backtest
+  app.post("/api/backtest/start", async (req, res) => {
+    try {
+      const { symbol, interval, from, to, agents, initialBalance } = req.body;
+      
+      if (!symbol || !interval || !from || !to || !agents || agents.length === 0) {
+        return res.status(400).json({ 
+          error: "Missing required fields: symbol, interval, from, to, agents" 
+        });
+      }
+      
+      const result = await quickBacktestEngine.runQuickBacktest({
+        symbol,
+        interval,
+        from,
+        to,
+        agents,
+        initialBalance,
+      });
+      
+      res.status(201).json(result);
+    } catch (error: any) {
+      console.error("Failed to start quick backtest:", error);
+      res.status(500).json({ error: error.message || "Failed to start backtest" });
+    }
+  });
+
+  // Get quick backtest result by ID
+  app.get("/api/backtest/:id", async (req, res) => {
+    try {
+      const result = quickBacktestEngine.getResult(req.params.id);
+      if (!result) {
+        return res.status(404).json({ error: "Backtest not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to get backtest result:", error);
+      res.status(500).json({ error: "Failed to get backtest result" });
+    }
+  });
+
+  // Get formatted summary for a backtest
+  app.get("/api/backtest/:id/summary", async (req, res) => {
+    try {
+      const result = quickBacktestEngine.getResult(req.params.id);
+      if (!result) {
+        return res.status(404).json({ error: "Backtest not found" });
+      }
+      res.json({ summary: quickBacktestEngine.formatSummary(result) });
+    } catch (error) {
+      console.error("Failed to get backtest summary:", error);
+      res.status(500).json({ error: "Failed to get backtest summary" });
+    }
+  });
+
+  // Get all quick backtest results
+  app.get("/api/backtest/results", async (req, res) => {
+    try {
+      const results = quickBacktestEngine.getResults();
+      res.json(results);
+    } catch (error) {
+      console.error("Failed to get backtest results:", error);
+      res.status(500).json({ error: "Failed to get backtest results" });
+    }
+  });
+
+  // Get available agents for backtesting
+  app.get("/api/backtest/agents", async (req, res) => {
+    try {
+      const agents = quickBacktestEngine.getAvailableAgents();
+      res.json(agents);
+    } catch (error) {
+      console.error("Failed to get available agents:", error);
+      res.status(500).json({ error: "Failed to get available agents" });
     }
   });
 
