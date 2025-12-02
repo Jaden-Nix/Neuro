@@ -944,6 +944,79 @@ export interface BacktestComparison {
   createdAt: number;
 }
 
+// ==========================================
+// Quick Backtest Types (Simplified Workflow)
+// ==========================================
+
+export type BacktestInterval = "1m" | "5m" | "15m" | "1h" | "4h" | "1d";
+
+export const BACKTEST_AGENTS = ["Atlas", "Vega", "Nova", "Sentinel", "Arbiter"] as const;
+export type BacktestAgentName = typeof BACKTEST_AGENTS[number];
+
+export interface QuickBacktestRequest {
+  symbol: string;
+  interval: BacktestInterval;
+  from: string;  // ISO date string
+  to: string;    // ISO date string
+  agents: BacktestAgentName[];
+  initialBalance?: number;
+}
+
+export interface AgentTradeDecision {
+  timestamp: string;
+  agent: BacktestAgentName;
+  action: "BUY" | "SELL" | "HOLD";
+  price: number;
+  reason: string;
+  confidence: number;
+}
+
+export interface AgentPerformance {
+  agent: BacktestAgentName;
+  totalTrades: number;
+  winningTrades: number;
+  losingTrades: number;
+  winRate: number;
+  totalReturn: number;
+  avgRoiPerTrade: number;
+  maxDrawdown: number;
+  sharpeRatio: number;
+}
+
+export interface QuickBacktestResult {
+  id: string;
+  symbol: string;
+  interval: BacktestInterval;
+  from: string;
+  to: string;
+  agents: BacktestAgentName[];
+  status: "running" | "completed" | "failed";
+  startedAt: number;
+  completedAt?: number;
+  durationMs?: number;
+  
+  // Overall metrics
+  totalTrades: number;
+  winRate: number;
+  totalReturn: number;
+  cumulativeReturn: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  
+  // Per-agent breakdown
+  agentPerformance: AgentPerformance[];
+  bestAgent: BacktestAgentName;
+  worstAgent: BacktestAgentName;
+  
+  // Decision trace (for transparency)
+  decisions: AgentTradeDecision[];
+  
+  // Insights
+  insights: string[];
+  
+  errorMessage?: string;
+}
+
 export const backtestScenarios = pgTable("backtest_scenarios", {
   id: varchar("id").primaryKey(),
   name: varchar("name").notNull(),
