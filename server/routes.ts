@@ -3752,6 +3752,76 @@ export async function registerRoutes(
     }
   });
 
+  // Dream Mode Engine - Enhanced overnight scanning with Morning Reports
+  app.get("/api/dream/engine/status", async (req, res) => {
+    try {
+      const { dreamModeEngine } = await import("./dream/DreamModeEngine");
+      const status = dreamModeEngine.getStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Failed to get dream mode status:", error);
+      res.status(500).json({ error: "Failed to get dream mode status" });
+    }
+  });
+
+  app.post("/api/dream/engine/start", writeLimiter, async (req, res) => {
+    try {
+      const { dreamModeEngine } = await import("./dream/DreamModeEngine");
+      const { depth = 5 } = req.body;
+      
+      const session = await dreamModeEngine.startDreaming(depth);
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "dream_mode_started", session },
+        timestamp: Date.now(),
+      });
+      
+      res.status(201).json({ success: true, session });
+    } catch (error: any) {
+      console.error("Failed to start dream mode:", error);
+      res.status(400).json({ error: error.message || "Failed to start dream mode" });
+    }
+  });
+
+  app.post("/api/dream/engine/stop", writeLimiter, async (req, res) => {
+    try {
+      const { dreamModeEngine } = await import("./dream/DreamModeEngine");
+      const report = await dreamModeEngine.stopDreaming();
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "dream_mode_stopped", reportId: report.id },
+        timestamp: Date.now(),
+      });
+      
+      res.json({ success: true, report });
+    } catch (error: any) {
+      console.error("Failed to stop dream mode:", error);
+      res.status(400).json({ error: error.message || "Failed to stop dream mode" });
+    }
+  });
+
+  app.post("/api/dream/engine/demo", writeLimiter, async (req, res) => {
+    try {
+      const { dreamModeEngine } = await import("./dream/DreamModeEngine");
+      
+      dreamModeEngine.clearData();
+      const report = await dreamModeEngine.generateDemoReport();
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "dream_demo_generated", reportId: report.id },
+        timestamp: Date.now(),
+      });
+      
+      res.json(report);
+    } catch (error) {
+      console.error("Failed to generate demo dream report:", error);
+      res.status(500).json({ error: "Failed to generate demo dream report" });
+    }
+  });
+
   // Stress Scenarios
   app.get("/api/stress/scenarios", async (req, res) => {
     try {
