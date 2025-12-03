@@ -48,17 +48,18 @@ const levelColors = {
   success: "text-green-500",
 };
 
-function TypewriterText({ text, speed = 15, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
+function TypewriterText({ text = "", speed = 15, onComplete }: { text?: string; speed?: number; onComplete?: () => void }) {
+  const safeText = text || "";
   const [displayedText, setDisplayedText] = useState("");
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    if (isComplete) return;
+    if (isComplete || !safeText) return;
     
     let currentIndex = 0;
     const interval = setInterval(() => {
-      if (currentIndex < text.length) {
-        setDisplayedText(text.slice(0, currentIndex + 1));
+      if (currentIndex < safeText.length) {
+        setDisplayedText(safeText.slice(0, currentIndex + 1));
         currentIndex++;
       } else {
         clearInterval(interval);
@@ -68,7 +69,7 @@ function TypewriterText({ text, speed = 15, onComplete }: { text: string; speed?
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, speed, isComplete, onComplete]);
+  }, [safeText, speed, isComplete, onComplete]);
 
   return (
     <span>
@@ -269,9 +270,9 @@ export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogS
             </div>
           ) : (
             <AnimatePresence mode="popLayout">
-              {displayLogs.map((log) => (
+              {displayLogs.map((log, index) => (
                 <LogEntryItem 
-                  key={log.id} 
+                  key={`${log.id}-${log.timestamp}-${index}`} 
                   log={log} 
                   isNew={newLogIds.has(log.id)}
                 />
