@@ -25,12 +25,14 @@ import Evolution from "@/pages/Evolution";
 import StressLab from "@/pages/StressLab";
 import DreamMode from "@/pages/DreamMode";
 import Insights from "@/pages/Insights";
+import TradingAdvisor from "@/pages/TradingAdvisor";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/trading" component={TradingAdvisor} />
       <Route path="/ml" component={MLInsights} />
       {/* <Route path="/marketplace" component={Marketplace} /> */}
       <Route path="/alerts" component={Alerts} />

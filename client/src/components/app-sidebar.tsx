@@ -23,7 +23,8 @@ import {
   GitBranch,
   Moon,
   Beaker,
-  Activity
+  Activity,
+  TrendingUp,
 } from "lucide-react";
 
 const menuItems = [
@@ -32,6 +33,12 @@ const menuItems = [
     url: "/",
     icon: LayoutDashboard,
     testId: "nav-dashboard",
+  },
+  {
+    title: "Trading Advisor",
+    url: "/trading",
+    icon: TrendingUp,
+    testId: "nav-trading",
   },
   {
     title: "AI Insights",

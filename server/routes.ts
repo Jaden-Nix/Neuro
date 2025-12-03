@@ -31,6 +31,7 @@ import { parliamentEngine } from "./parliament/ParliamentEngine";
 import { blockchainSync } from "./blockchain/BlockchainSyncService";
 import { evolutionEngine } from "./evolution/EvolutionEngine";
 import { tradingIntelligenceService } from "./trading/TradingIntelligenceService";
+import { tradingVillage } from "./trading/TradingVillage";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -4944,6 +4945,100 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ error: "Failed to get airdrop" });
     }
+  });
+
+  // ==========================================
+  // Trading Village Routes (AI Agent Ecosystem)
+  // ==========================================
+
+  app.get("/api/village/agents", async (req, res) => {
+    try {
+      const agents = tradingVillage.getAgents();
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get village agents" });
+    }
+  });
+
+  app.get("/api/village/agents/:id", async (req, res) => {
+    try {
+      const agent = tradingVillage.getAgent(req.params.id);
+      if (!agent) return res.status(404).json({ error: "Agent not found" });
+      res.json(agent);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent" });
+    }
+  });
+
+  app.get("/api/village/thoughts", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const agentId = req.query.agentId as string | undefined;
+      const thoughts = tradingVillage.getThoughts(limit, agentId);
+      res.json(thoughts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent thoughts" });
+    }
+  });
+
+  app.get("/api/village/leaderboard", async (req, res) => {
+    try {
+      const leaderboard = tradingVillage.getLeaderboard();
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get leaderboard" });
+    }
+  });
+
+  app.get("/api/village/competitions", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const competitions = tradingVillage.getCompetitions(limit);
+      res.json(competitions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get competitions" });
+    }
+  });
+
+  app.get("/api/village/stats", async (req, res) => {
+    try {
+      const stats = tradingVillage.getVillageStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get village stats" });
+    }
+  });
+
+  tradingVillage.on("thought", (thought) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_thought", thought },
+      timestamp: Date.now(),
+    });
+  });
+
+  tradingVillage.on("signalClaimed", ({ agent, claim }) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_signal_claimed", agent: agent.name, claim },
+      timestamp: Date.now(),
+    });
+  });
+
+  tradingVillage.on("evolution", ({ agent, competition }) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_evolution", agent: agent.name, generation: agent.generation, competition },
+      timestamp: Date.now(),
+    });
+  });
+
+  tradingVillage.on("competition", (competition) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_competition", competition },
+      timestamp: Date.now(),
+    });
   });
 
   return httpServer;
