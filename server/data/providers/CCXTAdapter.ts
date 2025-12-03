@@ -1,0 +1,430 @@
+import * as ccxt from 'ccxt';
+import { EventEmitter } from 'events';
+import type { 
+  SupportedExchange, 
+  LivePrice, 
+  OHLCVBar, 
+  TokenMetadata,
+  TokenCategory 
+} from '@shared/schema';
+
+const TOKEN_REGISTRY: Omit<TokenMetadata, 'addedAt' | 'updatedAt'>[] = [
+  { id: 'btc', symbol: 'BTC', name: 'Bitcoin', category: 'layer1', chains: ['bitcoin'], coingeckoId: 'bitcoin', marketCapRank: 1, isActive: true },
+  { id: 'eth', symbol: 'ETH', name: 'Ethereum', category: 'layer1', chains: ['ethereum'], coingeckoId: 'ethereum', marketCapRank: 2, isActive: true },
+  { id: 'sol', symbol: 'SOL', name: 'Solana', category: 'layer1', chains: ['solana'], coingeckoId: 'solana', marketCapRank: 5, isActive: true },
+  { id: 'xrp', symbol: 'XRP', name: 'Ripple', category: 'layer1', chains: ['xrp'], coingeckoId: 'ripple', marketCapRank: 3, isActive: true },
+  { id: 'bnb', symbol: 'BNB', name: 'BNB', category: 'layer1', chains: ['bsc'], coingeckoId: 'binancecoin', marketCapRank: 4, isActive: true },
+  { id: 'ada', symbol: 'ADA', name: 'Cardano', category: 'layer1', chains: ['cardano'], coingeckoId: 'cardano', marketCapRank: 8, isActive: true },
+  { id: 'avax', symbol: 'AVAX', name: 'Avalanche', category: 'layer1', chains: ['avalanche'], coingeckoId: 'avalanche-2', marketCapRank: 12, isActive: true },
+  { id: 'doge', symbol: 'DOGE', name: 'Dogecoin', category: 'meme', chains: ['dogecoin'], coingeckoId: 'dogecoin', marketCapRank: 7, isActive: true },
+  { id: 'trx', symbol: 'TRX', name: 'TRON', category: 'layer1', chains: ['tron'], coingeckoId: 'tron', marketCapRank: 10, isActive: true },
+  { id: 'dot', symbol: 'DOT', name: 'Polkadot', category: 'layer1', chains: ['polkadot'], coingeckoId: 'polkadot', marketCapRank: 14, isActive: true },
+  { id: 'link', symbol: 'LINK', name: 'Chainlink', category: 'oracle', chains: ['ethereum'], coingeckoId: 'chainlink', marketCapRank: 13, isActive: true },
+  { id: 'matic', symbol: 'MATIC', name: 'Polygon', category: 'layer2', chains: ['polygon'], coingeckoId: 'matic-network', marketCapRank: 15, isActive: true },
+  { id: 'shib', symbol: 'SHIB', name: 'Shiba Inu', category: 'meme', chains: ['ethereum'], coingeckoId: 'shiba-inu', marketCapRank: 11, isActive: true },
+  { id: 'ltc', symbol: 'LTC', name: 'Litecoin', category: 'layer1', chains: ['litecoin'], coingeckoId: 'litecoin', marketCapRank: 20, isActive: true },
+  { id: 'uni', symbol: 'UNI', name: 'Uniswap', category: 'defi', chains: ['ethereum'], coingeckoId: 'uniswap', marketCapRank: 22, isActive: true },
+  { id: 'atom', symbol: 'ATOM', name: 'Cosmos', category: 'layer1', chains: ['cosmos'], coingeckoId: 'cosmos', marketCapRank: 25, isActive: true },
+  { id: 'etc', symbol: 'ETC', name: 'Ethereum Classic', category: 'layer1', chains: ['ethereum-classic'], coingeckoId: 'ethereum-classic', marketCapRank: 26, isActive: true },
+  { id: 'xlm', symbol: 'XLM', name: 'Stellar', category: 'layer1', chains: ['stellar'], coingeckoId: 'stellar', marketCapRank: 28, isActive: true },
+  { id: 'near', symbol: 'NEAR', name: 'NEAR Protocol', category: 'layer1', chains: ['near'], coingeckoId: 'near', marketCapRank: 19, isActive: true },
+  { id: 'apt', symbol: 'APT', name: 'Aptos', category: 'layer1', chains: ['aptos'], coingeckoId: 'aptos', marketCapRank: 27, isActive: true },
+  { id: 'arb', symbol: 'ARB', name: 'Arbitrum', category: 'layer2', chains: ['arbitrum'], coingeckoId: 'arbitrum', marketCapRank: 35, isActive: true },
+  { id: 'op', symbol: 'OP', name: 'Optimism', category: 'layer2', chains: ['optimism'], coingeckoId: 'optimism', marketCapRank: 40, isActive: true },
+  { id: 'aave', symbol: 'AAVE', name: 'Aave', category: 'defi', chains: ['ethereum'], coingeckoId: 'aave', marketCapRank: 30, isActive: true },
+  { id: 'mkr', symbol: 'MKR', name: 'Maker', category: 'defi', chains: ['ethereum'], coingeckoId: 'maker', marketCapRank: 45, isActive: true },
+  { id: 'crv', symbol: 'CRV', name: 'Curve', category: 'defi', chains: ['ethereum'], coingeckoId: 'curve-dao-token', marketCapRank: 80, isActive: true },
+  { id: 'ldo', symbol: 'LDO', name: 'Lido DAO', category: 'defi', chains: ['ethereum'], coingeckoId: 'lido-dao', marketCapRank: 50, isActive: true },
+  { id: 'snx', symbol: 'SNX', name: 'Synthetix', category: 'defi', chains: ['ethereum'], coingeckoId: 'havven', marketCapRank: 90, isActive: true },
+  { id: 'comp', symbol: 'COMP', name: 'Compound', category: 'defi', chains: ['ethereum'], coingeckoId: 'compound-governance-token', marketCapRank: 95, isActive: true },
+  { id: 'inj', symbol: 'INJ', name: 'Injective', category: 'defi', chains: ['injective'], coingeckoId: 'injective-protocol', marketCapRank: 38, isActive: true },
+  { id: 'fil', symbol: 'FIL', name: 'Filecoin', category: 'storage', chains: ['filecoin'], coingeckoId: 'filecoin', marketCapRank: 32, isActive: true },
+  { id: 'sui', symbol: 'SUI', name: 'Sui', category: 'layer1', chains: ['sui'], coingeckoId: 'sui', marketCapRank: 17, isActive: true },
+  { id: 'sei', symbol: 'SEI', name: 'Sei', category: 'layer1', chains: ['sei'], coingeckoId: 'sei-network', marketCapRank: 55, isActive: true },
+  { id: 'ftm', symbol: 'FTM', name: 'Fantom', category: 'layer1', chains: ['fantom'], coingeckoId: 'fantom', marketCapRank: 65, isActive: true },
+  { id: 'imx', symbol: 'IMX', name: 'Immutable', category: 'gaming', chains: ['ethereum'], coingeckoId: 'immutable-x', marketCapRank: 42, isActive: true },
+  { id: 'mana', symbol: 'MANA', name: 'Decentraland', category: 'gaming', chains: ['ethereum'], coingeckoId: 'decentraland', marketCapRank: 75, isActive: true },
+  { id: 'sand', symbol: 'SAND', name: 'The Sandbox', category: 'gaming', chains: ['ethereum'], coingeckoId: 'the-sandbox', marketCapRank: 78, isActive: true },
+  { id: 'axs', symbol: 'AXS', name: 'Axie Infinity', category: 'gaming', chains: ['ethereum'], coingeckoId: 'axie-infinity', marketCapRank: 85, isActive: true },
+  { id: 'gala', symbol: 'GALA', name: 'Gala', category: 'gaming', chains: ['ethereum'], coingeckoId: 'gala', marketCapRank: 70, isActive: true },
+  { id: 'ape', symbol: 'APE', name: 'ApeCoin', category: 'gaming', chains: ['ethereum'], coingeckoId: 'apecoin', marketCapRank: 88, isActive: true },
+  { id: 'pepe', symbol: 'PEPE', name: 'Pepe', category: 'meme', chains: ['ethereum'], coingeckoId: 'pepe', marketCapRank: 23, isActive: true },
+  { id: 'wif', symbol: 'WIF', name: 'dogwifhat', category: 'meme', chains: ['solana'], coingeckoId: 'dogwifcoin', marketCapRank: 33, isActive: true },
+  { id: 'bonk', symbol: 'BONK', name: 'Bonk', category: 'meme', chains: ['solana'], coingeckoId: 'bonk', marketCapRank: 48, isActive: true },
+  { id: 'floki', symbol: 'FLOKI', name: 'Floki', category: 'meme', chains: ['ethereum', 'bsc'], coingeckoId: 'floki', marketCapRank: 52, isActive: true },
+  { id: 'render', symbol: 'RENDER', name: 'Render Token', category: 'ai', chains: ['solana'], coingeckoId: 'render-token', marketCapRank: 29, isActive: true },
+  { id: 'fet', symbol: 'FET', name: 'Fetch.ai', category: 'ai', chains: ['ethereum'], coingeckoId: 'fetch-ai', marketCapRank: 34, isActive: true },
+  { id: 'tao', symbol: 'TAO', name: 'Bittensor', category: 'ai', chains: ['bittensor'], coingeckoId: 'bittensor', marketCapRank: 24, isActive: true },
+  { id: 'agix', symbol: 'AGIX', name: 'SingularityNET', category: 'ai', chains: ['ethereum'], coingeckoId: 'singularitynet', marketCapRank: 100, isActive: true },
+  { id: 'ocean', symbol: 'OCEAN', name: 'Ocean Protocol', category: 'ai', chains: ['ethereum'], coingeckoId: 'ocean-protocol', marketCapRank: 110, isActive: true },
+  { id: 'ondo', symbol: 'ONDO', name: 'Ondo Finance', category: 'rwa', chains: ['ethereum'], coingeckoId: 'ondo-finance', marketCapRank: 53, isActive: true },
+  { id: 'pendle', symbol: 'PENDLE', name: 'Pendle', category: 'defi', chains: ['ethereum'], coingeckoId: 'pendle', marketCapRank: 60, isActive: true },
+  { id: 'ena', symbol: 'ENA', name: 'Ethena', category: 'defi', chains: ['ethereum'], coingeckoId: 'ethena', marketCapRank: 44, isActive: true },
+  { id: 'jup', symbol: 'JUP', name: 'Jupiter', category: 'defi', chains: ['solana'], coingeckoId: 'jupiter-exchange-solana', marketCapRank: 46, isActive: true },
+  { id: 'ray', symbol: 'RAY', name: 'Raydium', category: 'defi', chains: ['solana'], coingeckoId: 'raydium', marketCapRank: 82, isActive: true },
+  { id: 'orca', symbol: 'ORCA', name: 'Orca', category: 'defi', chains: ['solana'], coingeckoId: 'orca', marketCapRank: 200, isActive: true },
+  { id: 'grt', symbol: 'GRT', name: 'The Graph', category: 'infrastructure', chains: ['ethereum'], coingeckoId: 'the-graph', marketCapRank: 41, isActive: true },
+  { id: 'vet', symbol: 'VET', name: 'VeChain', category: 'infrastructure', chains: ['vechain'], coingeckoId: 'vechain', marketCapRank: 37, isActive: true },
+  { id: 'algo', symbol: 'ALGO', name: 'Algorand', category: 'layer1', chains: ['algorand'], coingeckoId: 'algorand', marketCapRank: 58, isActive: true },
+  { id: 'flow', symbol: 'FLOW', name: 'Flow', category: 'layer1', chains: ['flow'], coingeckoId: 'flow', marketCapRank: 68, isActive: true },
+  { id: 'hbar', symbol: 'HBAR', name: 'Hedera', category: 'layer1', chains: ['hedera'], coingeckoId: 'hedera-hashgraph', marketCapRank: 18, isActive: true },
+  { id: 'icp', symbol: 'ICP', name: 'Internet Computer', category: 'layer1', chains: ['icp'], coingeckoId: 'internet-computer', marketCapRank: 21, isActive: true },
+  { id: 'egld', symbol: 'EGLD', name: 'MultiversX', category: 'layer1', chains: ['multiversx'], coingeckoId: 'elrond-erd-2', marketCapRank: 47, isActive: true },
+  { id: 'stx', symbol: 'STX', name: 'Stacks', category: 'layer2', chains: ['stacks'], coingeckoId: 'blockstack', marketCapRank: 36, isActive: true },
+  { id: 'kas', symbol: 'KAS', name: 'Kaspa', category: 'layer1', chains: ['kaspa'], coingeckoId: 'kaspa', marketCapRank: 31, isActive: true },
+  { id: 'rune', symbol: 'RUNE', name: 'THORChain', category: 'defi', chains: ['thorchain'], coingeckoId: 'thorchain', marketCapRank: 49, isActive: true },
+  { id: 'ftx', symbol: 'FTT', name: 'FTX Token', category: 'exchange', chains: ['ethereum'], coingeckoId: 'ftx-token', marketCapRank: 120, isActive: true },
+  { id: 'cro', symbol: 'CRO', name: 'Cronos', category: 'exchange', chains: ['cronos'], coingeckoId: 'crypto-com-chain', marketCapRank: 43, isActive: true },
+  { id: 'okb', symbol: 'OKB', name: 'OKB', category: 'exchange', chains: ['okc'], coingeckoId: 'okb', marketCapRank: 16, isActive: true },
+  { id: 'leo', symbol: 'LEO', name: 'UNUS SED LEO', category: 'exchange', chains: ['ethereum'], coingeckoId: 'leo-token', marketCapRank: 9, isActive: true },
+  { id: 'xmr', symbol: 'XMR', name: 'Monero', category: 'privacy', chains: ['monero'], coingeckoId: 'monero', marketCapRank: 39, isActive: true },
+  { id: 'zec', symbol: 'ZEC', name: 'Zcash', category: 'privacy', chains: ['zcash'], coingeckoId: 'zcash', marketCapRank: 130, isActive: true },
+  { id: 'eos', symbol: 'EOS', name: 'EOS', category: 'layer1', chains: ['eos'], coingeckoId: 'eos', marketCapRank: 72, isActive: true },
+  { id: 'kcs', symbol: 'KCS', name: 'KuCoin Token', category: 'exchange', chains: ['kcc'], coingeckoId: 'kucoin-shares', marketCapRank: 89, isActive: true },
+  { id: 'qnt', symbol: 'QNT', name: 'Quant', category: 'infrastructure', chains: ['ethereum'], coingeckoId: 'quant-network', marketCapRank: 56, isActive: true },
+  { id: 'theta', symbol: 'THETA', name: 'Theta Network', category: 'infrastructure', chains: ['theta'], coingeckoId: 'theta-token', marketCapRank: 66, isActive: true },
+  { id: 'bsv', symbol: 'BSV', name: 'Bitcoin SV', category: 'layer1', chains: ['bsv'], coingeckoId: 'bitcoin-cash-sv', marketCapRank: 54, isActive: true },
+  { id: 'neo', symbol: 'NEO', name: 'Neo', category: 'layer1', chains: ['neo'], coingeckoId: 'neo', marketCapRank: 74, isActive: true },
+  { id: 'kava', symbol: 'KAVA', name: 'Kava', category: 'defi', chains: ['kava'], coingeckoId: 'kava', marketCapRank: 125, isActive: true },
+  { id: 'mina', symbol: 'MINA', name: 'Mina Protocol', category: 'layer1', chains: ['mina'], coingeckoId: 'mina-protocol', marketCapRank: 115, isActive: true },
+  { id: 'zil', symbol: 'ZIL', name: 'Zilliqa', category: 'layer1', chains: ['zilliqa'], coingeckoId: 'zilliqa', marketCapRank: 145, isActive: true },
+  { id: 'iota', symbol: 'IOTA', name: 'IOTA', category: 'layer1', chains: ['iota'], coingeckoId: 'iota', marketCapRank: 135, isActive: true },
+  { id: 'chz', symbol: 'CHZ', name: 'Chiliz', category: 'infrastructure', chains: ['chiliz'], coingeckoId: 'chiliz', marketCapRank: 87, isActive: true },
+  { id: 'enj', symbol: 'ENJ', name: 'Enjin Coin', category: 'gaming', chains: ['ethereum'], coingeckoId: 'enjincoin', marketCapRank: 105, isActive: true },
+  { id: 'bat', symbol: 'BAT', name: 'Basic Attention Token', category: 'infrastructure', chains: ['ethereum'], coingeckoId: 'basic-attention-token', marketCapRank: 97, isActive: true },
+  { id: '1inch', symbol: '1INCH', name: '1inch', category: 'defi', chains: ['ethereum'], coingeckoId: '1inch', marketCapRank: 102, isActive: true },
+  { id: 'rndr', symbol: 'RNDR', name: 'Render Token (legacy)', category: 'ai', chains: ['ethereum'], coingeckoId: 'render-token', marketCapRank: 29, isActive: false },
+  { id: 'blur', symbol: 'BLUR', name: 'Blur', category: 'defi', chains: ['ethereum'], coingeckoId: 'blur', marketCapRank: 63, isActive: true },
+  { id: 'pyth', symbol: 'PYTH', name: 'Pyth Network', category: 'oracle', chains: ['solana'], coingeckoId: 'pyth-network', marketCapRank: 51, isActive: true },
+  { id: 'wld', symbol: 'WLD', name: 'Worldcoin', category: 'ai', chains: ['ethereum'], coingeckoId: 'worldcoin-wld', marketCapRank: 59, isActive: true },
+  { id: 'strk', symbol: 'STRK', name: 'Starknet', category: 'layer2', chains: ['starknet'], coingeckoId: 'starknet', marketCapRank: 62, isActive: true },
+  { id: 'dydx', symbol: 'DYDX', name: 'dYdX', category: 'defi', chains: ['dydx'], coingeckoId: 'dydx-chain', marketCapRank: 67, isActive: true },
+  { id: 'gmx', symbol: 'GMX', name: 'GMX', category: 'defi', chains: ['arbitrum'], coingeckoId: 'gmx', marketCapRank: 92, isActive: true },
+  { id: 'cake', symbol: 'CAKE', name: 'PancakeSwap', category: 'defi', chains: ['bsc'], coingeckoId: 'pancakeswap-token', marketCapRank: 83, isActive: true },
+  { id: 'sushi', symbol: 'SUSHI', name: 'SushiSwap', category: 'defi', chains: ['ethereum'], coingeckoId: 'sushi', marketCapRank: 155, isActive: true },
+  { id: 'rpl', symbol: 'RPL', name: 'Rocket Pool', category: 'defi', chains: ['ethereum'], coingeckoId: 'rocket-pool', marketCapRank: 140, isActive: true },
+  { id: 'fxs', symbol: 'FXS', name: 'Frax Share', category: 'defi', chains: ['ethereum'], coingeckoId: 'frax-share', marketCapRank: 112, isActive: true },
+  { id: 'cvx', symbol: 'CVX', name: 'Convex Finance', category: 'defi', chains: ['ethereum'], coingeckoId: 'convex-finance', marketCapRank: 150, isActive: true },
+  { id: 'osmo', symbol: 'OSMO', name: 'Osmosis', category: 'defi', chains: ['cosmos'], coingeckoId: 'osmosis', marketCapRank: 93, isActive: true },
+  { id: 'audio', symbol: 'AUDIO', name: 'Audius', category: 'infrastructure', chains: ['solana'], coingeckoId: 'audius', marketCapRank: 165, isActive: true },
+  { id: 'mask', symbol: 'MASK', name: 'Mask Network', category: 'infrastructure', chains: ['ethereum'], coingeckoId: 'mask-network', marketCapRank: 175, isActive: true },
+  { id: 'usdt', symbol: 'USDT', name: 'Tether', category: 'stablecoin', chains: ['ethereum', 'tron', 'bsc'], coingeckoId: 'tether', marketCapRank: 3, isActive: true },
+  { id: 'usdc', symbol: 'USDC', name: 'USD Coin', category: 'stablecoin', chains: ['ethereum', 'solana'], coingeckoId: 'usd-coin', marketCapRank: 6, isActive: true },
+  { id: 'dai', symbol: 'DAI', name: 'Dai', category: 'stablecoin', chains: ['ethereum'], coingeckoId: 'dai', marketCapRank: 25, isActive: true },
+  { id: 'frax', symbol: 'FRAX', name: 'Frax', category: 'stablecoin', chains: ['ethereum'], coingeckoId: 'frax', marketCapRank: 160, isActive: true },
+  { id: 'fdusd', symbol: 'FDUSD', name: 'First Digital USD', category: 'stablecoin', chains: ['bsc'], coingeckoId: 'first-digital-usd', marketCapRank: 57, isActive: true },
+];
+
+const EXCHANGE_CONFIGS: Record<SupportedExchange, { enabled: boolean; rateLimit: number }> = {
+  binance: { enabled: true, rateLimit: 1200 },
+  bybit: { enabled: true, rateLimit: 600 },
+  okx: { enabled: true, rateLimit: 600 },
+  coinbase: { enabled: true, rateLimit: 300 },
+  kraken: { enabled: true, rateLimit: 300 },
+  kucoin: { enabled: true, rateLimit: 600 },
+  gate: { enabled: true, rateLimit: 600 },
+  mexc: { enabled: true, rateLimit: 600 },
+  bitget: { enabled: true, rateLimit: 600 },
+  huobi: { enabled: true, rateLimit: 600 },
+};
+
+interface PriceCache {
+  price: LivePrice;
+  timestamp: number;
+}
+
+export class CCXTAdapter extends EventEmitter {
+  private exchanges: Map<SupportedExchange, ccxt.Exchange> = new Map();
+  private priceCache: Map<string, PriceCache> = new Map();
+  private tokenRegistry: Map<string, TokenMetadata> = new Map();
+  private isStreaming: boolean = false;
+  private streamInterval?: NodeJS.Timeout;
+  private lastPrices: Map<string, number> = new Map();
+  
+  private readonly CACHE_TTL = 5000;
+  private readonly STREAM_INTERVAL = 2000;
+  private readonly MAX_CONCURRENT_REQUESTS = 10;
+
+  constructor() {
+    super();
+    this.initializeTokenRegistry();
+    this.initializeExchanges();
+  }
+
+  private initializeTokenRegistry(): void {
+    const now = Date.now();
+    TOKEN_REGISTRY.forEach(token => {
+      if (token.isActive) {
+        this.tokenRegistry.set(token.symbol, {
+          ...token,
+          addedAt: now,
+          updatedAt: now,
+        });
+      }
+    });
+    console.log(`[CCXT] Initialized ${this.tokenRegistry.size} tokens in registry`);
+  }
+
+  private initializeExchanges(): void {
+    const exchangeClasses: Record<SupportedExchange, any> = {
+      binance: ccxt.binance,
+      bybit: ccxt.bybit,
+      okx: ccxt.okx,
+      coinbase: ccxt.coinbase,
+      kraken: ccxt.kraken,
+      kucoin: ccxt.kucoin,
+      gate: ccxt.gate,
+      mexc: ccxt.mexc,
+      bitget: ccxt.bitget,
+      huobi: ccxt.huobi,
+    };
+
+    for (const [name, config] of Object.entries(EXCHANGE_CONFIGS)) {
+      if (config.enabled) {
+        try {
+          const ExchangeClass = exchangeClasses[name as SupportedExchange];
+          if (ExchangeClass) {
+            const exchange = new ExchangeClass({
+              enableRateLimit: true,
+              rateLimit: config.rateLimit,
+            });
+            this.exchanges.set(name as SupportedExchange, exchange);
+          }
+        } catch (error) {
+          console.warn(`[CCXT] Failed to initialize ${name}:`, error);
+        }
+      }
+    }
+    console.log(`[CCXT] Initialized ${this.exchanges.size} exchanges`);
+  }
+
+  getTokenRegistry(): TokenMetadata[] {
+    return Array.from(this.tokenRegistry.values());
+  }
+
+  getActiveTokens(): string[] {
+    return Array.from(this.tokenRegistry.values())
+      .filter(t => t.isActive)
+      .map(t => t.symbol);
+  }
+
+  getTokensByCategory(category: TokenCategory): TokenMetadata[] {
+    return Array.from(this.tokenRegistry.values())
+      .filter(t => t.category === category && t.isActive);
+  }
+
+  async fetchPrice(symbol: string, exchange: SupportedExchange = 'binance'): Promise<LivePrice | null> {
+    const cacheKey = `${symbol}:${exchange}`;
+    const cached = this.priceCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return cached.price;
+    }
+
+    const exchangeClient = this.exchanges.get(exchange);
+    if (!exchangeClient) {
+      return null;
+    }
+
+    try {
+      const ccxtSymbol = `${symbol}/USDT`;
+      const ticker = await exchangeClient.fetchTicker(ccxtSymbol);
+      
+      const lastPrice = this.lastPrices.get(symbol) || ticker.last || 0;
+      const currentPrice = ticker.last || 0;
+      const change24h = currentPrice - (ticker.open || lastPrice);
+      const changePercent24h = ticker.open ? ((currentPrice - ticker.open) / ticker.open) * 100 : 0;
+      
+      this.lastPrices.set(symbol, currentPrice);
+
+      const price: LivePrice = {
+        symbol,
+        price: currentPrice,
+        change24h,
+        changePercent24h,
+        high24h: ticker.high || currentPrice,
+        low24h: ticker.low || currentPrice,
+        volume24h: ticker.baseVolume || 0,
+        volumeUsd24h: ticker.quoteVolume || 0,
+        bid: ticker.bid,
+        ask: ticker.ask,
+        spread: ticker.bid && ticker.ask ? ((ticker.ask - ticker.bid) / ticker.ask) * 100 : undefined,
+        exchange,
+        timestamp: Date.now(),
+      };
+
+      this.priceCache.set(cacheKey, { price, timestamp: Date.now() });
+      return price;
+    } catch (error) {
+      console.warn(`[CCXT] Failed to fetch ${symbol} from ${exchange}:`, error);
+      return null;
+    }
+  }
+
+  async fetchMultiplePrices(symbols: string[], exchange: SupportedExchange = 'binance'): Promise<Map<string, LivePrice>> {
+    const results = new Map<string, LivePrice>();
+    const exchangeClient = this.exchanges.get(exchange);
+    
+    if (!exchangeClient) {
+      return results;
+    }
+
+    try {
+      const ccxtSymbols = symbols.map(s => `${s}/USDT`);
+      const tickers = await exchangeClient.fetchTickers(ccxtSymbols);
+      
+      for (const [ccxtSymbol, ticker] of Object.entries(tickers)) {
+        const symbol = ccxtSymbol.replace('/USDT', '');
+        const lastPrice = this.lastPrices.get(symbol) || (ticker as any).last || 0;
+        const currentPrice = (ticker as any).last || 0;
+        
+        this.lastPrices.set(symbol, currentPrice);
+
+        const price: LivePrice = {
+          symbol,
+          price: currentPrice,
+          change24h: currentPrice - ((ticker as any).open || lastPrice),
+          changePercent24h: (ticker as any).percentage || 0,
+          high24h: (ticker as any).high || currentPrice,
+          low24h: (ticker as any).low || currentPrice,
+          volume24h: (ticker as any).baseVolume || 0,
+          volumeUsd24h: (ticker as any).quoteVolume || 0,
+          bid: (ticker as any).bid,
+          ask: (ticker as any).ask,
+          exchange,
+          timestamp: Date.now(),
+        };
+
+        results.set(symbol, price);
+        this.priceCache.set(`${symbol}:${exchange}`, { price, timestamp: Date.now() });
+      }
+    } catch (error) {
+      console.warn(`[CCXT] Failed to fetch multiple prices from ${exchange}:`, error);
+      
+      for (const symbol of symbols) {
+        const cached = this.priceCache.get(`${symbol}:${exchange}`);
+        if (cached) {
+          results.set(symbol, cached.price);
+        }
+      }
+    }
+
+    return results;
+  }
+
+  async fetchOHLCV(
+    symbol: string, 
+    timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d' = '1h',
+    limit: number = 100,
+    exchange: SupportedExchange = 'binance'
+  ): Promise<OHLCVBar[]> {
+    const exchangeClient = this.exchanges.get(exchange);
+    if (!exchangeClient) {
+      return [];
+    }
+
+    try {
+      const ccxtSymbol = `${symbol}/USDT`;
+      const ohlcv = await exchangeClient.fetchOHLCV(ccxtSymbol, timeframe, undefined, limit);
+      
+      return ohlcv.map(([timestamp, open, high, low, close, volume]) => ({
+        timestamp: timestamp as number,
+        open: open as number,
+        high: high as number,
+        low: low as number,
+        close: close as number,
+        volume: volume as number,
+      }));
+    } catch (error) {
+      console.warn(`[CCXT] Failed to fetch OHLCV for ${symbol}:`, error);
+      return [];
+    }
+  }
+
+  async startPriceStreaming(): Promise<void> {
+    if (this.isStreaming) return;
+    
+    this.isStreaming = true;
+    console.log('[CCXT] Starting price streaming for', this.tokenRegistry.size, 'tokens');
+
+    const fetchBatch = async () => {
+      const tokens = this.getActiveTokens();
+      const batchSize = 20;
+      
+      for (let i = 0; i < tokens.length; i += batchSize) {
+        const batch = tokens.slice(i, i + batchSize);
+        try {
+          const prices = await this.fetchMultiplePrices(batch, 'binance');
+          
+          if (prices.size > 0) {
+            this.emit('prices', Array.from(prices.values()));
+          }
+        } catch (error) {
+          console.warn('[CCXT] Batch fetch error:', error);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    };
+
+    fetchBatch();
+    
+    this.streamInterval = setInterval(fetchBatch, this.STREAM_INTERVAL);
+  }
+
+  stopPriceStreaming(): void {
+    if (this.streamInterval) {
+      clearInterval(this.streamInterval);
+      this.streamInterval = undefined;
+    }
+    this.isStreaming = false;
+    console.log('[CCXT] Stopped price streaming');
+  }
+
+  getCachedPrice(symbol: string): LivePrice | null {
+    const cached = this.priceCache.get(`${symbol}:binance`);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL * 2) {
+      return cached.price;
+    }
+    return null;
+  }
+
+  getAllCachedPrices(): LivePrice[] {
+    const prices: LivePrice[] = [];
+    const now = Date.now();
+    
+    for (const [key, cached] of this.priceCache.entries()) {
+      if (now - cached.timestamp < this.CACHE_TTL * 2 && key.endsWith(':binance')) {
+        prices.push(cached.price);
+      }
+    }
+    
+    return prices;
+  }
+
+  getExchangeStatus(): Record<SupportedExchange, boolean> {
+    const status: Record<SupportedExchange, boolean> = {} as any;
+    for (const [name, exchange] of this.exchanges.entries()) {
+      status[name] = exchange !== undefined;
+    }
+    return status;
+  }
+
+  async checkExchangeHealth(exchange: SupportedExchange): Promise<{ healthy: boolean; latencyMs: number }> {
+    const exchangeClient = this.exchanges.get(exchange);
+    if (!exchangeClient) {
+      return { healthy: false, latencyMs: -1 };
+    }
+
+    try {
+      const start = Date.now();
+      await exchangeClient.fetchTicker('BTC/USDT');
+      const latencyMs = Date.now() - start;
+      return { healthy: true, latencyMs };
+    } catch {
+      return { healthy: false, latencyMs: -1 };
+    }
+  }
+}
+
+export const ccxtAdapter = new CCXTAdapter();

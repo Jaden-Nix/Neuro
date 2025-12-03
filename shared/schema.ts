@@ -2082,3 +2082,363 @@ export type SelectTradeOutcome = typeof tradeOutcomes.$inferSelect;
 export type SelectAirdropOpportunity = typeof airdropOpportunities.$inferSelect;
 export type SelectBigTransaction = typeof bigTransactions.$inferSelect;
 
+// ==========================================
+// CCXT Multi-Exchange Token Registry
+// ==========================================
+
+export type SupportedExchange = 
+  | "binance" 
+  | "bybit" 
+  | "okx" 
+  | "coinbase" 
+  | "kraken" 
+  | "kucoin" 
+  | "gate" 
+  | "mexc"
+  | "bitget"
+  | "huobi";
+
+export type TokenCategory = 
+  | "layer1" 
+  | "layer2" 
+  | "defi" 
+  | "gaming" 
+  | "meme" 
+  | "ai" 
+  | "rwa" 
+  | "stablecoin" 
+  | "infrastructure"
+  | "exchange"
+  | "privacy"
+  | "storage"
+  | "oracle";
+
+export interface TokenMetadata {
+  id: string;
+  symbol: string;
+  name: string;
+  category: TokenCategory;
+  chains: string[];
+  coingeckoId?: string;
+  logoUrl?: string;
+  marketCapRank?: number;
+  isActive: boolean;
+  addedAt: number;
+  updatedAt: number;
+}
+
+export interface LivePrice {
+  symbol: string;
+  price: number;
+  change24h: number;
+  changePercent24h: number;
+  high24h: number;
+  low24h: number;
+  volume24h: number;
+  volumeUsd24h: number;
+  marketCap?: number;
+  bid?: number;
+  ask?: number;
+  spread?: number;
+  exchange: SupportedExchange;
+  timestamp: number;
+}
+
+export interface OHLCVBar {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface WhaleEvent {
+  id: string;
+  symbol: string;
+  type: "accumulation" | "distribution" | "transfer" | "exchange_inflow" | "exchange_outflow";
+  walletAddress: string;
+  walletLabel?: string;
+  amount: number;
+  valueUsd: number;
+  fromAddress?: string;
+  toAddress?: string;
+  chain: string;
+  txHash: string;
+  significance: "low" | "medium" | "high" | "extreme";
+  priceImpactEstimate?: number;
+  timestamp: number;
+}
+
+export interface SentimentSignal {
+  id: string;
+  symbol: string;
+  source: "onchain" | "social" | "funding" | "options" | "orderbook";
+  signal: "bullish" | "bearish" | "neutral";
+  strength: number;
+  data: {
+    longShortRatio?: number;
+    fundingRate?: number;
+    openInterest?: number;
+    fearGreedIndex?: number;
+    socialMentions?: number;
+    whaleActivity?: string;
+    optionsSkew?: number;
+    orderBookImbalance?: number;
+  };
+  description: string;
+  timestamp: number;
+}
+
+// ==========================================
+// Enhanced Alpha Signal Types
+// ==========================================
+
+export interface AlphaSignal {
+  id: string;
+  symbol: string;
+  direction: "long" | "short";
+  confidence: number;
+  entry: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2: number;
+  takeProfit3: number;
+  riskRewardRatio: number;
+  positionSizePercent: number;
+  timeframe: string;
+  exchange: SupportedExchange;
+  indicators: {
+    rsi: number;
+    rsiSignal: "oversold" | "overbought" | "neutral";
+    macd: { line: number; signal: number; histogram: number; trend: "bullish" | "bearish" | "neutral" };
+    ema20: number;
+    ema50: number;
+    ema200: number;
+    bollingerBands: { upper: number; middle: number; lower: number; percentB: number };
+    atr: number;
+    atrPercent: number;
+    volume24h: number;
+    volumeChange: number;
+    obv: number;
+    adx?: number;
+    stochRsi?: number;
+  };
+  patterns: string[];
+  confluenceScore: number;
+  reasoning: string;
+  aiAnalysis: string;
+  agentId: string;
+  agentName: string;
+  validators: { agentId: string; agentName: string; agrees: boolean; comment: string }[];
+  status: "active" | "triggered" | "closed" | "expired" | "invalidated";
+  outcome?: {
+    result: "win" | "loss" | "breakeven";
+    exitPrice: number;
+    pnlPercent: number;
+    exitReason: string;
+    holdingTimeMs: number;
+  };
+  createdAt: number;
+  expiresAt: number;
+  triggeredAt?: number;
+  closedAt?: number;
+}
+
+export interface TokenPriceSnapshot {
+  symbol: string;
+  prices: Record<SupportedExchange, number>;
+  bestBid: { exchange: SupportedExchange; price: number };
+  bestAsk: { exchange: SupportedExchange; price: number };
+  arbitrageOpportunity?: {
+    buyExchange: SupportedExchange;
+    sellExchange: SupportedExchange;
+    spreadPercent: number;
+    potentialProfit: number;
+  };
+  timestamp: number;
+}
+
+// ==========================================
+// Agent Performance & Self-Healing Types
+// ==========================================
+
+export interface AgentHealthMetrics {
+  agentId: string;
+  agentName: string;
+  rollingWinRate30d: number;
+  rollingPnl30d: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  avgHoldingTime: number;
+  signalAccuracy: number;
+  latencyMs: number;
+  errorRate: number;
+  lastActiveAt: number;
+  healthScore: number;
+  predictedDegradation?: {
+    likelihood: number;
+    estimatedDaysToFailure: number;
+    recommendedAction: string;
+  };
+}
+
+export interface EvolutionBattle {
+  id: string;
+  parentAgentId: string;
+  childAgentId: string;
+  battleSymbol: string;
+  battlePeriod: { start: number; end: number };
+  parentPerformance: { pnl: number; winRate: number; trades: number };
+  childPerformance: { pnl: number; winRate: number; trades: number };
+  winner: "parent" | "child" | "draw";
+  mutationsApplied: string[];
+  timestamp: number;
+}
+
+// ==========================================
+// Token Registry Database Tables
+// ==========================================
+
+export const tokenRegistry = pgTable("token_registry", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  name: varchar("name").notNull(),
+  category: varchar("category").$type<TokenCategory>().notNull(),
+  chains: jsonb("chains").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  coingeckoId: varchar("coingecko_id"),
+  logoUrl: varchar("logo_url"),
+  marketCapRank: integer("market_cap_rank"),
+  isActive: boolean("is_active").notNull().default(true),
+  addedAt: timestamp("added_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const priceHistory = pgTable("price_history", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  exchange: varchar("exchange").$type<SupportedExchange>().notNull(),
+  price: integer("price").notNull(),
+  change24h: integer("change_24h").notNull(),
+  volume24h: integer("volume_24h").notNull(),
+  high24h: integer("high_24h").notNull(),
+  low24h: integer("low_24h").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const whaleEvents = pgTable("whale_events", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  type: varchar("type").$type<WhaleEvent["type"]>().notNull(),
+  walletAddress: varchar("wallet_address").notNull(),
+  walletLabel: varchar("wallet_label"),
+  amount: integer("amount").notNull(),
+  valueUsd: integer("value_usd").notNull(),
+  fromAddress: varchar("from_address"),
+  toAddress: varchar("to_address"),
+  chain: varchar("chain").notNull(),
+  txHash: varchar("tx_hash").notNull(),
+  significance: varchar("significance").$type<WhaleEvent["significance"]>().notNull(),
+  priceImpactEstimate: integer("price_impact_estimate"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const sentimentSignals = pgTable("sentiment_signals", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  source: varchar("source").$type<SentimentSignal["source"]>().notNull(),
+  signal: varchar("signal").$type<SentimentSignal["signal"]>().notNull(),
+  strength: integer("strength").notNull(),
+  data: jsonb("data").$type<SentimentSignal["data"]>().notNull(),
+  description: text("description").notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const alphaSignals = pgTable("alpha_signals", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  direction: varchar("direction").$type<"long" | "short">().notNull(),
+  confidence: integer("confidence").notNull(),
+  entry: integer("entry").notNull(),
+  stopLoss: integer("stop_loss").notNull(),
+  takeProfit1: integer("take_profit_1").notNull(),
+  takeProfit2: integer("take_profit_2").notNull(),
+  takeProfit3: integer("take_profit_3").notNull(),
+  riskRewardRatio: integer("risk_reward_ratio").notNull(),
+  positionSizePercent: integer("position_size_percent").notNull(),
+  timeframe: varchar("timeframe").notNull(),
+  exchange: varchar("exchange").$type<SupportedExchange>().notNull(),
+  indicators: jsonb("indicators").$type<AlphaSignal["indicators"]>().notNull(),
+  patterns: jsonb("patterns").$type<string[]>().notNull(),
+  confluenceScore: integer("confluence_score").notNull(),
+  reasoning: text("reasoning").notNull(),
+  aiAnalysis: text("ai_analysis").notNull(),
+  agentId: varchar("agent_id").notNull(),
+  agentName: varchar("agent_name").notNull(),
+  validators: jsonb("validators").$type<AlphaSignal["validators"]>().notNull().default(sql`'[]'::jsonb`),
+  status: varchar("status").$type<AlphaSignal["status"]>().notNull().default("active"),
+  outcome: jsonb("outcome").$type<AlphaSignal["outcome"]>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  triggeredAt: timestamp("triggered_at"),
+  closedAt: timestamp("closed_at"),
+});
+
+export const agentHealthMetrics = pgTable("agent_health_metrics", {
+  id: varchar("id").primaryKey(),
+  agentId: varchar("agent_id").notNull(),
+  agentName: varchar("agent_name").notNull(),
+  rollingWinRate30d: integer("rolling_win_rate_30d").notNull(),
+  rollingPnl30d: integer("rolling_pnl_30d").notNull(),
+  sharpeRatio: integer("sharpe_ratio").notNull(),
+  maxDrawdown: integer("max_drawdown").notNull(),
+  avgHoldingTime: integer("avg_holding_time").notNull(),
+  signalAccuracy: integer("signal_accuracy").notNull(),
+  latencyMs: integer("latency_ms").notNull(),
+  errorRate: integer("error_rate").notNull(),
+  lastActiveAt: timestamp("last_active_at").notNull(),
+  healthScore: integer("health_score").notNull(),
+  predictedDegradation: jsonb("predicted_degradation").$type<AgentHealthMetrics["predictedDegradation"]>(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const evolutionBattles = pgTable("evolution_battles", {
+  id: varchar("id").primaryKey(),
+  parentAgentId: varchar("parent_agent_id").notNull(),
+  childAgentId: varchar("child_agent_id").notNull(),
+  battleSymbol: varchar("battle_symbol").notNull(),
+  battlePeriodStart: timestamp("battle_period_start").notNull(),
+  battlePeriodEnd: timestamp("battle_period_end").notNull(),
+  parentPerformance: jsonb("parent_performance").$type<EvolutionBattle["parentPerformance"]>().notNull(),
+  childPerformance: jsonb("child_performance").$type<EvolutionBattle["childPerformance"]>().notNull(),
+  winner: varchar("winner").$type<"parent" | "child" | "draw">().notNull(),
+  mutationsApplied: jsonb("mutations_applied").$type<string[]>().notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+// Insert schemas for new tables
+export const insertTokenRegistrySchema = createInsertSchema(tokenRegistry).omit({ addedAt: true, updatedAt: true });
+export const insertPriceHistorySchema = createInsertSchema(priceHistory).omit({ timestamp: true });
+export const insertWhaleEventSchema = createInsertSchema(whaleEvents).omit({ timestamp: true });
+export const insertSentimentSignalSchema = createInsertSchema(sentimentSignals).omit({ timestamp: true });
+export const insertAlphaSignalSchema = createInsertSchema(alphaSignals).omit({ createdAt: true, triggeredAt: true, closedAt: true });
+export const insertAgentHealthMetricsSchema = createInsertSchema(agentHealthMetrics).omit({ timestamp: true });
+export const insertEvolutionBattleSchema = createInsertSchema(evolutionBattles).omit({ timestamp: true });
+
+// Types for new tables
+export type InsertTokenRegistry = z.infer<typeof insertTokenRegistrySchema>;
+export type InsertPriceHistory = z.infer<typeof insertPriceHistorySchema>;
+export type InsertWhaleEvent = z.infer<typeof insertWhaleEventSchema>;
+export type InsertSentimentSignal = z.infer<typeof insertSentimentSignalSchema>;
+export type InsertAlphaSignal = z.infer<typeof insertAlphaSignalSchema>;
+export type InsertAgentHealthMetrics = z.infer<typeof insertAgentHealthMetricsSchema>;
+export type InsertEvolutionBattle = z.infer<typeof insertEvolutionBattleSchema>;
+
+export type SelectTokenRegistry = typeof tokenRegistry.$inferSelect;
+export type SelectPriceHistory = typeof priceHistory.$inferSelect;
+export type SelectWhaleEvent = typeof whaleEvents.$inferSelect;
+export type SelectSentimentSignal = typeof sentimentSignals.$inferSelect;
+export type SelectAlphaSignal = typeof alphaSignals.$inferSelect;
+export type SelectAgentHealthMetrics = typeof agentHealthMetrics.$inferSelect;
+export type SelectEvolutionBattle = typeof evolutionBattles.$inferSelect;
+
