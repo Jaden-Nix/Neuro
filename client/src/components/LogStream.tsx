@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo, forwardRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Brain, Search, Shield, Zap, Info, AlertTriangle, XCircle, CheckCircle, Trash2, Terminal } from "lucide-react";
 import { AgentType, type LogEntry } from "@shared/schema";
@@ -84,33 +84,35 @@ function TypewriterText({ text, speed = 15, onComplete }: { text: string; speed?
   );
 }
 
-function LogEntryItem({ log, isNew }: { log: LogEntry; isNew: boolean }) {
-  const [showTypewriter, setShowTypewriter] = useState(isNew);
-  const AgentIcon = agentIcons[log.agentType];
-  const LevelIcon = levelIcons[log.level];
-  const agentColorClass = agentColors[log.agentType];
-  const glowColorClass = agentGlowColors[log.agentType];
-  const levelColorClass = levelColors[log.level];
+const LogEntryItem = forwardRef<HTMLDivElement, { log: LogEntry; isNew: boolean }>(
+  function LogEntryItem({ log, isNew }, ref) {
+    const [showTypewriter, setShowTypewriter] = useState(isNew);
+    const AgentIcon = agentIcons[log.agentType];
+    const LevelIcon = levelIcons[log.level];
+    const agentColorClass = agentColors[log.agentType];
+    const glowColorClass = agentGlowColors[log.agentType];
+    const levelColorClass = levelColors[log.level];
 
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', { 
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      fractionalSecondDigits: 3
-    });
-  };
+    const formatTimestamp = (timestamp: number) => {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('en-US', { 
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        fractionalSecondDigits: 3
+      });
+    };
 
-  return (
-    <motion.div
-      initial={isNew ? { opacity: 0, x: -20, scale: 0.95 } : false}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className={`p-3 rounded-md bg-card/50 border hover-elevate space-y-1 ${agentColorClass} ${isNew ? `shadow-lg ${glowColorClass}` : ""}`}
-      data-testid={`log-entry-${log.id}`}
-    >
+    return (
+      <motion.div
+        ref={ref}
+        initial={isNew ? { opacity: 0, x: -20, scale: 0.95 } : false}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className={`p-3 rounded-md bg-card/50 border hover-elevate space-y-1 ${agentColorClass} ${isNew ? `shadow-lg ${glowColorClass}` : ""}`}
+        data-testid={`log-entry-${log.id}`}
+      >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <motion.div
@@ -169,8 +171,9 @@ function LogEntryItem({ log, isNew }: { log: LogEntry; isNew: boolean }) {
         </motion.p>
       )}
     </motion.div>
-  );
-}
+    );
+  }
+);
 
 export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogStreamProps) {
   const [autoScroll, setAutoScroll] = useState(true);
