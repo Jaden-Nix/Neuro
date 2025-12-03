@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion } from "framer-motion";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Header } from "@/components/Header";
 import { NeuroNetCore } from "@/components/NeuroNetCore";
@@ -14,6 +15,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
+};
+
 import type {
   Agent,
   SystemState,
@@ -233,18 +248,22 @@ export default function Dashboard() {
       />
 
       <main className="flex-1 pt-4 pb-8 px-6 overflow-auto">
-        <div className="mb-4">
-          <SidebarTrigger data-testid="button-sidebar-toggle" />
-        </div>
-        <div className="container mx-auto space-y-6">
+        <motion.div 
+          className="container mx-auto space-y-6"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           {/* Metrics Dashboard */}
-          <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
+          <motion.div variants={itemVariants}>
+            <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
+          </motion.div>
 
           {/* Main Grid Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Left Column - Controls */}
-            <div className="space-y-4">
-              <Card>
+            <motion.div variants={itemVariants} className="space-y-4">
+              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
                 <CardContent className="p-5">
                   <ControlPanel
                     autonomousMode={systemState?.autonomousMode || false}
@@ -257,16 +276,16 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
                 <CardContent className="p-5">
                   <RiskHeatmap />
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
             {/* Center - Core */}
-            <div className="lg:col-span-2">
-              <Card className="h-full">
+            <motion.div variants={itemVariants} className="lg:col-span-2">
+              <Card className="h-full shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
                 <CardContent className="p-5">
                   <NeuroNetCore
                     agents={agents}
@@ -274,11 +293,11 @@ export default function Dashboard() {
                   />
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
             {/* Right Column - Logs */}
-            <div>
-              <Card className="h-full">
+            <motion.div variants={itemVariants}>
+              <Card className="h-full shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
                 <CardContent className="p-5 h-full flex flex-col">
                   <LogStream 
                     logs={logs}
@@ -287,55 +306,77 @@ export default function Dashboard() {
                   />
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
           </div>
 
           {/* Timeline Slider */}
           {timelineEvents.length > 0 && (
-            <Card>
-              <CardContent className="p-5">
-                <TimeWarpSlider events={timelineEvents} onTimeChange={(timestamp) => {
-                  console.log("Timeline changed to:", new Date(timestamp).toISOString());
-                }} />
-              </CardContent>
-            </Card>
+            <motion.div variants={itemVariants}>
+              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
+                <CardContent className="p-5">
+                  <TimeWarpSlider events={timelineEvents} onTimeChange={(timestamp) => {
+                    console.log("Timeline changed to:", new Date(timestamp).toISOString());
+                  }} />
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
 
           {/* Simulations Section - Compact */}
           {simulationTree.length > 0 && (
-            <Card>
-              <CardContent className="p-5">
-                <div className="mb-4">
-                  <h3 className="text-base font-semibold mb-2">Future Trading Scenarios</h3>
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-md p-3 text-sm text-muted-foreground mb-4">
-                    <p className="text-xs mb-2"><strong>What this shows:</strong></p>
-                    <ul className="space-y-1 text-xs list-disc list-inside">
-                      <li><strong>EV:</strong> Profit potential score (higher = better opportunity)</li>
-                      <li><strong>Viable/Risky:</strong> How safe this trade is</li>
-                      <li><strong>Yield:</strong> Money you could make if it works</li>
-                    </ul>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-52 overflow-y-auto">
-                  {simulationTree.slice(0, 6).map((sim, idx) => (
-                    <div key={sim.id} className={`border rounded-md p-3 ${sim.outcome === "success" ? "border-green-500/40 bg-green-500/5" : sim.outcome === "failure" ? "border-red-500/40 bg-red-500/5" : "border-blue-500/30 bg-blue-500/5"}`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-muted-foreground">#{idx + 1}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${sim.outcome === "success" ? "bg-green-500/30 text-green-700 dark:text-green-300" : sim.outcome === "failure" ? "bg-red-500/30 text-red-700 dark:text-red-300" : "bg-blue-500/20 text-blue-700 dark:text-blue-300"}`}>
-                          {sim.outcome === "success" ? "Viable" : sim.outcome === "failure" ? "Risky" : "Pending"}
-                        </span>
-                      </div>
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <div>EV: {sim.evScore.toFixed(2)}</div>
-                        {sim.predictions[0] && <div>Yield: {sim.predictions[0].yield.toFixed(1)}%</div>}
-                      </div>
+            <motion.div variants={itemVariants}>
+              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
+                <CardContent className="p-5">
+                  <div className="mb-4">
+                    <h3 className="text-base font-semibold mb-2">Future Trading Scenarios</h3>
+                    <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg p-3.5 text-sm text-muted-foreground mb-4">
+                      <p className="text-xs font-medium mb-2">What this shows:</p>
+                      <ul className="space-y-1 text-xs list-disc list-inside text-muted-foreground/80">
+                        <li><strong className="text-foreground">EV:</strong> Profit potential score (higher = better opportunity)</li>
+                        <li><strong className="text-foreground">Viable/Risky:</strong> How safe this trade is</li>
+                        <li><strong className="text-foreground">Yield:</strong> Money you could make if it works</li>
+                      </ul>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-52 overflow-y-auto">
+                    {simulationTree.slice(0, 6).map((sim, idx) => (
+                      <motion.div 
+                        key={sim.id} 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className={`border rounded-lg p-3.5 transition-colors ${
+                          sim.outcome === "success" 
+                            ? "border-green-500/30 bg-green-500/5 dark:bg-green-500/10" 
+                            : sim.outcome === "failure" 
+                              ? "border-red-500/30 bg-red-500/5 dark:bg-red-500/10" 
+                              : "border-primary/20 bg-primary/5 dark:bg-primary/10"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <span className="text-xs font-mono text-muted-foreground">#{idx + 1}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            sim.outcome === "success" 
+                              ? "bg-green-500/20 text-green-700 dark:text-green-400" 
+                              : sim.outcome === "failure" 
+                                ? "bg-red-500/20 text-red-700 dark:text-red-400" 
+                                : "bg-primary/20 text-primary"
+                          }`}>
+                            {sim.outcome === "success" ? "Viable" : sim.outcome === "failure" ? "Risky" : "Pending"}
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <div className="font-medium">EV: <span className="text-foreground">{sim.evScore.toFixed(2)}</span></div>
+                          {sim.predictions[0] && <div>Yield: <span className="text-foreground">{sim.predictions[0].yield.toFixed(1)}%</span></div>}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
-        </div>
+        </motion.div>
       </main>
 
       {/* Developer Panel */}

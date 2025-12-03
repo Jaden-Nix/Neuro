@@ -14,17 +14,71 @@ import {
   Sparkles,
   Target,
   TrendingUp,
-  AlertTriangle,
-  Layers
+  Layers,
+  LucideIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
   onSkip: () => void;
+}
+
+interface WelcomeFeature {
+  icon: LucideIcon;
+  text: string;
+}
+
+interface AgentInfo {
+  name: string;
+  role: string;
+  color: string;
+  traits: string[];
+  tasks: string;
+}
+
+interface FeatureInfo {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+interface IntegrationInfo {
+  name: string;
+  description: string;
+  status: 'active' | 'ready';
+}
+
+interface WelcomeContent {
+  headline: string;
+  features: WelcomeFeature[];
+}
+
+interface AgentsContent {
+  agents: AgentInfo[];
+}
+
+interface FeaturesContent {
+  features: FeatureInfo[];
+}
+
+interface AtpContent {
+  integrations: IntegrationInfo[];
+}
+
+interface ConnectContent {
+  steps: string[];
+}
+
+interface OnboardingStep {
+  id: string;
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  color: string;
+  content: WelcomeContent | AgentsContent | FeaturesContent | AtpContent | ConnectContent;
 }
 
 const ONBOARDING_STEPS = [
@@ -275,98 +329,102 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                     transition={{ duration: 0.2 }}
                     className="min-h-[280px]"
                   >
-                    {step.id === 'welcome' && (
+                    {step.id === 'welcome' && 'headline' in step.content && (
                       <div className="space-y-4">
                         <p className="text-lg font-medium text-center mb-6">
-                          {step.content.headline}
+                          {(step.content as WelcomeContent).headline}
                         </p>
                         <div className="grid grid-cols-2 gap-3">
-                          {step.content.features.map((feature, i) => (
+                          {(step.content as WelcomeContent).features.map((feature, i) => (
                             <motion.div
                               key={i}
                               initial={{ opacity: 0, y: 20 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: i * 0.1 }}
-                              className="flex items-center gap-2 p-3 rounded-lg bg-muted/50"
+                              className="flex items-center gap-3 p-4 rounded-xl bg-gradient-to-br from-muted/60 to-muted/30 border border-border/50"
                             >
-                              <feature.icon className="h-5 w-5 text-primary" />
-                              <span className="text-sm">{feature.text}</span>
+                              <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <feature.icon className="h-5 w-5 text-primary" />
+                              </div>
+                              <span className="text-sm font-medium">{feature.text}</span>
                             </motion.div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {step.id === 'agents' && (
+                    {step.id === 'agents' && 'agents' in step.content && (
                       <div className="grid grid-cols-2 gap-3">
-                        {step.content.agents.map((agent, i) => (
+                        {(step.content as AgentsContent).agents.map((agent, i) => (
                           <motion.div
                             key={agent.name}
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: i * 0.1 }}
-                            className="p-3 rounded-lg border"
+                            className="p-4 rounded-xl border bg-gradient-to-br from-card to-muted/20"
                           >
                             <div className="flex items-center gap-2 mb-2">
                               <div 
-                                className="h-3 w-3 rounded-full"
-                                style={{ backgroundColor: agent.color }}
+                                className="h-3 w-3 rounded-full ring-2 ring-offset-2 ring-offset-card"
+                                style={{ backgroundColor: agent.color, boxShadow: `0 0 8px ${agent.color}40` }}
                               />
-                              <span className="font-medium text-sm">{agent.name}</span>
+                              <span className="font-semibold text-sm">{agent.name}</span>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-2">{agent.role}</p>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">{agent.role}</p>
                             <div className="flex flex-wrap gap-1 mb-2">
                               {agent.traits.map(trait => (
-                                <Badge key={trait} variant="secondary" className="text-xs">
+                                <Badge key={trait} variant="secondary" className="text-xs px-2 py-0.5">
                                   {trait}
                                 </Badge>
                               ))}
                             </div>
-                            <p className="text-xs text-muted-foreground">{agent.tasks}</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">{agent.tasks}</p>
                           </motion.div>
                         ))}
                       </div>
                     )}
 
-                    {step.id === 'features' && (
+                    {step.id === 'features' && 'features' in step.content && (
                       <div className="grid grid-cols-2 gap-3">
-                        {step.content.features.map((feature, i) => (
+                        {(step.content as FeaturesContent).features.map((feature, i) => (
                           <motion.div
                             key={feature.title}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.08 }}
-                            className="flex items-start gap-3 p-3 rounded-lg bg-muted/50"
+                            className="flex items-start gap-3 p-4 rounded-xl bg-gradient-to-br from-muted/60 to-muted/30 border border-border/50"
                           >
-                            <feature.icon className="h-5 w-5 text-primary mt-0.5" />
+                            <div className="flex-shrink-0 h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <feature.icon className="h-4 w-4 text-primary" />
+                            </div>
                             <div>
-                              <p className="font-medium text-sm">{feature.title}</p>
-                              <p className="text-xs text-muted-foreground">{feature.description}</p>
+                              <p className="font-semibold text-sm">{feature.title}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
                             </div>
                           </motion.div>
                         ))}
                       </div>
                     )}
 
-                    {step.id === 'atp' && (
+                    {step.id === 'atp' && 'integrations' in step.content && (
                       <div className="space-y-3">
-                        {step.content.integrations.map((integration, i) => (
+                        {(step.content as AtpContent).integrations.map((integration, i) => (
                           <motion.div
                             key={integration.name}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.1 }}
-                            className="flex items-center justify-between p-3 rounded-lg border"
+                            className="flex items-center justify-between gap-4 p-4 rounded-xl border bg-gradient-to-r from-card to-muted/20"
                           >
                             <div>
-                              <p className="font-medium text-sm">{integration.name}</p>
-                              <p className="text-xs text-muted-foreground">{integration.description}</p>
+                              <p className="font-semibold text-sm">{integration.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{integration.description}</p>
                             </div>
-                            <Badge variant={integration.status === 'active' ? 'default' : 'secondary'}>
+                            <Badge variant={integration.status === 'active' ? 'default' : 'secondary'} className="shrink-0">
                               {integration.status === 'active' ? (
-                                <><CheckCircle className="h-3 w-3 mr-1" /> Active</>
+                                <span className="flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Active</span>
                               ) : (
-                                <><Zap className="h-3 w-3 mr-1" /> Ready</>
+                                <span className="flex items-center gap-1"><Zap className="h-3 w-3" /> Ready</span>
                               )}
                             </Badge>
                           </motion.div>
@@ -374,20 +432,20 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                       </div>
                     )}
 
-                    {step.id === 'connect' && (
+                    {step.id === 'connect' && 'steps' in step.content && (
                       <div className="space-y-4">
-                        {step.content.steps.map((stepText, i) => (
+                        {(step.content as ConnectContent).steps.map((stepText, i) => (
                           <motion.div
                             key={i}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.1 }}
-                            className="flex items-center gap-3"
+                            className="flex items-center gap-4"
                           >
-                            <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                            <div className="flex-shrink-0 h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center text-primary font-bold shadow-sm">
                               {i + 1}
                             </div>
-                            <p className="text-sm">{stepText}</p>
+                            <p className="text-sm font-medium">{stepText}</p>
                           </motion.div>
                         ))}
                         
@@ -395,11 +453,13 @@ export function OnboardingWizard({ onComplete, onSkip }: OnboardingWizardProps) 
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: 0.5 }}
-                          className="mt-6 p-4 rounded-lg bg-primary/5 border border-primary/20 text-center"
+                          className="mt-6 p-5 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 text-center"
                         >
-                          <Sparkles className="h-6 w-6 text-primary mx-auto mb-2" />
-                          <p className="text-sm font-medium">Ready to explore!</p>
-                          <p className="text-xs text-muted-foreground">
+                          <div className="h-12 w-12 mx-auto mb-3 rounded-xl bg-primary/20 flex items-center justify-center">
+                            <Sparkles className="h-6 w-6 text-primary" />
+                          </div>
+                          <p className="text-base font-semibold">Ready to explore!</p>
+                          <p className="text-sm text-muted-foreground mt-1">
                             Click "Get Started" to enter the Command Center
                           </p>
                         </motion.div>
