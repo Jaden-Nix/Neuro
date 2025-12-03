@@ -30,6 +30,7 @@ import { aiInsightsEngine } from "./insights/AIInsightsEngine";
 import { parliamentEngine } from "./parliament/ParliamentEngine";
 import { blockchainSync } from "./blockchain/BlockchainSyncService";
 import { evolutionEngine } from "./evolution/EvolutionEngine";
+import { tradingIntelligenceService } from "./trading/TradingIntelligenceService";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -4802,6 +4803,146 @@ export async function registerRoutes(
       res.json(response);
     } catch (error) {
       res.status(500).json({ error: "Failed to update stress test run" });
+    }
+  });
+
+  // ==========================================
+  // Trading Intelligence Routes
+  // ==========================================
+  
+  app.get("/api/trading/signals", async (req, res) => {
+    try {
+      const { status } = req.query;
+      const signals = status === "active" 
+        ? tradingIntelligenceService.getActiveSignals()
+        : tradingIntelligenceService.getAllSignals();
+      res.json(signals);
+    } catch (error) {
+      console.error("Failed to get trading signals:", error);
+      res.status(500).json({ error: "Failed to get trading signals" });
+    }
+  });
+
+  app.get("/api/trading/signals/:id", async (req, res) => {
+    try {
+      const signal = tradingIntelligenceService.getSignal(req.params.id);
+      if (!signal) return res.status(404).json({ error: "Signal not found" });
+      res.json(signal);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get signal" });
+    }
+  });
+
+  app.post("/api/trading/signals/generate", writeLimiter, async (req, res) => {
+    try {
+      const { symbol, exchange, timeframe } = req.body;
+      const signal = await tradingIntelligenceService.generateTradingSignal(
+        symbol || "BTC-USD",
+        exchange || "binance",
+        timeframe || "4h"
+      );
+      
+      if (signal) {
+        broadcastToClients({
+          type: "log",
+          data: { 
+            event: "trading_signal_generated", 
+            signal,
+            timestamp: Date.now()
+          },
+          timestamp: Date.now(),
+        });
+      }
+      
+      res.json(signal || { message: "No high-confidence signal found" });
+    } catch (error) {
+      console.error("Failed to generate trading signal:", error);
+      res.status(500).json({ error: "Failed to generate trading signal" });
+    }
+  });
+
+  app.post("/api/trading/signals/scan", writeLimiter, async (req, res) => {
+    try {
+      const { symbols } = req.body;
+      const signals = await tradingIntelligenceService.scanMarkets(symbols);
+      
+      signals.forEach(signal => {
+        broadcastToClients({
+          type: "log",
+          data: { event: "trading_signal_generated", signal },
+          timestamp: Date.now(),
+        });
+      });
+      
+      res.json({ signals, count: signals.length });
+    } catch (error) {
+      console.error("Failed to scan markets:", error);
+      res.status(500).json({ error: "Failed to scan markets" });
+    }
+  });
+
+  app.post("/api/trading/signals/:id/close", writeLimiter, async (req, res) => {
+    try {
+      const { exitPrice, exitReason } = req.body;
+      const outcome = await tradingIntelligenceService.processTradeOutcome(
+        req.params.id,
+        exitPrice,
+        exitReason
+      );
+      
+      if (!outcome) return res.status(404).json({ error: "Signal not found" });
+      
+      broadcastToClients({
+        type: "log",
+        data: { 
+          event: "trade_outcome", 
+          outcome,
+          evolutionTriggered: outcome.evolutionTriggered 
+        },
+        timestamp: Date.now(),
+      });
+      
+      res.json(outcome);
+    } catch (error) {
+      console.error("Failed to close trade:", error);
+      res.status(500).json({ error: "Failed to close trade" });
+    }
+  });
+
+  app.get("/api/trading/outcomes", async (req, res) => {
+    try {
+      const outcomes = tradingIntelligenceService.getOutcomes();
+      res.json(outcomes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get trade outcomes" });
+    }
+  });
+
+  app.get("/api/trading/performance", async (req, res) => {
+    try {
+      const performance = tradingIntelligenceService.getPerformance();
+      res.json(performance);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get trading performance" });
+    }
+  });
+
+  app.get("/api/airdrops", async (req, res) => {
+    try {
+      const airdrops = tradingIntelligenceService.getAirdrops();
+      res.json(airdrops);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get airdrops" });
+    }
+  });
+
+  app.get("/api/airdrops/:id", async (req, res) => {
+    try {
+      const airdrop = tradingIntelligenceService.getAirdrop(req.params.id);
+      if (!airdrop) return res.status(404).json({ error: "Airdrop not found" });
+      res.json(airdrop);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get airdrop" });
     }
   });
 

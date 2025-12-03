@@ -1772,3 +1772,313 @@ export interface InsertAlertEvent {
   data: Record<string, any>;
 }
 
+// ==========================================
+// Trading Intelligence System
+// ==========================================
+
+export type SignalDirection = "long" | "short";
+export type SignalStatus = "active" | "hit_tp" | "hit_sl" | "expired" | "cancelled";
+export type TimeFrame = "1m" | "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
+export type Exchange = "binance" | "hyperliquid" | "bybit" | "okx" | "coinbase" | "kraken";
+
+export interface TechnicalIndicators {
+  rsi: number;
+  rsiSignal: "oversold" | "neutral" | "overbought";
+  macd: { value: number; signal: number; histogram: number };
+  macdSignal: "bullish" | "bearish" | "neutral";
+  ema20: number;
+  ema50: number;
+  ema200: number;
+  emaTrend: "bullish" | "bearish" | "neutral";
+  bollingerBands: { upper: number; middle: number; lower: number };
+  bbPosition: "above" | "middle" | "below";
+  atr: number;
+  volume24h: number;
+  volumeChange: number;
+  priceChange24h: number;
+}
+
+export interface MarketPattern {
+  id: string;
+  symbol: string;
+  patternType: "head_shoulders" | "double_top" | "double_bottom" | "triangle_ascending" | "triangle_descending" | "wedge_rising" | "wedge_falling" | "flag_bull" | "flag_bear" | "cup_handle" | "breakout" | "breakdown";
+  timeframe: TimeFrame;
+  confidence: number;
+  detectedAt: number;
+  priceAtDetection: number;
+  targetPrice?: number;
+  invalidationPrice?: number;
+  description: string;
+  isActive: boolean;
+}
+
+export interface TradingSignal {
+  id: string;
+  symbol: string;
+  direction: SignalDirection;
+  exchange: Exchange;
+  timeframe: TimeFrame;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2?: number;
+  takeProfit3?: number;
+  confidence: number;
+  riskRewardRatio: number;
+  leverage?: number;
+  reasoning: string;
+  technicalAnalysis: string;
+  indicators: TechnicalIndicators;
+  patterns: string[];
+  agentId: string;
+  agentConsensus: {
+    signalStrategist: number;
+    riskGuardian: number;
+    marketSentinel: number;
+    metaApproval: boolean;
+  };
+  status: SignalStatus;
+  createdAt: number;
+  expiresAt: number;
+  closedAt?: number;
+  closedPrice?: number;
+  closedReason?: string;
+}
+
+export interface TradeOutcome {
+  id: string;
+  signalId: string;
+  symbol: string;
+  direction: SignalDirection;
+  entryPrice: number;
+  exitPrice: number;
+  stopLoss: number;
+  takeProfit: number;
+  result: "win" | "loss" | "breakeven";
+  pnlPercent: number;
+  pnlUsd?: number;
+  holdingTime: number;
+  maxDrawdown: number;
+  maxProfit: number;
+  exitReason: "hit_tp" | "hit_sl" | "manual" | "expired";
+  lessonsLearned: string;
+  evolutionTriggered: boolean;
+  mutationType?: string;
+  timestamp: number;
+}
+
+export interface TradingPerformance {
+  totalTrades: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  avgWinPercent: number;
+  avgLossPercent: number;
+  profitFactor: number;
+  sharpeRatio: number;
+  maxDrawdown: number;
+  totalPnlPercent: number;
+  bestTrade: { symbol: string; pnl: number };
+  worstTrade: { symbol: string; pnl: number };
+  currentStreak: { type: "win" | "loss"; count: number };
+  byTimeframe: Record<TimeFrame, { wins: number; losses: number; pnl: number }>;
+  byExchange: Record<Exchange, { wins: number; losses: number; pnl: number }>;
+  evolutionCount: number;
+  lastUpdated: number;
+}
+
+// ==========================================
+// Airdrop Intelligence System
+// ==========================================
+
+export type AirdropCategory = "retro" | "non_retro" | "testnet" | "mainnet" | "social" | "liquidity" | "governance";
+export type AirdropStatus = "active" | "upcoming" | "ended" | "claimed";
+export type AirdropRisk = "low" | "medium" | "high";
+
+export interface AirdropOpportunity {
+  id: string;
+  protocolName: string;
+  protocolUrl: string;
+  chain: "ethereum" | "base" | "arbitrum" | "optimism" | "solana" | "sui" | "aptos" | "zksync" | "starknet" | "scroll" | "linea" | "blast";
+  category: AirdropCategory;
+  isRetro: boolean;
+  status: AirdropStatus;
+  estimatedValue: string;
+  confidence: number;
+  riskLevel: AirdropRisk;
+  eligibilityCriteria: string[];
+  requiredActions: {
+    action: string;
+    completed: boolean;
+    priority: "high" | "medium" | "low";
+    estimatedCost?: string;
+    deadline?: number;
+  }[];
+  totalValueLocked?: number;
+  fundingRound?: string;
+  investors?: string[];
+  tokenomicsInfo?: string;
+  snapshotDate?: number;
+  claimDeadline?: number;
+  discoveredAt: number;
+  updatedAt: number;
+  notes?: string;
+}
+
+// ==========================================
+// Portfolio & Big Transactions
+// ==========================================
+
+export interface BigTransaction {
+  id: string;
+  hash: string;
+  chain: string;
+  walletAddress: string;
+  type: "transfer_in" | "transfer_out" | "swap" | "bridge" | "contract_interaction";
+  fromAddress: string;
+  toAddress: string;
+  asset: string;
+  amount: number;
+  valueUsd: number;
+  gasUsed?: number;
+  gasCostUsd?: number;
+  isWhale: boolean;
+  significance: "low" | "medium" | "high" | "critical";
+  analysis?: string;
+  timestamp: number;
+}
+
+export interface PortfolioSnapshot {
+  id: string;
+  walletAddress: string;
+  totalValueUsd: number;
+  totalPnlUsd: number;
+  totalPnlPercent: number;
+  holdings: {
+    asset: string;
+    chain: string;
+    amount: number;
+    valueUsd: number;
+    allocation: number;
+  }[];
+  defiPositions: number;
+  defiValueUsd: number;
+  riskScore: number;
+  diversificationScore: number;
+  timestamp: number;
+}
+
+// ==========================================
+// Trading Intelligence Database Tables
+// ==========================================
+
+export const tradingSignals = pgTable("trading_signals", {
+  id: varchar("id").primaryKey(),
+  symbol: varchar("symbol").notNull(),
+  direction: varchar("direction").$type<SignalDirection>().notNull(),
+  exchange: varchar("exchange").$type<Exchange>().notNull(),
+  timeframe: varchar("timeframe").$type<TimeFrame>().notNull(),
+  entryPrice: integer("entry_price").notNull(),
+  stopLoss: integer("stop_loss").notNull(),
+  takeProfit1: integer("take_profit_1").notNull(),
+  takeProfit2: integer("take_profit_2"),
+  takeProfit3: integer("take_profit_3"),
+  confidence: integer("confidence").notNull(),
+  riskRewardRatio: integer("risk_reward_ratio").notNull(),
+  leverage: integer("leverage"),
+  reasoning: text("reasoning").notNull(),
+  technicalAnalysis: text("technical_analysis").notNull(),
+  indicators: jsonb("indicators").$type<TechnicalIndicators>().notNull(),
+  patterns: jsonb("patterns").$type<string[]>().notNull(),
+  agentId: varchar("agent_id").notNull(),
+  agentConsensus: jsonb("agent_consensus").notNull(),
+  status: varchar("status").$type<SignalStatus>().notNull().default("active"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  closedAt: timestamp("closed_at"),
+  closedPrice: integer("closed_price"),
+  closedReason: text("closed_reason"),
+});
+
+export const tradeOutcomes = pgTable("trade_outcomes", {
+  id: varchar("id").primaryKey(),
+  signalId: varchar("signal_id").notNull(),
+  symbol: varchar("symbol").notNull(),
+  direction: varchar("direction").$type<SignalDirection>().notNull(),
+  entryPrice: integer("entry_price").notNull(),
+  exitPrice: integer("exit_price").notNull(),
+  stopLoss: integer("stop_loss").notNull(),
+  takeProfit: integer("take_profit").notNull(),
+  result: varchar("result").$type<"win" | "loss" | "breakeven">().notNull(),
+  pnlPercent: integer("pnl_percent").notNull(),
+  pnlUsd: integer("pnl_usd"),
+  holdingTime: integer("holding_time").notNull(),
+  maxDrawdown: integer("max_drawdown").notNull(),
+  maxProfit: integer("max_profit").notNull(),
+  exitReason: varchar("exit_reason").$type<"hit_tp" | "hit_sl" | "manual" | "expired">().notNull(),
+  lessonsLearned: text("lessons_learned").notNull(),
+  evolutionTriggered: boolean("evolution_triggered").notNull().default(false),
+  mutationType: varchar("mutation_type"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const airdropOpportunities = pgTable("airdrop_opportunities", {
+  id: varchar("id").primaryKey(),
+  protocolName: varchar("protocol_name").notNull(),
+  protocolUrl: varchar("protocol_url").notNull(),
+  chain: varchar("chain").notNull(),
+  category: varchar("category").$type<AirdropCategory>().notNull(),
+  isRetro: boolean("is_retro").notNull().default(false),
+  status: varchar("status").$type<AirdropStatus>().notNull().default("active"),
+  estimatedValue: varchar("estimated_value").notNull(),
+  confidence: integer("confidence").notNull(),
+  riskLevel: varchar("risk_level").$type<AirdropRisk>().notNull(),
+  eligibilityCriteria: jsonb("eligibility_criteria").$type<string[]>().notNull(),
+  requiredActions: jsonb("required_actions").notNull(),
+  totalValueLocked: integer("total_value_locked"),
+  fundingRound: varchar("funding_round"),
+  investors: jsonb("investors").$type<string[]>(),
+  tokenomicsInfo: text("tokenomics_info"),
+  snapshotDate: timestamp("snapshot_date"),
+  claimDeadline: timestamp("claim_deadline"),
+  discoveredAt: timestamp("discovered_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  notes: text("notes"),
+});
+
+export const bigTransactions = pgTable("big_transactions", {
+  id: varchar("id").primaryKey(),
+  hash: varchar("hash").notNull(),
+  chain: varchar("chain").notNull(),
+  walletAddress: varchar("wallet_address").notNull(),
+  type: varchar("type").$type<"transfer_in" | "transfer_out" | "swap" | "bridge" | "contract_interaction">().notNull(),
+  fromAddress: varchar("from_address").notNull(),
+  toAddress: varchar("to_address").notNull(),
+  asset: varchar("asset").notNull(),
+  amount: integer("amount").notNull(),
+  valueUsd: integer("value_usd").notNull(),
+  gasUsed: integer("gas_used"),
+  gasCostUsd: integer("gas_cost_usd"),
+  isWhale: boolean("is_whale").notNull().default(false),
+  significance: varchar("significance").$type<"low" | "medium" | "high" | "critical">().notNull(),
+  analysis: text("analysis"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+// Insert schemas for trading intelligence
+export const insertTradingSignalSchema = createInsertSchema(tradingSignals).omit({ createdAt: true, closedAt: true });
+export const insertTradeOutcomeSchema = createInsertSchema(tradeOutcomes).omit({ timestamp: true });
+export const insertAirdropOpportunitySchema = createInsertSchema(airdropOpportunities).omit({ discoveredAt: true, updatedAt: true });
+export const insertBigTransactionSchema = createInsertSchema(bigTransactions).omit({ timestamp: true });
+
+// Types
+export type InsertTradingSignal = z.infer<typeof insertTradingSignalSchema>;
+export type InsertTradeOutcome = z.infer<typeof insertTradeOutcomeSchema>;
+export type InsertAirdropOpportunity = z.infer<typeof insertAirdropOpportunitySchema>;
+export type InsertBigTransaction = z.infer<typeof insertBigTransactionSchema>;
+
+export type SelectTradingSignal = typeof tradingSignals.$inferSelect;
+export type SelectTradeOutcome = typeof tradeOutcomes.$inferSelect;
+export type SelectAirdropOpportunity = typeof airdropOpportunities.$inferSelect;
+export type SelectBigTransaction = typeof bigTransactions.$inferSelect;
+
