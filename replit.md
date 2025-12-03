@@ -6,6 +6,7 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
 
 ## Recent Changes (December 2024)
 
+- **On-Chain Agent Identity System**: Implemented NeuronBadge.sol soulbound NFT contract and BlockchainSyncService for proving agent evolution on-chain. Agents earn badges for successful mutations, with complete identity tracking including credit scores, generation lineage, and performance metrics. The Evolution page now has an "On-Chain" tab showing proof cards, agent resumes, and blockchain sync status.
 - **Real Data Integration**: All system components now use real market data sources (Binance, CoinGecko, DefiLlama) instead of simulated data
 - **Backtesting Enhancement**: QuickBacktestEngine now fetches actual historical OHLCV data with deterministic seeded fallback
 - **Claude AI Integration**: All agents now use Replit AI Integrations for Anthropic Claude access (AI_INTEGRATIONS_ANTHROPIC_API_KEY, AI_INTEGRATIONS_ANTHROPIC_BASE_URL)

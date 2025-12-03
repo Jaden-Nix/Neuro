@@ -318,16 +318,17 @@ function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
                   className="p-2 rounded bg-background/30"
                   whileHover={{ scale: 1.02 }}
                 >
-                  <p className="text-xs text-muted-foreground mb-1">Mutation</p>
-                  <p className="text-sm font-medium flex items-center gap-1">
-                    <motion.div
+                  <span className="text-xs text-muted-foreground mb-1 block">Mutation</span>
+                  <span className="text-sm font-medium flex items-center gap-1">
+                    <motion.span
                       animate={{ rotate: [0, 180, 360] }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="inline-flex"
                     >
                       <Dna className="w-3 h-3" />
-                    </motion.div>
+                    </motion.span>
                     {mutationTypeLabels[event.mutation.type] || event.mutation.type}
-                  </p>
+                  </span>
                 </motion.div>
                 <motion.div 
                   className="p-2 rounded bg-background/30"
@@ -346,8 +347,8 @@ function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
                 animate={{ height: "auto", opacity: 1 }}
                 transition={{ delay: index * 0.1 + 0.4 }}
               >
-                <p className="text-xs text-muted-foreground mb-1">Parameter Change</p>
-                <p className="text-sm flex items-center gap-2">
+                <span className="text-xs text-muted-foreground mb-1 block">Parameter Change</span>
+                <span className="text-sm flex items-center gap-2">
                   <motion.span 
                     className="opacity-60 line-through"
                     initial={{ opacity: 1 }}
@@ -368,7 +369,7 @@ function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
                   <span className="text-xs text-muted-foreground">
                     ({event.mutation.parameterName})
                   </span>
-                </p>
+                </span>
               </motion.div>
 
               <p className="text-sm text-muted-foreground mt-2 italic">
