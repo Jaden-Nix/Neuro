@@ -329,10 +329,32 @@ export class CCXTAdapter extends EventEmitter {
         if (remainingSymbols.length === 0) break;
         
         const ccxtSymbols = remainingSymbols.map(s => `${s}/USDT`);
-        const tickers = await exchangeClient.fetchTickers(ccxtSymbols);
+        
+        let tickers: Record<string, any> = {};
+        
+        if (exchangeClient.has['fetchTickers']) {
+          try {
+            tickers = await exchangeClient.fetchTickers(ccxtSymbols);
+          } catch (e) {
+            tickers = await exchangeClient.fetchTickers();
+          }
+        } else {
+          const tickerPromises = ccxtSymbols.slice(0, 10).map(async (sym) => {
+            try {
+              const ticker = await exchangeClient.fetchTicker(sym);
+              return { [sym]: ticker };
+            } catch {
+              return {};
+            }
+          });
+          const tickerResults = await Promise.all(tickerPromises);
+          tickers = Object.assign({}, ...tickerResults);
+        }
         
         for (const [ccxtSymbol, ticker] of Object.entries(tickers)) {
-          const symbol = ccxtSymbol.replace('/USDT', '');
+          const symbol = ccxtSymbol.replace('/USDT', '').replace('/USD', '');
+          if (!remainingSymbols.includes(symbol)) continue;
+          
           const lastPrice = this.lastPrices.get(symbol) || (ticker as any).last || 0;
           const currentPrice = (ticker as any).last || 0;
           
@@ -359,7 +381,7 @@ export class CCXTAdapter extends EventEmitter {
           this.priceCache.set(`${symbol}:${exchange}`, { price, timestamp: Date.now() });
         }
         
-        if (results.size >= symbols.length * 0.8) break;
+        if (results.size >= symbols.length * 0.5) break;
       } catch (error) {
         continue;
       }

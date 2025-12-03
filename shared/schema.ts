@@ -1796,6 +1796,10 @@ export interface TechnicalIndicators {
   volume24h: number;
   volumeChange: number;
   priceChange24h: number;
+  stochRSI?: { k: number; d: number };
+  adx?: number;
+  obv?: { value: number; trend: "bullish" | "bearish" | "neutral" };
+  vwap?: number;
 }
 
 export interface MarketPattern {

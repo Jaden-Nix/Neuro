@@ -6,6 +6,14 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
 
 ## Recent Changes (December 2024)
 
+- **Ultron Signals - Live Price Streaming**: Real-time price streaming for 103 tokens across 9 exchanges (KuCoin, MEXC, Gate, Bitget, Kraken, Bybit, OKX, Coinbase, Huobi). Features:
+  - **CCXT Multi-Exchange Adapter**: Unified interface for fetching live prices with intelligent fallback chain
+  - **103 Token Registry**: Covering Layer 1s (BTC, ETH, SOL, XRP, etc.), DeFi (AAVE, UNI, CRV), Memes (DOGE, SHIB, PEPE), AI tokens (RENDER, FET, TAO), and more
+  - **Real-time WebSocket Updates**: Sub-2-second price updates with 24h change, high/low, volume
+  - **Category Filtering**: Filter by Layer 1, Layer 2, DeFi, Meme, AI, Gaming, Infrastructure, etc.
+  - **Fallback System**: CoinGecko → Exchange priority chain → Static prices for maximum reliability
+  - **Onboarding Wizard**: Disabled in development mode for quick access to signals page
+
 - **AI Trading Village**: Collaborative multi-agent ecosystem where 10 specialized AI trader agents (Atlas, Nova, Cipher, Vega, Orion, Nebula, Phoenix, Quantum, Echo, Apex) hunt for trading opportunities and share knowledge. Features include:
   - Agent roles: Hunter, Analyst, Strategist, Sentinel, Scout, Veteran
   - Personalities: Aggressive, Conservative, Balanced, Contrarian, Momentum, Experimental

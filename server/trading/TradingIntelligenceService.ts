@@ -109,6 +109,8 @@ export class TradingIntelligenceService {
     }
 
     const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
     const volumes = candles.map(c => c.volume);
     const currentPrice = closes[closes.length - 1];
 
@@ -119,6 +121,11 @@ export class TradingIntelligenceService {
     const ema200 = this.calculateEMA(closes, Math.min(200, closes.length));
     const bb = this.calculateBollingerBands(closes);
     const atr = this.calculateATR(candles);
+    
+    const stochRSI = this.calculateStochasticRSI(closes);
+    const adx = this.calculateADX(highs, lows, closes);
+    const obv = this.calculateOBV(closes, volumes);
+    const vwap = this.calculateVWAP(highs, lows, closes, volumes);
     
     const volume24h = volumes.slice(-24).reduce((a, b) => a + b, 0);
     const prevVolume = volumes.slice(-48, -24).reduce((a, b) => a + b, 0);
@@ -143,8 +150,288 @@ export class TradingIntelligenceService {
       atr,
       volume24h,
       volumeChange,
-      priceChange24h
+      priceChange24h,
+      stochRSI,
+      adx,
+      obv,
+      vwap
     };
+  }
+  
+  private calculateStochasticRSI(prices: number[], period: number = 14): { k: number; d: number } {
+    const rsiValues: number[] = [];
+    for (let i = period; i < prices.length; i++) {
+      rsiValues.push(this.calculateRSI(prices.slice(0, i + 1), period));
+    }
+    
+    if (rsiValues.length < period) return { k: 50, d: 50 };
+    
+    const recentRSI = rsiValues.slice(-period);
+    const minRSI = Math.min(...recentRSI);
+    const maxRSI = Math.max(...recentRSI);
+    const currentRSI = rsiValues[rsiValues.length - 1];
+    
+    const k = maxRSI !== minRSI ? ((currentRSI - minRSI) / (maxRSI - minRSI)) * 100 : 50;
+    
+    const kValues: number[] = [];
+    for (let i = period; i <= rsiValues.length; i++) {
+      const slice = rsiValues.slice(i - period, i);
+      const minR = Math.min(...slice);
+      const maxR = Math.max(...slice);
+      const currR = rsiValues[i - 1];
+      kValues.push(maxR !== minR ? ((currR - minR) / (maxR - minR)) * 100 : 50);
+    }
+    
+    const d = kValues.length >= 3 
+      ? kValues.slice(-3).reduce((a, b) => a + b) / 3 
+      : k;
+    
+    return { k: Math.max(0, Math.min(100, k)), d: Math.max(0, Math.min(100, d)) };
+  }
+  
+  private calculateADX(highs: number[], lows: number[], closes: number[], period: number = 14): number {
+    if (closes.length < period * 2) return 25;
+    
+    const trValues: number[] = [];
+    const plusDMValues: number[] = [];
+    const minusDMValues: number[] = [];
+    
+    for (let i = 1; i < closes.length; i++) {
+      const highDiff = highs[i] - highs[i - 1];
+      const lowDiff = lows[i - 1] - lows[i];
+      
+      plusDMValues.push(highDiff > lowDiff && highDiff > 0 ? highDiff : 0);
+      minusDMValues.push(lowDiff > highDiff && lowDiff > 0 ? lowDiff : 0);
+      
+      trValues.push(Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1])
+      ));
+    }
+    
+    const smoothedTR = this.wilder_smooth(trValues, period);
+    const smoothedPlusDM = this.wilder_smooth(plusDMValues, period);
+    const smoothedMinusDM = this.wilder_smooth(minusDMValues, period);
+    
+    if (smoothedTR === 0) return 25;
+    
+    const plusDI = (smoothedPlusDM / smoothedTR) * 100;
+    const minusDI = (smoothedMinusDM / smoothedTR) * 100;
+    
+    if (plusDI + minusDI === 0) return 25;
+    
+    const dx = Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100;
+    
+    const dxValues: number[] = [];
+    for (let i = period; i < trValues.length; i++) {
+      const sliceTR = this.wilder_smooth(trValues.slice(0, i + 1), period);
+      const slicePlusDM = this.wilder_smooth(plusDMValues.slice(0, i + 1), period);
+      const sliceMinusDM = this.wilder_smooth(minusDMValues.slice(0, i + 1), period);
+      
+      if (sliceTR > 0) {
+        const pDI = (slicePlusDM / sliceTR) * 100;
+        const mDI = (sliceMinusDM / sliceTR) * 100;
+        if (pDI + mDI > 0) {
+          dxValues.push(Math.abs(pDI - mDI) / (pDI + mDI) * 100);
+        }
+      }
+    }
+    
+    const adx = dxValues.length >= period 
+      ? this.wilder_smooth(dxValues.slice(-period * 2), period)
+      : dx;
+    
+    return Math.min(100, Math.max(0, adx));
+  }
+  
+  private wilder_smooth(values: number[], period: number): number {
+    if (values.length < period) {
+      return values.reduce((a, b) => a + b, 0) / values.length || 0;
+    }
+    
+    let smoothed = values.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < values.length; i++) {
+      smoothed = (smoothed * (period - 1) + values[i]) / period;
+    }
+    return smoothed;
+  }
+  
+  private calculateOBV(closes: number[], volumes: number[]): { value: number; trend: "bullish" | "bearish" | "neutral" } {
+    let obv = 0;
+    const obvValues: number[] = [0];
+    
+    for (let i = 1; i < closes.length; i++) {
+      if (closes[i] > closes[i - 1]) {
+        obv += volumes[i];
+      } else if (closes[i] < closes[i - 1]) {
+        obv -= volumes[i];
+      }
+      obvValues.push(obv);
+    }
+    
+    const lookback = Math.min(20, obvValues.length);
+    const recentOBV = obvValues.slice(-lookback);
+    
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let i = 0; i < recentOBV.length; i++) {
+      sumX += i;
+      sumY += recentOBV[i];
+      sumXY += i * recentOBV[i];
+      sumX2 += i * i;
+    }
+    const n = recentOBV.length;
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    
+    const avgOBV = sumY / n;
+    const normalizedSlope = avgOBV !== 0 ? (slope / Math.abs(avgOBV)) * 100 : 0;
+    
+    const trend = normalizedSlope > 2 ? "bullish" :
+                  normalizedSlope < -2 ? "bearish" : "neutral";
+    
+    return { value: obv, trend };
+  }
+  
+  private calculateVWAP(highs: number[], lows: number[], closes: number[], volumes: number[]): number {
+    let cumulativeTPV = 0;
+    let cumulativeVolume = 0;
+    
+    for (let i = 0; i < closes.length; i++) {
+      const typicalPrice = (highs[i] + lows[i] + closes[i]) / 3;
+      cumulativeTPV += typicalPrice * volumes[i];
+      cumulativeVolume += volumes[i];
+    }
+    
+    return cumulativeVolume > 0 ? cumulativeTPV / cumulativeVolume : closes[closes.length - 1];
+  }
+  
+  calculateConfluenceScore(indicators: TechnicalIndicators, direction: "long" | "short"): {
+    score: number;
+    signals: { indicator: string; signal: string; weight: number }[];
+    recommendation: "strong_entry" | "entry" | "wait" | "avoid";
+  } {
+    const signals: { indicator: string; signal: string; weight: number }[] = [];
+    let totalWeight = 0;
+    let maxWeight = 0;
+    
+    if (direction === "long") {
+      if (indicators.rsi < 35) {
+        signals.push({ indicator: "RSI", signal: "Oversold < 35", weight: 15 });
+        totalWeight += 15;
+      } else if (indicators.rsi < 45) {
+        signals.push({ indicator: "RSI", signal: "Low zone", weight: 8 });
+        totalWeight += 8;
+      }
+      maxWeight += 15;
+      
+      if (indicators.macd.histogram > 0 && indicators.macd.value > indicators.macd.signal) {
+        signals.push({ indicator: "MACD", signal: "Bullish crossover", weight: 12 });
+        totalWeight += 12;
+      }
+      maxWeight += 12;
+      
+      if (indicators.emaTrend === "bullish") {
+        signals.push({ indicator: "EMA Trend", signal: "Price > EMA50 > EMA200", weight: 15 });
+        totalWeight += 15;
+      }
+      maxWeight += 15;
+      
+      if (indicators.bbPosition === "below") {
+        signals.push({ indicator: "Bollinger", signal: "Below lower band", weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.stochRSI && indicators.stochRSI.k < 20) {
+        signals.push({ indicator: "StochRSI", signal: "Extreme oversold", weight: 12 });
+        totalWeight += 12;
+      }
+      maxWeight += 12;
+      
+      if (indicators.adx && indicators.adx > 25) {
+        signals.push({ indicator: "ADX", signal: `Strong trend (${indicators.adx.toFixed(0)})`, weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.obv && indicators.obv.trend === "bullish") {
+        signals.push({ indicator: "OBV", signal: "Volume confirming uptrend", weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.volumeChange > 20) {
+        signals.push({ indicator: "Volume", signal: `Surge +${indicators.volumeChange.toFixed(0)}%`, weight: 8 });
+        totalWeight += 8;
+      }
+      maxWeight += 8;
+    } else {
+      if (indicators.rsi > 65) {
+        signals.push({ indicator: "RSI", signal: "Overbought > 65", weight: 15 });
+        totalWeight += 15;
+      } else if (indicators.rsi > 55) {
+        signals.push({ indicator: "RSI", signal: "High zone", weight: 8 });
+        totalWeight += 8;
+      }
+      maxWeight += 15;
+      
+      if (indicators.macd.histogram < 0 && indicators.macd.value < indicators.macd.signal) {
+        signals.push({ indicator: "MACD", signal: "Bearish crossover", weight: 12 });
+        totalWeight += 12;
+      }
+      maxWeight += 12;
+      
+      if (indicators.emaTrend === "bearish") {
+        signals.push({ indicator: "EMA Trend", signal: "Price < EMA50 < EMA200", weight: 15 });
+        totalWeight += 15;
+      }
+      maxWeight += 15;
+      
+      if (indicators.bbPosition === "above") {
+        signals.push({ indicator: "Bollinger", signal: "Above upper band", weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.stochRSI && indicators.stochRSI.k > 80) {
+        signals.push({ indicator: "StochRSI", signal: "Extreme overbought", weight: 12 });
+        totalWeight += 12;
+      }
+      maxWeight += 12;
+      
+      if (indicators.adx && indicators.adx > 25) {
+        signals.push({ indicator: "ADX", signal: `Strong trend (${indicators.adx.toFixed(0)})`, weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.obv && indicators.obv.trend === "bearish") {
+        signals.push({ indicator: "OBV", signal: "Volume confirming downtrend", weight: 10 });
+        totalWeight += 10;
+      }
+      maxWeight += 10;
+      
+      if (indicators.volumeChange > 20) {
+        signals.push({ indicator: "Volume", signal: `Surge +${indicators.volumeChange.toFixed(0)}%`, weight: 8 });
+        totalWeight += 8;
+      }
+      maxWeight += 8;
+    }
+    
+    const score = maxWeight > 0 ? (totalWeight / maxWeight) * 100 : 0;
+    
+    let recommendation: "strong_entry" | "entry" | "wait" | "avoid";
+    if (score >= 75 && signals.length >= 5) {
+      recommendation = "strong_entry";
+    } else if (score >= 60 && signals.length >= 4) {
+      recommendation = "entry";
+    } else if (score >= 40 && signals.length >= 3) {
+      recommendation = "wait";
+    } else {
+      recommendation = "avoid";
+    }
+    
+    return { score, signals, recommendation };
   }
 
   private getDefaultIndicators(price: number): TechnicalIndicators {
@@ -162,7 +449,11 @@ export class TradingIntelligenceService {
       atr: price * 0.02,
       volume24h: 0,
       volumeChange: 0,
-      priceChange24h: 0
+      priceChange24h: 0,
+      stochRSI: { k: 50, d: 50 },
+      adx: 25,
+      obv: { value: 0, trend: "neutral" },
+      vwap: price
     };
   }
 
@@ -260,6 +551,24 @@ export class TradingIntelligenceService {
       const candles = await this.generateMockCandles(currentPrice, 200);
       const indicators = this.calculateIndicators(candles);
       
+      const longConfluence = this.calculateConfluenceScore(indicators, "long");
+      const shortConfluence = this.calculateConfluenceScore(indicators, "short");
+      
+      const bestDirection = longConfluence.score > shortConfluence.score ? "long" : "short";
+      const bestConfluence = bestDirection === "long" ? longConfluence : shortConfluence;
+      
+      console.log(`[TradingIntelligence] ${symbol} confluence: Long ${longConfluence.score.toFixed(1)}% (${longConfluence.recommendation}), Short ${shortConfluence.score.toFixed(1)}% (${shortConfluence.recommendation})`);
+      
+      if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
+        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Insufficient confluence (${bestConfluence.score.toFixed(1)}% < 60%)`);
+        return null;
+      }
+      
+      const stochRSIStr = indicators.stochRSI ? `StochRSI K: ${indicators.stochRSI.k.toFixed(1)}, D: ${indicators.stochRSI.d.toFixed(1)}` : "N/A";
+      const adxStr = indicators.adx ? `ADX: ${indicators.adx.toFixed(1)}` : "N/A";
+      const obvStr = indicators.obv ? `OBV Trend: ${indicators.obv.trend}` : "N/A";
+      const vwapStr = indicators.vwap ? `VWAP: $${indicators.vwap.toFixed(2)}` : "N/A";
+      
       const analysisPrompt = `You are an elite crypto trading AI with expertise across all markets including Binance and Hyperliquid. 
 Analyze this market data and provide a trading signal ONLY if there's a high-confidence opportunity (>70%).
 
@@ -275,14 +584,24 @@ Technical Indicators:
 - EMA Trend: ${indicators.emaTrend}
 - Bollinger Bands: Upper $${indicators.bollingerBands.upper.toFixed(2)}, Middle $${indicators.bollingerBands.middle.toFixed(2)}, Lower $${indicators.bollingerBands.lower.toFixed(2)}
 - BB Position: ${indicators.bbPosition}
+- ${stochRSIStr}
+- ${adxStr}
+- ${obvStr}
+- ${vwapStr}
 - ATR: ${indicators.atr.toFixed(2)}
 - 24h Volume Change: ${indicators.volumeChange.toFixed(1)}%
 - 24h Price Change: ${indicators.priceChange24h.toFixed(2)}%
 
+MULTI-INDICATOR CONFLUENCE ANALYSIS (Pre-filtered for high probability):
+- Direction: ${bestDirection.toUpperCase()}
+- Confluence Score: ${bestConfluence.score.toFixed(1)}%
+- Recommendation: ${bestConfluence.recommendation.toUpperCase()}
+- Confirming Signals: ${bestConfluence.signals.map(s => `${s.indicator}: ${s.signal}`).join(', ')}
+
 Provide your analysis in this exact JSON format:
 {
   "hasSignal": true/false,
-  "direction": "long" or "short",
+  "direction": "${bestDirection}",
   "confidence": 0-100,
   "entryPrice": number,
   "stopLoss": number,
@@ -290,7 +609,7 @@ Provide your analysis in this exact JSON format:
   "takeProfit2": number,
   "takeProfit3": number,
   "leverage": 1-10,
-  "reasoning": "detailed explanation",
+  "reasoning": "detailed explanation including confluence factors",
   "patterns": ["pattern1", "pattern2"],
   "riskRewardRatio": number
 }
@@ -299,8 +618,8 @@ CRITICAL RULES:
 1. Only suggest trades with R:R ratio >= 2:1
 2. Stop loss must be tight (max 3% for spot, 1.5% for leverage)
 3. Be VERY conservative - protect capital above all
-4. Consider market regime, volume, and multiple timeframes
-5. If no clear setup exists, return hasSignal: false`;
+4. This signal has ALREADY passed confluence filtering (${bestConfluence.signals.length} indicators aligned)
+5. If no clear setup exists despite confluence, return hasSignal: false`;
 
       const response = await this.callClaude(analysisPrompt);
       
@@ -308,13 +627,13 @@ CRITICAL RULES:
         const jsonMatch = response.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
           console.log("[TradingIntelligence] No valid JSON in response, using fallback signal");
-          return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators);
+          return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators, { direction: bestDirection, confluence: bestConfluence });
         }
         
         const analysis = JSON.parse(jsonMatch[0]);
         
         if (!analysis.hasSignal || analysis.confidence < 70) {
-          console.log(`[TradingIntelligence] No high-confidence signal for ${symbol}`);
+          console.log(`[TradingIntelligence] AI rejected signal for ${symbol} despite confluence`);
           return null;
         }
 
@@ -329,19 +648,19 @@ CRITICAL RULES:
           takeProfit1: analysis.takeProfit1,
           takeProfit2: analysis.takeProfit2,
           takeProfit3: analysis.takeProfit3,
-          confidence: analysis.confidence,
+          confidence: Math.min(analysis.confidence, bestConfluence.score + 10),
           riskRewardRatio: analysis.riskRewardRatio || 2,
           leverage: analysis.leverage || 1,
-          reasoning: analysis.reasoning,
-          technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}`,
+          reasoning: `${analysis.reasoning} [Confluence: ${bestConfluence.score.toFixed(0)}% with ${bestConfluence.signals.length} aligned indicators]`,
+          technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}, Confluence: ${bestConfluence.signals.map(s => s.indicator).join('+')}`,
           indicators,
           patterns: analysis.patterns || [],
           agentId: "signal-strategist",
           agentConsensus: {
             signalStrategist: analysis.confidence,
-            riskGuardian: Math.max(60, analysis.confidence - 15),
-            marketSentinel: Math.max(65, analysis.confidence - 10),
-            metaApproval: analysis.confidence >= 75
+            riskGuardian: Math.max(60, bestConfluence.score - 10),
+            marketSentinel: Math.max(65, bestConfluence.score - 5),
+            metaApproval: bestConfluence.recommendation === "strong_entry" || bestConfluence.recommendation === "entry"
           },
           status: "active",
           createdAt: Date.now(),
@@ -349,12 +668,12 @@ CRITICAL RULES:
         };
 
         this.signals.set(signal.id, signal);
-        console.log(`[TradingIntelligence] Generated ${signal.direction.toUpperCase()} signal for ${symbol} @ $${signal.entryPrice.toFixed(2)}`);
+        console.log(`[TradingIntelligence] Generated ${signal.direction.toUpperCase()} signal for ${symbol} @ $${signal.entryPrice.toFixed(2)} (Confluence: ${bestConfluence.score.toFixed(0)}%)`);
         
         return signal;
       } catch (parseError) {
         console.error("[TradingIntelligence] Failed to parse AI response:", parseError);
-        return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators);
+        return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators, { direction: bestDirection, confluence: bestConfluence });
       }
     } catch (error) {
       console.error(`[TradingIntelligence] Failed to generate signal for ${symbol}:`, error);
@@ -367,17 +686,42 @@ CRITICAL RULES:
     exchange: Exchange,
     timeframe: TimeFrame,
     currentPrice: number,
-    indicators: TechnicalIndicators
+    indicators: TechnicalIndicators,
+    precomputedConfluence?: { 
+      direction: "long" | "short";
+      confluence: { score: number; signals: { indicator: string; signal: string; weight: number }[]; recommendation: "strong_entry" | "entry" | "wait" | "avoid" };
+    }
   ): TradingSignal | null {
-    const isBullish = indicators.rsi < 40 && indicators.macdSignal === "bullish" && indicators.emaTrend !== "bearish";
-    const isBearish = indicators.rsi > 60 && indicators.macdSignal === "bearish" && indicators.emaTrend !== "bullish";
+    let direction: SignalDirection;
+    let bestConfluence: { score: number; signals: { indicator: string; signal: string; weight: number }[]; recommendation: "strong_entry" | "entry" | "wait" | "avoid" };
     
-    if (!isBullish && !isBearish) return null;
+    if (precomputedConfluence) {
+      direction = precomputedConfluence.direction;
+      bestConfluence = precomputedConfluence.confluence;
+    } else {
+      const longConfluence = this.calculateConfluenceScore(indicators, "long");
+      const shortConfluence = this.calculateConfluenceScore(indicators, "short");
+      
+      if (longConfluence.score > shortConfluence.score) {
+        direction = "long";
+        bestConfluence = longConfluence;
+      } else {
+        direction = "short";
+        bestConfluence = shortConfluence;
+      }
+    }
     
-    const direction: SignalDirection = isBullish ? "long" : "short";
+    if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
+      console.log(`[TradingIntelligence] Fallback signal blocked for ${symbol} - confluence ${bestConfluence.score.toFixed(0)}% too low (${bestConfluence.recommendation})`);
+      return null;
+    }
+    
     const slPercent = direction === "long" ? 0.97 : 1.03;
     const tp1Percent = direction === "long" ? 1.04 : 0.96;
     const tp2Percent = direction === "long" ? 1.08 : 0.92;
+    
+    const confidenceBoost = bestConfluence.recommendation === "strong_entry" ? 8 : 0;
+    const baseConfidence = Math.min(85, 60 + bestConfluence.score * 0.25 + confidenceBoost);
     
     const signal: TradingSignal = {
       id: `signal-${nanoid(10)}`,
@@ -390,19 +734,19 @@ CRITICAL RULES:
       takeProfit1: currentPrice * tp1Percent,
       takeProfit2: currentPrice * tp2Percent,
       takeProfit3: currentPrice * (direction === "long" ? 1.12 : 0.88),
-      confidence: 72,
+      confidence: baseConfidence,
       riskRewardRatio: 2.5,
       leverage: 1,
-      reasoning: `Technical analysis suggests a ${direction} opportunity based on ${isBullish ? "oversold RSI and bullish MACD" : "overbought RSI and bearish MACD"}`,
-      technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}`,
+      reasoning: `Multi-indicator confluence signal (${bestConfluence.score.toFixed(0)}%) with ${bestConfluence.signals.length} aligned indicators: ${bestConfluence.signals.map(s => s.indicator).join(', ')}`,
+      technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}, Confluence: ${bestConfluence.signals.map(s => s.indicator).join('+')}`,
       indicators,
-      patterns: [isBullish ? "potential_reversal" : "distribution"],
+      patterns: bestConfluence.signals.map(s => s.indicator.toLowerCase()),
       agentId: "signal-strategist",
       agentConsensus: {
-        signalStrategist: 72,
-        riskGuardian: 68,
-        marketSentinel: 70,
-        metaApproval: true
+        signalStrategist: baseConfidence,
+        riskGuardian: Math.max(60, bestConfluence.score - 10),
+        marketSentinel: Math.max(65, bestConfluence.score - 5),
+        metaApproval: bestConfluence.recommendation === "strong_entry" || bestConfluence.recommendation === "entry"
       },
       status: "active",
       createdAt: Date.now(),
@@ -410,6 +754,7 @@ CRITICAL RULES:
     };
     
     this.signals.set(signal.id, signal);
+    console.log(`[TradingIntelligence] Fallback ${direction.toUpperCase()} signal for ${symbol} @ $${currentPrice.toFixed(2)} (Confluence: ${bestConfluence.score.toFixed(0)}%)`);
     return signal;
   }
 
