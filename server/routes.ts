@@ -5009,6 +5009,36 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/village/debates", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const debates = tradingVillage.getDebates(limit);
+      res.json(debates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get debates" });
+    }
+  });
+
+  app.post("/api/village/debates", async (req, res) => {
+    try {
+      const { topic, symbol } = req.body;
+      const debate = await tradingVillage.initiateDebate(topic, symbol);
+      res.json(debate || { message: "Not enough available agents for debate" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to start debate" });
+    }
+  });
+
+  app.get("/api/village/knowledge", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const knowledge = tradingVillage.getSharedKnowledge(limit);
+      res.json(knowledge);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get shared knowledge" });
+    }
+  });
+
   tradingVillage.on("thought", (thought) => {
     broadcastToClients({
       type: "log",
