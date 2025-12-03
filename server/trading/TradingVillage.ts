@@ -312,7 +312,7 @@ export class TradingVillage extends EventEmitter {
 
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 200,
         messages: [{
           role: "user",
@@ -412,7 +412,7 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
           ).join("\n");
 
           const response = await anthropic.messages.create({
-            model: "claude-sonnet-4-20250514",
+            model: "claude-sonnet-4-5",
             max_tokens: 150,
             messages: [{
               role: "user",
@@ -675,7 +675,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
 
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 400,
         messages: [{
           role: "user",
@@ -850,7 +850,7 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
 
       try {
         const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-5",
           max_tokens: 150,
           messages: [{
             role: "user",
@@ -1043,7 +1043,7 @@ Keep it under 20 words. Be direct.`
 
     try {
       const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5",
         max_tokens: 300,
         messages: [{
           role: "user",

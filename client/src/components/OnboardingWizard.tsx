@@ -526,7 +526,12 @@ export function useOnboarding() {
 
   useEffect(() => {
     const completed = localStorage.getItem('neuronet_onboarding_complete');
-    setShowOnboarding(!completed);
+    if (!completed && import.meta.env.DEV) {
+      localStorage.setItem('neuronet_onboarding_complete', 'true');
+      setShowOnboarding(false);
+    } else {
+      setShowOnboarding(!completed);
+    }
     setHasChecked(true);
   }, []);
 

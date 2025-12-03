@@ -26,6 +26,7 @@ import StressLab from "@/pages/StressLab";
 import DreamMode from "@/pages/DreamMode";
 import Insights from "@/pages/Insights";
 import TradingAdvisor from "@/pages/TradingAdvisor";
+import UltronSignals from "@/pages/UltronSignals";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Dashboard} />
       <Route path="/trading" component={TradingAdvisor} />
+      <Route path="/signals" component={UltronSignals} />
       <Route path="/ml" component={MLInsights} />
       {/* <Route path="/marketplace" component={Marketplace} /> */}
       <Route path="/alerts" component={Alerts} />

@@ -25,6 +25,7 @@ import {
   Beaker,
   Activity,
   TrendingUp,
+  Signal,
 } from "lucide-react";
 
 const menuItems = [
@@ -39,6 +40,12 @@ const menuItems = [
     url: "/trading",
     icon: TrendingUp,
     testId: "nav-trading",
+  },
+  {
+    title: "Ultron Signals",
+    url: "/signals",
+    icon: Signal,
+    testId: "nav-signals",
   },
   {
     title: "AI Insights",

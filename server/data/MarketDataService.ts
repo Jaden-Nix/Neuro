@@ -85,11 +85,6 @@ export class MarketDataService {
     limit: number = 100
   ): Promise<BacktestCandle[]> {
     try {
-      const klines = await binanceClient.getKlines(symbol, interval, limit);
-      return binanceClient.convertToBacktestCandles(klines);
-    } catch (error) {
-      console.warn(`[MarketData] Binance failed for recent candles, using CoinGecko`);
-      
       const days = interval === '1d' ? limit : Math.ceil(limit / 24);
       const ohlcData = await coinGeckoClient.getOHLC(symbol, Math.min(days, 30));
       
@@ -97,6 +92,9 @@ export class MarketDataService {
         ...c,
         volume: 100000,
       }));
+    } catch (error) {
+      console.warn(`[MarketData] CoinGecko failed for recent candles, using fallback`);
+      return [];
     }
   }
 
@@ -125,16 +123,6 @@ export class MarketDataService {
     const upperSymbol = symbol.toUpperCase();
     
     try {
-      const price = await binanceClient.getCurrentPrice(symbol);
-      if (price > 0) {
-        this.fallbackPrices[upperSymbol] = price;
-        return price;
-      }
-    } catch (binanceError) {
-      console.warn(`[MarketData] Binance price fetch failed for ${symbol}`);
-    }
-    
-    try {
       const prices = await coinGeckoClient.getCurrentPrice([symbol]);
       const price = prices[symbol];
       if (price && price > 0) {
@@ -142,16 +130,13 @@ export class MarketDataService {
         return price;
       }
     } catch (geckoError) {
-      console.warn(`[MarketData] CoinGecko price fetch failed for ${symbol}`);
     }
     
     const fallback = this.fallbackPrices[upperSymbol] || this.fallbackPrices[upperSymbol.replace('-USD', '')];
     if (fallback) {
-      console.log(`[MarketData] Using fallback price for ${symbol}: $${fallback}`);
       return fallback;
     }
     
-    console.error(`[MarketData] No price available for ${symbol}`);
     return 0;
   }
 
@@ -159,33 +144,14 @@ export class MarketDataService {
     const result: Record<string, number> = {};
     
     try {
-      const binancePrices = await binanceClient.getMultiplePrices(symbols);
-      Object.entries(binancePrices).forEach(([symbol, price]) => {
+      const geckoPrices = await coinGeckoClient.getCurrentPrice(symbols);
+      Object.entries(geckoPrices).forEach(([symbol, price]) => {
         if (price > 0) {
           result[symbol] = price;
           this.fallbackPrices[symbol.toUpperCase()] = price;
         }
       });
-      if (Object.keys(result).length === symbols.length) {
-        return result;
-      }
     } catch {
-      console.warn(`[MarketData] Binance multiple prices fetch failed`);
-    }
-    
-    const missingSymbols = symbols.filter(s => !result[s]);
-    if (missingSymbols.length > 0) {
-      try {
-        const geckoPrices = await coinGeckoClient.getCurrentPrice(missingSymbols);
-        Object.entries(geckoPrices).forEach(([symbol, price]) => {
-          if (price > 0) {
-            result[symbol] = price;
-            this.fallbackPrices[symbol.toUpperCase()] = price;
-          }
-        });
-      } catch {
-        console.warn(`[MarketData] CoinGecko multiple prices fetch failed`);
-      }
     }
     
     symbols.forEach(symbol => {
@@ -194,7 +160,6 @@ export class MarketDataService {
         const fallback = this.fallbackPrices[upper] || this.fallbackPrices[upper.replace('-USD', '')];
         if (fallback) {
           result[symbol] = fallback;
-          console.log(`[MarketData] Using fallback price for ${symbol}: $${fallback}`);
         }
       }
     });
@@ -204,26 +169,21 @@ export class MarketDataService {
 
   async getMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
     try {
-      const [ticker, volatility] = await Promise.all([
-        binanceClient.getTicker24h(symbol),
-        binanceClient.getVolatility(symbol, 20),
-      ]);
-
+      const prices = await coinGeckoClient.getCurrentPrice([symbol]);
+      const price = prices[symbol] || this.fallbackPrices[symbol.toUpperCase()] || 0;
       return {
         symbol,
-        price: ticker.lastPrice,
-        change24h: ticker.priceChangePercent,
-        volume24h: ticker.quoteVolume,
-        volatility,
+        price,
+        change24h: 0,
+        volume24h: 0,
+        volatility: 0,
         timestamp: Date.now(),
       };
     } catch (error) {
-      console.warn(`[MarketData] Failed to get snapshot for ${symbol}:`, error);
-      
-      const prices = await coinGeckoClient.getCurrentPrice([symbol]);
+      const price = this.fallbackPrices[symbol.toUpperCase()] || 0;
       return {
         symbol,
-        price: prices[symbol] || 0,
+        price,
         change24h: 0,
         volume24h: 0,
         volatility: 0,

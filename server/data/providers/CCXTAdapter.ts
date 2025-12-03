@@ -7,6 +7,31 @@ import type {
   TokenMetadata,
   TokenCategory 
 } from '@shared/schema';
+import { coinGeckoClient } from './CoinGeckoClient';
+
+const FALLBACK_PRICES: Record<string, number> = {
+  'BTC': 97000, 'ETH': 3650, 'SOL': 235, 'XRP': 2.35, 'BNB': 715,
+  'ADA': 1.05, 'AVAX': 52, 'DOGE': 0.42, 'TRX': 0.26, 'DOT': 9.5,
+  'LINK': 24, 'MATIC': 0.58, 'SHIB': 0.000028, 'LTC': 115, 'UNI': 17,
+  'ATOM': 10.5, 'ETC': 32, 'XLM': 0.48, 'NEAR': 6.8, 'APT': 13.5,
+  'ARB': 1.05, 'OP': 2.4, 'AAVE': 365, 'MKR': 1950, 'CRV': 1.1,
+  'LDO': 2.1, 'SNX': 3.8, 'COMP': 85, 'INJ': 35, 'FIL': 6.5,
+  'SUI': 4.2, 'SEI': 0.52, 'FTM': 0.95, 'IMX': 1.85, 'MANA': 0.55,
+  'SAND': 0.65, 'AXS': 8.5, 'GALA': 0.05, 'APE': 1.6, 'PEPE': 0.000022,
+  'WIF': 3.2, 'BONK': 0.000035, 'FLOKI': 0.00019, 'RENDER': 9.5,
+  'FET': 2.4, 'TAO': 590, 'AGIX': 0.85, 'OCEAN': 0.95, 'ONDO': 1.45,
+  'PENDLE': 5.8, 'ENA': 0.95, 'JUP': 1.1, 'RAY': 5.2, 'ORCA': 5.0,
+  'GRT': 0.28, 'VET': 0.048, 'ALGO': 0.42, 'FLOW': 0.92, 'HBAR': 0.28,
+  'ICP': 12.5, 'EGLD': 42, 'STX': 2.1, 'KAS': 0.15, 'RUNE': 6.2,
+  'FTT': 2.8, 'CRO': 0.16, 'OKB': 52, 'LEO': 9.2, 'XMR': 195,
+  'ZEC': 52, 'EOS': 0.95, 'KCS': 11.5, 'QNT': 115, 'THETA': 2.3,
+  'BSV': 65, 'NEO': 15.5, 'KAVA': 0.62, 'MINA': 0.72, 'ZIL': 0.025,
+  'IOTA': 0.38, 'CHZ': 0.095, 'ENJ': 0.22, 'BAT': 0.28, '1INCH': 0.52,
+  'BLUR': 0.35, 'PYTH': 0.48, 'WLD': 2.8, 'STRK': 0.55, 'DYDX': 1.6,
+  'GMX': 28, 'CAKE': 2.8, 'SUSHI': 1.2, 'RPL': 12.5, 'FXS': 3.8,
+  'CVX': 3.2, 'OSMO': 0.62, 'AUDIO': 0.18, 'MASK': 3.2,
+  'USDT': 1.0, 'USDC': 1.0, 'DAI': 1.0, 'FRAX': 1.0, 'FDUSD': 1.0,
+};
 
 const TOKEN_REGISTRY: Omit<TokenMetadata, 'addedAt' | 'updatedAt'>[] = [
   { id: 'btc', symbol: 'BTC', name: 'Bitcoin', category: 'layer1', chains: ['bitcoin'], coingeckoId: 'bitcoin', marketCapRank: 1, isActive: true },
@@ -115,18 +140,23 @@ const TOKEN_REGISTRY: Omit<TokenMetadata, 'addedAt' | 'updatedAt'>[] = [
   { id: 'fdusd', symbol: 'FDUSD', name: 'First Digital USD', category: 'stablecoin', chains: ['bsc'], coingeckoId: 'first-digital-usd', marketCapRank: 57, isActive: true },
 ];
 
-const EXCHANGE_CONFIGS: Record<SupportedExchange, { enabled: boolean; rateLimit: number }> = {
-  binance: { enabled: true, rateLimit: 1200 },
-  bybit: { enabled: true, rateLimit: 600 },
-  okx: { enabled: true, rateLimit: 600 },
-  coinbase: { enabled: true, rateLimit: 300 },
-  kraken: { enabled: true, rateLimit: 300 },
-  kucoin: { enabled: true, rateLimit: 600 },
-  gate: { enabled: true, rateLimit: 600 },
-  mexc: { enabled: true, rateLimit: 600 },
-  bitget: { enabled: true, rateLimit: 600 },
-  huobi: { enabled: true, rateLimit: 600 },
+const EXCHANGE_CONFIGS: Record<SupportedExchange, { enabled: boolean; rateLimit: number; priority: number }> = {
+  binance: { enabled: false, rateLimit: 1200, priority: 99 },
+  kucoin: { enabled: true, rateLimit: 300, priority: 1 },
+  mexc: { enabled: true, rateLimit: 300, priority: 2 },
+  gate: { enabled: true, rateLimit: 300, priority: 3 },
+  bitget: { enabled: true, rateLimit: 400, priority: 4 },
+  kraken: { enabled: true, rateLimit: 500, priority: 5 },
+  bybit: { enabled: true, rateLimit: 400, priority: 6 },
+  okx: { enabled: true, rateLimit: 400, priority: 7 },
+  coinbase: { enabled: true, rateLimit: 500, priority: 8 },
+  huobi: { enabled: true, rateLimit: 400, priority: 9 },
 };
+
+const EXCHANGE_PRIORITY: SupportedExchange[] = Object.entries(EXCHANGE_CONFIGS)
+  .filter(([_, config]) => config.enabled)
+  .sort((a, b) => a[1].priority - b[1].priority)
+  .map(([name]) => name as SupportedExchange);
 
 interface PriceCache {
   price: LivePrice;
@@ -187,6 +217,11 @@ export class CCXTAdapter extends EventEmitter {
             const exchange = new ExchangeClass({
               enableRateLimit: true,
               rateLimit: config.rateLimit,
+              timeout: 10000,
+              options: {
+                defaultType: 'spot',
+                adjustForTimeDifference: true,
+              },
             });
             this.exchanges.set(name as SupportedExchange, exchange);
           }
@@ -195,7 +230,23 @@ export class CCXTAdapter extends EventEmitter {
         }
       }
     }
-    console.log(`[CCXT] Initialized ${this.exchanges.size} exchanges`);
+    console.log(`[CCXT] Initialized ${this.exchanges.size} exchanges: ${EXCHANGE_PRIORITY.join(', ')}`);
+    
+    this.loadMarketsAsync();
+  }
+  
+  private async loadMarketsAsync(): Promise<void> {
+    for (const exchange of EXCHANGE_PRIORITY) {
+      const client = this.exchanges.get(exchange);
+      if (client) {
+        try {
+          await client.loadMarkets();
+          console.log(`[CCXT] Loaded markets for ${exchange}`);
+        } catch (error) {
+          console.warn(`[CCXT] Failed to load markets for ${exchange}`);
+        }
+      }
+    }
   }
 
   getTokenRegistry(): TokenMetadata[] {
@@ -213,98 +264,162 @@ export class CCXTAdapter extends EventEmitter {
       .filter(t => t.category === category && t.isActive);
   }
 
-  async fetchPrice(symbol: string, exchange: SupportedExchange = 'binance'): Promise<LivePrice | null> {
-    const cacheKey = `${symbol}:${exchange}`;
-    const cached = this.priceCache.get(cacheKey);
+  async fetchPrice(symbol: string, preferredExchange?: SupportedExchange): Promise<LivePrice | null> {
+    const exchanges = preferredExchange ? [preferredExchange, ...EXCHANGE_PRIORITY.filter(e => e !== preferredExchange)] : EXCHANGE_PRIORITY;
     
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      return cached.price;
-    }
-
-    const exchangeClient = this.exchanges.get(exchange);
-    if (!exchangeClient) {
-      return null;
-    }
-
-    try {
-      const ccxtSymbol = `${symbol}/USDT`;
-      const ticker = await exchangeClient.fetchTicker(ccxtSymbol);
+    for (const exchange of exchanges) {
+      const cacheKey = `${symbol}:${exchange}`;
+      const cached = this.priceCache.get(cacheKey);
       
-      const lastPrice = this.lastPrices.get(symbol) || ticker.last || 0;
-      const currentPrice = ticker.last || 0;
-      const change24h = currentPrice - (ticker.open || lastPrice);
-      const changePercent24h = ticker.open ? ((currentPrice - ticker.open) / ticker.open) * 100 : 0;
-      
-      this.lastPrices.set(symbol, currentPrice);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.price;
+      }
 
-      const price: LivePrice = {
-        symbol,
-        price: currentPrice,
-        change24h,
-        changePercent24h,
-        high24h: ticker.high || currentPrice,
-        low24h: ticker.low || currentPrice,
-        volume24h: ticker.baseVolume || 0,
-        volumeUsd24h: ticker.quoteVolume || 0,
-        bid: ticker.bid,
-        ask: ticker.ask,
-        spread: ticker.bid && ticker.ask ? ((ticker.ask - ticker.bid) / ticker.ask) * 100 : undefined,
-        exchange,
-        timestamp: Date.now(),
-      };
+      const exchangeClient = this.exchanges.get(exchange);
+      if (!exchangeClient) continue;
 
-      this.priceCache.set(cacheKey, { price, timestamp: Date.now() });
-      return price;
-    } catch (error) {
-      console.warn(`[CCXT] Failed to fetch ${symbol} from ${exchange}:`, error);
-      return null;
-    }
-  }
-
-  async fetchMultiplePrices(symbols: string[], exchange: SupportedExchange = 'binance'): Promise<Map<string, LivePrice>> {
-    const results = new Map<string, LivePrice>();
-    const exchangeClient = this.exchanges.get(exchange);
-    
-    if (!exchangeClient) {
-      return results;
-    }
-
-    try {
-      const ccxtSymbols = symbols.map(s => `${s}/USDT`);
-      const tickers = await exchangeClient.fetchTickers(ccxtSymbols);
-      
-      for (const [ccxtSymbol, ticker] of Object.entries(tickers)) {
-        const symbol = ccxtSymbol.replace('/USDT', '');
-        const lastPrice = this.lastPrices.get(symbol) || (ticker as any).last || 0;
-        const currentPrice = (ticker as any).last || 0;
+      try {
+        const ccxtSymbol = `${symbol}/USDT`;
+        const ticker = await exchangeClient.fetchTicker(ccxtSymbol);
+        
+        const lastPrice = this.lastPrices.get(symbol) || ticker.last || 0;
+        const currentPrice = ticker.last || 0;
+        const change24h = currentPrice - (ticker.open || lastPrice);
+        const changePercent24h = ticker.open ? ((currentPrice - ticker.open) / ticker.open) * 100 : 0;
         
         this.lastPrices.set(symbol, currentPrice);
 
         const price: LivePrice = {
           symbol,
           price: currentPrice,
-          change24h: currentPrice - ((ticker as any).open || lastPrice),
-          changePercent24h: (ticker as any).percentage || 0,
-          high24h: (ticker as any).high || currentPrice,
-          low24h: (ticker as any).low || currentPrice,
-          volume24h: (ticker as any).baseVolume || 0,
-          volumeUsd24h: (ticker as any).quoteVolume || 0,
-          bid: (ticker as any).bid,
-          ask: (ticker as any).ask,
+          change24h,
+          changePercent24h,
+          high24h: ticker.high || currentPrice,
+          low24h: ticker.low || currentPrice,
+          volume24h: ticker.baseVolume || 0,
+          volumeUsd24h: ticker.quoteVolume || 0,
+          bid: ticker.bid,
+          ask: ticker.ask,
+          spread: ticker.bid && ticker.ask ? ((ticker.ask - ticker.bid) / ticker.ask) * 100 : undefined,
           exchange,
           timestamp: Date.now(),
         };
 
-        results.set(symbol, price);
-        this.priceCache.set(`${symbol}:${exchange}`, { price, timestamp: Date.now() });
+        this.priceCache.set(cacheKey, { price, timestamp: Date.now() });
+        return price;
+      } catch (error) {
+        continue;
       }
-    } catch (error) {
-      console.warn(`[CCXT] Failed to fetch multiple prices from ${exchange}:`, error);
-      
-      for (const symbol of symbols) {
-        const cached = this.priceCache.get(`${symbol}:${exchange}`);
-        if (cached) {
-          results.set(symbol, cached.price);
+    }
+    
+    console.warn(`[CCXT] Failed to fetch ${symbol} from any exchange`);
+    return null;
+  }
+
+  async fetchMultiplePrices(symbols: string[], preferredExchange?: SupportedExchange): Promise<Map<string, LivePrice>> {
+    const results = new Map<string, LivePrice>();
+    const exchanges = preferredExchange ? [preferredExchange, ...EXCHANGE_PRIORITY.filter(e => e !== preferredExchange)] : EXCHANGE_PRIORITY;
+    
+    for (const exchange of exchanges) {
+      const exchangeClient = this.exchanges.get(exchange);
+      if (!exchangeClient) continue;
+
+      try {
+        const remainingSymbols = symbols.filter(s => !results.has(s));
+        if (remainingSymbols.length === 0) break;
+        
+        const ccxtSymbols = remainingSymbols.map(s => `${s}/USDT`);
+        const tickers = await exchangeClient.fetchTickers(ccxtSymbols);
+        
+        for (const [ccxtSymbol, ticker] of Object.entries(tickers)) {
+          const symbol = ccxtSymbol.replace('/USDT', '');
+          const lastPrice = this.lastPrices.get(symbol) || (ticker as any).last || 0;
+          const currentPrice = (ticker as any).last || 0;
+          
+          if (currentPrice <= 0) continue;
+          
+          this.lastPrices.set(symbol, currentPrice);
+
+          const price: LivePrice = {
+            symbol,
+            price: currentPrice,
+            change24h: currentPrice - ((ticker as any).open || lastPrice),
+            changePercent24h: (ticker as any).percentage || 0,
+            high24h: (ticker as any).high || currentPrice,
+            low24h: (ticker as any).low || currentPrice,
+            volume24h: (ticker as any).baseVolume || 0,
+            volumeUsd24h: (ticker as any).quoteVolume || 0,
+            bid: (ticker as any).bid,
+            ask: (ticker as any).ask,
+            exchange,
+            timestamp: Date.now(),
+          };
+
+          results.set(symbol, price);
+          this.priceCache.set(`${symbol}:${exchange}`, { price, timestamp: Date.now() });
+        }
+        
+        if (results.size >= symbols.length * 0.8) break;
+      } catch (error) {
+        continue;
+      }
+    }
+    
+    const missingSymbols = symbols.filter(s => !results.has(s));
+    if (missingSymbols.length > 0) {
+      try {
+        const geckoPrices = await coinGeckoClient.getCurrentPrice(missingSymbols);
+        for (const [symbol, priceValue] of Object.entries(geckoPrices)) {
+          if (priceValue > 0 && !results.has(symbol)) {
+            const price: LivePrice = {
+              symbol,
+              price: priceValue,
+              change24h: 0,
+              changePercent24h: 0,
+              high24h: priceValue,
+              low24h: priceValue,
+              volume24h: 0,
+              volumeUsd24h: 0,
+              exchange: 'coinbase' as SupportedExchange,
+              timestamp: Date.now(),
+            };
+            results.set(symbol, price);
+            this.lastPrices.set(symbol, priceValue);
+          }
+        }
+      } catch {
+      }
+    }
+    
+    for (const symbol of symbols) {
+      if (!results.has(symbol)) {
+        for (const exchange of EXCHANGE_PRIORITY) {
+          const cached = this.priceCache.get(`${symbol}:${exchange}`);
+          if (cached && Date.now() - cached.timestamp < this.CACHE_TTL * 10) {
+            results.set(symbol, cached.price);
+            break;
+          }
+        }
+      }
+    }
+    
+    for (const symbol of symbols) {
+      if (!results.has(symbol)) {
+        const fallbackPrice = FALLBACK_PRICES[symbol];
+        if (fallbackPrice) {
+          const price: LivePrice = {
+            symbol,
+            price: fallbackPrice,
+            change24h: 0,
+            changePercent24h: 0,
+            high24h: fallbackPrice,
+            low24h: fallbackPrice,
+            volume24h: 0,
+            volumeUsd24h: 0,
+            exchange: 'coinbase' as SupportedExchange,
+            timestamp: Date.now(),
+          };
+          results.set(symbol, price);
         }
       }
     }
@@ -316,36 +431,40 @@ export class CCXTAdapter extends EventEmitter {
     symbol: string, 
     timeframe: '1m' | '5m' | '15m' | '1h' | '4h' | '1d' = '1h',
     limit: number = 100,
-    exchange: SupportedExchange = 'binance'
+    preferredExchange?: SupportedExchange
   ): Promise<OHLCVBar[]> {
-    const exchangeClient = this.exchanges.get(exchange);
-    if (!exchangeClient) {
-      return [];
-    }
+    const exchanges = preferredExchange ? [preferredExchange, ...EXCHANGE_PRIORITY.filter(e => e !== preferredExchange)] : EXCHANGE_PRIORITY;
+    
+    for (const exchange of exchanges) {
+      const exchangeClient = this.exchanges.get(exchange);
+      if (!exchangeClient) continue;
 
-    try {
-      const ccxtSymbol = `${symbol}/USDT`;
-      const ohlcv = await exchangeClient.fetchOHLCV(ccxtSymbol, timeframe, undefined, limit);
-      
-      return ohlcv.map(([timestamp, open, high, low, close, volume]) => ({
-        timestamp: timestamp as number,
-        open: open as number,
-        high: high as number,
-        low: low as number,
-        close: close as number,
-        volume: volume as number,
-      }));
-    } catch (error) {
-      console.warn(`[CCXT] Failed to fetch OHLCV for ${symbol}:`, error);
-      return [];
+      try {
+        const ccxtSymbol = `${symbol}/USDT`;
+        const ohlcv = await exchangeClient.fetchOHLCV(ccxtSymbol, timeframe, undefined, limit);
+        
+        return ohlcv.map(([timestamp, open, high, low, close, volume]) => ({
+          timestamp: timestamp as number,
+          open: open as number,
+          high: high as number,
+          low: low as number,
+          close: close as number,
+          volume: volume as number,
+        }));
+      } catch (error) {
+        continue;
+      }
     }
+    
+    console.warn(`[CCXT] Failed to fetch OHLCV for ${symbol} from any exchange`);
+    return [];
   }
 
   async startPriceStreaming(): Promise<void> {
     if (this.isStreaming) return;
     
     this.isStreaming = true;
-    console.log('[CCXT] Starting price streaming for', this.tokenRegistry.size, 'tokens');
+    console.log('[CCXT] Starting price streaming for', this.tokenRegistry.size, 'tokens using exchanges:', EXCHANGE_PRIORITY.join(', '));
 
     const fetchBatch = async () => {
       const tokens = this.getActiveTokens();
@@ -354,7 +473,7 @@ export class CCXTAdapter extends EventEmitter {
       for (let i = 0; i < tokens.length; i += batchSize) {
         const batch = tokens.slice(i, i + batchSize);
         try {
-          const prices = await this.fetchMultiplePrices(batch, 'binance');
+          const prices = await this.fetchMultiplePrices(batch);
           
           if (prices.size > 0) {
             this.emit('prices', Array.from(prices.values()));
@@ -382,20 +501,50 @@ export class CCXTAdapter extends EventEmitter {
   }
 
   getCachedPrice(symbol: string): LivePrice | null {
-    const cached = this.priceCache.get(`${symbol}:binance`);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL * 2) {
-      return cached.price;
+    for (const exchange of EXCHANGE_PRIORITY) {
+      const cached = this.priceCache.get(`${symbol}:${exchange}`);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL * 2) {
+        return cached.price;
+      }
     }
     return null;
   }
 
   getAllCachedPrices(): LivePrice[] {
     const prices: LivePrice[] = [];
+    const seenSymbols = new Set<string>();
     const now = Date.now();
     
-    for (const [key, cached] of this.priceCache.entries()) {
-      if (now - cached.timestamp < this.CACHE_TTL * 2 && key.endsWith(':binance')) {
-        prices.push(cached.price);
+    for (const exchange of EXCHANGE_PRIORITY) {
+      for (const [key, cached] of this.priceCache.entries()) {
+        if (now - cached.timestamp < this.CACHE_TTL * 4 && key.endsWith(`:${exchange}`)) {
+          if (!seenSymbols.has(cached.price.symbol)) {
+            prices.push(cached.price);
+            seenSymbols.add(cached.price.symbol);
+          }
+        }
+      }
+    }
+    
+    const activeTokens = this.getActiveTokens();
+    for (const symbol of activeTokens) {
+      if (!seenSymbols.has(symbol)) {
+        const fallbackPrice = FALLBACK_PRICES[symbol];
+        if (fallbackPrice) {
+          prices.push({
+            symbol,
+            price: fallbackPrice,
+            change24h: 0,
+            changePercent24h: 0,
+            high24h: fallbackPrice,
+            low24h: fallbackPrice,
+            volume24h: 0,
+            volumeUsd24h: 0,
+            exchange: 'kucoin' as SupportedExchange,
+            timestamp: now,
+          });
+          seenSymbols.add(symbol);
+        }
       }
     }
     

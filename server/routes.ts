@@ -32,6 +32,8 @@ import { blockchainSync } from "./blockchain/BlockchainSyncService";
 import { evolutionEngine } from "./evolution/EvolutionEngine";
 import { tradingIntelligenceService } from "./trading/TradingIntelligenceService";
 import { tradingVillage } from "./trading/TradingVillage";
+import { livePriceService } from "./data/LivePriceService";
+import { ccxtAdapter } from "./data/providers/CCXTAdapter";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -5088,6 +5090,92 @@ export async function registerRoutes(
       data: { event: "village_competition", competition },
       timestamp: Date.now(),
     });
+  });
+
+  // ==========================================
+  // Live Price Streaming Routes (CCXT Multi-Exchange)
+  // ==========================================
+
+  app.get("/api/prices/live", async (req, res) => {
+    try {
+      const prices = livePriceService.getAllPrices();
+      res.json(prices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get live prices" });
+    }
+  });
+
+  app.get("/api/prices/:symbol", async (req, res) => {
+    try {
+      const price = livePriceService.getPrice(req.params.symbol.toUpperCase());
+      if (!price) return res.status(404).json({ error: "Price not found" });
+      res.json(price);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get price" });
+    }
+  });
+
+  app.get("/api/prices/:symbol/analysis", async (req, res) => {
+    try {
+      const analysis = await livePriceService.getTokenAnalysis(req.params.symbol.toUpperCase());
+      if (!analysis) return res.status(404).json({ error: "Analysis not available" });
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get analysis" });
+    }
+  });
+
+  app.get("/api/tokens", async (req, res) => {
+    try {
+      const tokens = livePriceService.getTokenRegistry();
+      res.json(tokens);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get token registry" });
+    }
+  });
+
+  app.get("/api/tokens/categories/:category", async (req, res) => {
+    try {
+      const tokens = ccxtAdapter.getTokensByCategory(req.params.category as any);
+      res.json(tokens);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get tokens by category" });
+    }
+  });
+
+  app.get("/api/exchanges/health", async (req, res) => {
+    try {
+      const health = await livePriceService.getExchangeHealth();
+      res.json(health);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get exchange health" });
+    }
+  });
+
+  app.get("/api/ohlcv/:symbol", async (req, res) => {
+    try {
+      const { timeframe = '1h', limit = '100' } = req.query;
+      const data = await ccxtAdapter.fetchOHLCV(
+        req.params.symbol.toUpperCase(),
+        timeframe as any,
+        parseInt(limit as string)
+      );
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get OHLCV data" });
+    }
+  });
+
+  livePriceService.on('priceUpdate', (prices) => {
+    broadcastToClients({
+      type: "priceUpdate",
+      data: prices,
+      timestamp: Date.now(),
+    });
+  });
+
+  livePriceService.start().catch(err => {
+    console.error('[Routes] Failed to start live price service:', err);
   });
 
   return httpServer;
