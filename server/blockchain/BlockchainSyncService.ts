@@ -132,10 +132,28 @@ export class BlockchainSyncService extends EventEmitter {
     if (this.config.enabled) {
       this.processPendingMints();
     } else {
-      // Simulate successful mint for demo
+      // Simulate successful mint for demo - ensure proof is persisted and linked to identity
       const simulatedProof = this.simulateMint(request);
-      this.mintedProofs.set(request.simulationId, simulatedProof);
-      this.emit('badgeMinted', { requestId, proof: simulatedProof });
+      this.mintedProofs.set(requestId, simulatedProof);
+      
+      // Link proof to agent identity
+      const identity = this.agentIdentities.get(request.agentName);
+      if (identity) {
+        identity.badges.push(simulatedProof);
+      }
+      
+      // Clear from pending after simulation to avoid unbounded growth
+      const idx = this.pendingMints.indexOf(request);
+      if (idx > -1) this.pendingMints.splice(idx, 1);
+      
+      // Include agent context in event for UI
+      this.emit('badgeMinted', { 
+        requestId, 
+        proof: simulatedProof,
+        agentName: request.agentName,
+        generation: request.generation,
+        mutationType: request.mutationType,
+      });
     }
     
     console.log('[BlockchainSync] Evolution badge queued:', {
@@ -182,8 +200,35 @@ export class BlockchainSyncService extends EventEmitter {
     if (!this.config.enabled) {
       const simulatedProof = this.simulateMint(request);
       this.mintedProofs.set(requestId, simulatedProof);
-      this.emit('badgeMinted', { requestId, proof: simulatedProof });
+      
+      // Link proof to agent identity
+      const identity = this.agentIdentities.get(agentName);
+      if (identity) {
+        identity.badges.push(simulatedProof);
+      }
+      
+      // Clear from pending after simulation
+      const idx = this.pendingMints.indexOf(request);
+      if (idx > -1) this.pendingMints.splice(idx, 1);
+      
+      // Include agent context in event for UI
+      this.emit('badgeMinted', { 
+        requestId, 
+        proof: simulatedProof,
+        agentName: request.agentName,
+        generation: request.generation,
+        mutationType: 'stress_test',
+        scenarioName,
+        passed,
+      });
     }
+    
+    console.log('[BlockchainSync] Stress test badge queued:', {
+      agent: agentName,
+      scenario: scenarioName,
+      passed,
+      resilienceScore,
+    });
     
     return requestId;
   }
@@ -222,7 +267,27 @@ export class BlockchainSyncService extends EventEmitter {
     if (!this.config.enabled) {
       const simulatedProof = this.simulateMint(request);
       this.mintedProofs.set(requestId, simulatedProof);
-      this.emit('badgeMinted', { requestId, proof: simulatedProof });
+      
+      // Link proof to agent identity
+      const identity = this.agentIdentities.get(agentName);
+      if (identity) {
+        identity.badges.push(simulatedProof);
+      }
+      
+      // Clear from pending after simulation
+      const idx = this.pendingMints.indexOf(request);
+      if (idx > -1) this.pendingMints.splice(idx, 1);
+      
+      // Include agent context in event for UI
+      this.emit('badgeMinted', { 
+        requestId, 
+        proof: simulatedProof,
+        agentName: request.agentName,
+        generation: request.generation,
+        mutationType: 'healing',
+        failureType,
+        resolution,
+      });
     }
     
     console.log('[BlockchainSync] Agent self-healed:', {
@@ -374,6 +439,13 @@ export class BlockchainSyncService extends EventEmitter {
   }
   
   private getAgentGeneration(agentName: string): number {
+    // First check tracked identity for actual generation
+    const identity = this.agentIdentities.get(agentName);
+    if (identity && identity.generation > 0) {
+      return identity.generation;
+    }
+    
+    // Fallback: parse from agent name suffix (e.g., Atlas_v3 -> 3)
     const match = agentName.match(/_v(\d+)$/);
     return match ? parseInt(match[1]) : 1;
   }

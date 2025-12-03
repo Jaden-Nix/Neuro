@@ -2467,8 +2467,6 @@ export async function registerRoutes(
       
       // Trigger evolution for top-performing agents (if performance warrants it)
       try {
-        const { evolutionEngine } = await import("./evolution/EvolutionEngine");
-        
         for (const agentResult of result.agentPerformance) {
           // Only evolve agents with significant performance (positive ROI or high win rate)
           if (agentResult.totalReturn > 5 || agentResult.winRate > 60) {
@@ -3762,10 +3760,9 @@ export async function registerRoutes(
     }
   });
 
-  // Evolution Engine - Advanced endpoints
+  // Evolution Engine - Advanced endpoints (use top-level imported singleton)
   app.get("/api/evolution/engine/stats", async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const stats = evolutionEngine.getEvolutionStats();
       res.json(stats);
     } catch (error) {
@@ -3776,7 +3773,6 @@ export async function registerRoutes(
 
   app.get("/api/evolution/engine/history", async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const history = evolutionEngine.getEvolutionHistory(limit);
       res.json(history);
@@ -3788,7 +3784,6 @@ export async function registerRoutes(
 
   app.get("/api/evolution/engine/genealogy", async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const tree = evolutionEngine.getGenealogyTree();
       res.json(tree);
     } catch (error) {
@@ -3799,7 +3794,6 @@ export async function registerRoutes(
 
   app.get("/api/evolution/engine/genealogy/:agentName", async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const genealogy = evolutionEngine.getAgentGenealogy(req.params.agentName);
       if (!genealogy) {
         return res.status(404).json({ error: "Agent genealogy not found" });
@@ -3813,7 +3807,6 @@ export async function registerRoutes(
 
   app.get("/api/evolution/engine/heatmap", async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const heatmap = evolutionEngine.getMutationHeatmap();
       res.json(heatmap);
     } catch (error) {
@@ -3824,7 +3817,6 @@ export async function registerRoutes(
 
   app.post("/api/evolution/engine/evolve", writeLimiter, async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const { parentAgentName, trigger, currentPerformance, reason, currentParams } = req.body;
 
       if (!parentAgentName || !trigger || !currentPerformance || !reason) {
@@ -3859,7 +3851,6 @@ export async function registerRoutes(
 
   app.post("/api/evolution/engine/retire", writeLimiter, async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
       const { agentName, reason } = req.body;
 
       if (!agentName || !reason) {
@@ -3883,7 +3874,7 @@ export async function registerRoutes(
 
   app.post("/api/evolution/engine/demo", writeLimiter, async (req, res) => {
     try {
-      const { evolutionEngine } = await import("./evolution/EvolutionEngine");
+      // Use the imported singleton directly - no dynamic import to avoid double mutation
       const events = evolutionEngine.generateDemoEvolutions();
       const stats = evolutionEngine.getEvolutionStats();
 
@@ -4521,8 +4512,6 @@ export async function registerRoutes(
 
       // Trigger evolution for agents based on stress test performance
       try {
-        const { evolutionEngine } = await import("./evolution/EvolutionEngine");
-        
         for (const [agentType, perf] of Object.entries(agentPerformance)) {
           const agentPerf = perf as any;
           // If agent shows adaptability issues during stress, trigger evolution

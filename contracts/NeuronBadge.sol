@@ -393,11 +393,26 @@ contract NeuronBadge is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, Ree
     function _update(address to, uint256 tokenId, address auth) internal override(ERC721, ERC721Enumerable) returns (address) {
         address from = _ownerOf(tokenId);
         
+        // Allow minting (from == 0) and burning (to == 0), but not transfers
         if (from != address(0) && to != address(0)) {
             revert("NeuronBadge: Soulbound - transfers not allowed");
         }
         
         return super._update(to, tokenId, auth);
+    }
+    
+    /**
+     * @notice Disable approvals - soulbound tokens cannot be approved for transfer
+     */
+    function approve(address, uint256) public pure override(ERC721, IERC721) {
+        revert("NeuronBadge: Soulbound - approvals not allowed");
+    }
+    
+    /**
+     * @notice Disable setApprovalForAll - soulbound tokens cannot be approved for transfer
+     */
+    function setApprovalForAll(address, bool) public pure override(ERC721, IERC721) {
+        revert("NeuronBadge: Soulbound - approvals not allowed");
     }
     
     function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
