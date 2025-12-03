@@ -95,13 +95,28 @@ const LogEntryItem = forwardRef<HTMLDivElement, { log: LogEntry; isNew: boolean 
     const levelColorClass = levelColors[log.level] || "text-muted-foreground";
 
     const formatTimestamp = (timestamp: number) => {
+      if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
+        return new Date().toLocaleTimeString('en-US', { 
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
       const date = new Date(timestamp);
+      if (isNaN(date.getTime())) {
+        return new Date().toLocaleTimeString('en-US', { 
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+      }
       return date.toLocaleTimeString('en-US', { 
         hour12: false,
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
+        second: '2-digit'
       });
     };
 
