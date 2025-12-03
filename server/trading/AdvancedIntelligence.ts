@@ -11,6 +11,13 @@ export interface CandleData {
   volume: number;
 }
 
+export interface OHLCVResult {
+  candles: CandleData[];
+  source: 'real' | 'synthetic';
+  exchange: string;
+  timestamp: number;
+}
+
 export interface WhaleTransaction {
   id: string;
   chain: string;
@@ -124,13 +131,38 @@ export interface IntelligenceScore {
   confidence: number;
   signals: string[];
   timestamp: number;
+  dataQuality: DataQuality;
+}
+
+export interface DataQuality {
+  ohlcvSource: 'real' | 'synthetic';
+  fundingSource: 'real' | 'synthetic';
+  sentimentSource: 'real' | 'synthetic';
+  flowSource: 'real' | 'synthetic';
+  whaleSource: 'real' | 'synthetic';
+  patternSource: 'real' | 'synthetic';
+  overallQuality: 'high' | 'medium' | 'low';
+  realDataCount: number;
+  totalModules: number;
+  qualityScore: number;
+}
+
+export interface MultiTimeframeAnalysis {
+  symbol: string;
+  htfTrend: 'bullish' | 'bearish' | 'neutral';
+  htfTimeframe: string;
+  ltfTrend: 'bullish' | 'bearish' | 'neutral';
+  ltfTimeframe: string;
+  trendAlignment: boolean;
+  htfEmaAlignment: boolean;
+  confidenceBoost: number;
 }
 
 const EXCHANGE_PRIORITY: SupportedExchange[] = ['binance', 'bybit', 'okx', 'kucoin', 'gate', 'mexc', 'bitget', 'kraken', 'coinbase', 'huobi'];
 
 export class AdvancedIntelligenceService extends EventEmitter {
   private exchanges: Map<SupportedExchange, ccxt.Exchange> = new Map();
-  private ohlcvCache: Map<string, { data: CandleData[]; timestamp: number }> = new Map();
+  private ohlcvCache: Map<string, OHLCVResult> = new Map();
   private fundingCache: Map<string, FundingRateData> = new Map();
   private whaleAlerts: WhaleTransaction[] = [];
   private sentimentData: Map<string, SentimentSignal[]> = new Map();
@@ -139,8 +171,10 @@ export class AdvancedIntelligenceService extends EventEmitter {
   private volatilityRegimes: Map<string, VolatilityRegime> = new Map();
   private patternCache: Map<string, PatternMatch[]> = new Map();
   
-  private readonly OHLCV_CACHE_TTL = 60000;
-  private readonly FUNDING_CACHE_TTL = 300000;
+  private readonly OHLCV_CACHE_TTL = 60000; // 60s for real data
+  private readonly SYNTHETIC_CACHE_TTL = 10000; // 10s for synthetic - retry sooner
+  private readonly FUNDING_CACHE_TTL = 300000; // 5min for real funding data
+  private readonly SYNTHETIC_FUNDING_TTL = 30000; // 30s for synthetic funding
 
   constructor() {
     super();
@@ -185,11 +219,24 @@ export class AdvancedIntelligenceService extends EventEmitter {
     limit: number = 200,
     exchange?: SupportedExchange
   ): Promise<CandleData[]> {
+    const result = await this.fetchRealOHLCVWithMetadata(symbol, timeframe, limit, exchange);
+    return result.candles;
+  }
+
+  async fetchRealOHLCVWithMetadata(
+    symbol: string, 
+    timeframe: string = '4h', 
+    limit: number = 200,
+    exchange?: SupportedExchange
+  ): Promise<OHLCVResult> {
     const cacheKey = `${symbol}:${timeframe}:${exchange || 'any'}`;
     const cached = this.ohlcvCache.get(cacheKey);
     
-    if (cached && Date.now() - cached.timestamp < this.OHLCV_CACHE_TTL) {
-      return cached.data;
+    if (cached) {
+      const ttl = cached.source === 'synthetic' ? this.SYNTHETIC_CACHE_TTL : this.OHLCV_CACHE_TTL;
+      if (Date.now() - cached.timestamp < ttl) {
+        return cached;
+      }
     }
 
     const exchanges = exchange ? [exchange] : EXCHANGE_PRIORITY;
@@ -216,9 +263,15 @@ export class AdvancedIntelligenceService extends EventEmitter {
             volume: Number(candle[5]) || 0,
           }));
           
-          this.ohlcvCache.set(cacheKey, { data: candles, timestamp: Date.now() });
+          const result: OHLCVResult = { 
+            candles, 
+            source: 'real', 
+            exchange: ex, 
+            timestamp: Date.now() 
+          };
+          this.ohlcvCache.set(cacheKey, result);
           console.log(`[AdvancedIntelligence] Fetched ${candles.length} real candles for ${symbol} from ${ex}`);
-          return candles;
+          return result;
         }
       } catch (error) {
         continue;
@@ -226,7 +279,13 @@ export class AdvancedIntelligenceService extends EventEmitter {
     }
 
     console.warn(`[AdvancedIntelligence] Using synthetic OHLCV for ${symbol}`);
-    return this.generateSyntheticOHLCV(symbol, limit);
+    const syntheticCandles = this.generateSyntheticOHLCV(symbol, limit);
+    return { 
+      candles: syntheticCandles, 
+      source: 'synthetic', 
+      exchange: 'synthetic', 
+      timestamp: Date.now() 
+    };
   }
 
   private generateSyntheticOHLCV(symbol: string, limit: number): CandleData[] {
@@ -267,8 +326,12 @@ export class AdvancedIntelligenceService extends EventEmitter {
     const cacheKey = symbol;
     const cached = this.fundingCache.get(cacheKey);
     
-    if (cached && Date.now() - cached.timestamp < this.FUNDING_CACHE_TTL) {
-      return cached;
+    if (cached) {
+      const isSynthetic = cached.exchange === 'synthetic';
+      const ttl = isSynthetic ? this.SYNTHETIC_FUNDING_TTL : this.FUNDING_CACHE_TTL;
+      if (Date.now() - cached.timestamp < ttl) {
+        return cached;
+      }
     }
 
     const perpetualExchanges: SupportedExchange[] = ['binance', 'bybit', 'okx'];
@@ -775,8 +838,11 @@ export class AdvancedIntelligenceService extends EventEmitter {
   async calculateIntelligenceScore(
     symbol: string,
     technicalScore: number,
-    direction: 'long' | 'short'
+    direction: 'long' | 'short',
+    ohlcvMetadata?: { source: 'real' | 'synthetic' }
   ): Promise<IntelligenceScore> {
+    const isOHLCVRealFromCaller = ohlcvMetadata?.source === 'real';
+    
     const funding = await this.fetchFundingRates(symbol);
     const sentiment = this.simulateSentiment(symbol);
     const orderFlow = this.simulateOrderFlow(symbol);
@@ -852,38 +918,79 @@ export class AdvancedIntelligenceService extends EventEmitter {
 
     let patternBonus = 0;
     let patternScore = 50;
-    const candles = await this.fetchRealOHLCV(symbol, '4h', 50);
-    const patterns = this.detectPatterns(candles);
-    for (const pattern of patterns) {
-      if ((direction === 'long' && pattern.direction === 'bullish') ||
-          (direction === 'short' && pattern.direction === 'bearish')) {
-        patternScore = Math.max(patternScore, pattern.confidence);
-        patternBonus = Math.max(patternBonus, Math.floor(pattern.confidence / 20));
-      } else if ((direction === 'long' && pattern.direction === 'bearish') ||
-                 (direction === 'short' && pattern.direction === 'bullish')) {
-        patternBonus = Math.min(patternBonus, -2);
+    
+    const isOHLCVReal = ohlcvMetadata ? ohlcvMetadata.source === 'real' : false;
+    
+    if (isOHLCVReal) {
+      const ohlcvResult = await this.fetchRealOHLCVWithMetadata(symbol, '4h', 50);
+      const candles = ohlcvResult.candles;
+      const patterns = this.detectPatterns(candles);
+      
+      if (ohlcvResult.source === 'real') {
+        for (const pattern of patterns) {
+          if ((direction === 'long' && pattern.direction === 'bullish') ||
+              (direction === 'short' && pattern.direction === 'bearish')) {
+            patternScore = Math.max(patternScore, pattern.confidence);
+            patternBonus = Math.max(patternBonus, Math.floor(pattern.confidence / 20));
+          } else if ((direction === 'long' && pattern.direction === 'bearish') ||
+                     (direction === 'short' && pattern.direction === 'bullish')) {
+            patternBonus = Math.min(patternBonus, -2);
+          }
+        }
       }
     }
 
-    const totalBonus = fundingBonus + sentimentBonus + flowBonus + whaleBonus + patternBonus;
+    const dataQuality: DataQuality = {
+      ohlcvSource: isOHLCVReal ? 'real' : 'synthetic',
+      fundingSource: funding && funding.exchange !== 'synthetic' ? 'real' : 'synthetic',
+      sentimentSource: 'synthetic',
+      flowSource: 'synthetic',
+      whaleSource: 'synthetic',
+      patternSource: isOHLCVReal ? 'real' : 'synthetic',
+      overallQuality: 'medium',
+      realDataCount: 0,
+      totalModules: 6,
+      qualityScore: 0,
+    };
+
+    dataQuality.realDataCount = [
+      dataQuality.ohlcvSource === 'real',
+      dataQuality.fundingSource === 'real',
+      dataQuality.sentimentSource === 'real',
+      dataQuality.flowSource === 'real',
+      dataQuality.whaleSource === 'real',
+      dataQuality.patternSource === 'real',
+    ].filter(Boolean).length;
+    
+    dataQuality.qualityScore = (dataQuality.realDataCount / dataQuality.totalModules) * 100;
+    dataQuality.overallQuality = dataQuality.qualityScore >= 66 ? 'high' : dataQuality.qualityScore >= 33 ? 'medium' : 'low';
+
+    const syntheticPenalty = (6 - dataQuality.realDataCount) * 0.5;
+    const reducedSentimentBonus = dataQuality.sentimentSource === 'synthetic' ? Math.floor(sentimentBonus * 0.3) : sentimentBonus;
+    const reducedFlowBonus = dataQuality.flowSource === 'synthetic' ? Math.floor(flowBonus * 0.3) : flowBonus;
+    const reducedWhaleBonus = dataQuality.whaleSource === 'synthetic' ? Math.floor(whaleBonus * 0.3) : whaleBonus;
+
+    const totalBonus = fundingBonus + reducedSentimentBonus + reducedFlowBonus + reducedWhaleBonus + patternBonus;
     const clampedBonus = Math.max(-15, Math.min(20, totalBonus));
     
-    const overallScore = technicalScore + clampedBonus;
+    const overallScore = technicalScore + clampedBonus - syntheticPenalty;
 
     const signals: string[] = [];
     if (fundingBonus > 0) signals.push(`Favorable funding (${funding?.rate?.toFixed(4) || 'N/A'})`);
     if (fundingBonus < 0) signals.push(`Unfavorable funding (${funding?.rate?.toFixed(4) || 'N/A'})`);
-    if (sentimentBonus > 0) signals.push(`Positive sentiment (${sentiment.sentiment.toFixed(2)})`);
-    if (sentimentBonus < 0) signals.push(`Negative sentiment (${sentiment.sentiment.toFixed(2)})`);
-    if (flowBonus > 0) signals.push(`Strong order flow (delta: ${orderFlow.delta.toFixed(2)})`);
-    if (flowBonus < 0) signals.push(`Weak order flow (delta: ${orderFlow.delta.toFixed(2)})`);
-    if (whaleBonus > 0) signals.push(`Whale ${direction === 'long' ? 'accumulation' : 'distribution'}`);
-    if (whaleBonus < 0) signals.push(`Whale ${direction === 'long' ? 'distribution' : 'accumulation'} (bearish)`);
+    if (sentimentBonus > 0) signals.push(`Positive sentiment (${sentiment.sentiment.toFixed(2)})${dataQuality.sentimentSource === 'synthetic' ? ' [synthetic]' : ''}`);
+    if (sentimentBonus < 0) signals.push(`Negative sentiment (${sentiment.sentiment.toFixed(2)})${dataQuality.sentimentSource === 'synthetic' ? ' [synthetic]' : ''}`);
+    if (flowBonus > 0) signals.push(`Strong order flow (delta: ${orderFlow.delta.toFixed(2)})${dataQuality.flowSource === 'synthetic' ? ' [synthetic]' : ''}`);
+    if (flowBonus < 0) signals.push(`Weak order flow (delta: ${orderFlow.delta.toFixed(2)})${dataQuality.flowSource === 'synthetic' ? ' [synthetic]' : ''}`);
+    if (whaleBonus > 0) signals.push(`Whale ${direction === 'long' ? 'accumulation' : 'distribution'}${dataQuality.whaleSource === 'synthetic' ? ' [synthetic]' : ''}`);
+    if (whaleBonus < 0) signals.push(`Whale ${direction === 'long' ? 'distribution' : 'accumulation'} (bearish)${dataQuality.whaleSource === 'synthetic' ? ' [synthetic]' : ''}`);
     if (patternBonus > 0) signals.push(`Pattern: ${patterns.filter(p => (direction === 'long' && p.direction === 'bullish') || (direction === 'short' && p.direction === 'bearish')).map(p => p.pattern).join(', ')}`);
     if (patternBonus < 0) signals.push(`Counter-pattern detected`);
     if (smartMoney.flowSignal === (direction === 'long' ? 'accumulation' : 'distribution')) {
-      signals.push(`Smart money ${smartMoney.flowSignal}`);
+      signals.push(`Smart money ${smartMoney.flowSignal}${dataQuality.flowSource === 'synthetic' ? ' [synthetic]' : ''}`);
     }
+    
+    signals.push(`Data quality: ${dataQuality.overallQuality} (${dataQuality.realDataCount}/${dataQuality.totalModules} real sources)`);
 
     return {
       symbol,
@@ -898,7 +1005,81 @@ export class AdvancedIntelligenceService extends EventEmitter {
       confidence: Math.min(95, overallScore * 0.95),
       signals,
       timestamp: Date.now(),
+      dataQuality,
     };
+  }
+
+  async analyzeMultiTimeframe(
+    symbol: string,
+    primaryTimeframe: string = '4h'
+  ): Promise<MultiTimeframeAnalysis> {
+    const htfTimeframe = primaryTimeframe === '1h' ? '4h' : primaryTimeframe === '4h' ? '1d' : '1w';
+    const ltfTimeframe = primaryTimeframe;
+    
+    const [htfResult, ltfResult] = await Promise.all([
+      this.fetchRealOHLCVWithMetadata(symbol, htfTimeframe, 50),
+      this.fetchRealOHLCVWithMetadata(symbol, ltfTimeframe, 50),
+    ]);
+    
+    const htfCandles = htfResult.candles;
+    const ltfCandles = ltfResult.candles;
+    
+    const htfIsReal = htfResult.source === 'real';
+    const ltfIsReal = ltfResult.source === 'real';
+    
+    const calculateEMATrend = (candles: CandleData[]): 'bullish' | 'bearish' | 'neutral' => {
+      if (candles.length < 20) return 'neutral';
+      const closes = candles.map(c => c.close);
+      const ema20 = this.calculateSimpleEMA(closes, 20);
+      const ema50 = this.calculateSimpleEMA(closes, Math.min(50, closes.length));
+      const currentPrice = closes[closes.length - 1];
+      
+      if (currentPrice > ema20 && ema20 > ema50) return 'bullish';
+      if (currentPrice < ema20 && ema20 < ema50) return 'bearish';
+      return 'neutral';
+    };
+    
+    const htfTrend = htfIsReal ? calculateEMATrend(htfCandles) : 'neutral';
+    const ltfTrend = ltfIsReal ? calculateEMATrend(ltfCandles) : 'neutral';
+    
+    const trendAlignment = htfIsReal && ltfIsReal && (htfTrend === ltfTrend) && htfTrend !== 'neutral';
+    
+    const htfCloses = htfCandles.map(c => c.close);
+    const htfEma50 = this.calculateSimpleEMA(htfCloses, Math.min(50, htfCloses.length));
+    const htfEma200 = this.calculateSimpleEMA(htfCloses, Math.min(200, htfCloses.length));
+    const htfEmaAlignment = htfIsReal && (htfTrend === 'bullish' ? htfEma50 > htfEma200 : htfTrend === 'bearish' ? htfEma50 < htfEma200 : false);
+    
+    let confidenceBoost = 0;
+    
+    if (!htfIsReal || !ltfIsReal) {
+      confidenceBoost = -15;
+      console.warn(`[MTF] Synthetic data detected for ${symbol} - HTF: ${htfResult.source}, LTF: ${ltfResult.source}`);
+    } else {
+      if (trendAlignment) confidenceBoost += 10;
+      if (htfEmaAlignment) confidenceBoost += 5;
+      if (htfTrend === 'neutral') confidenceBoost -= 5;
+    }
+    
+    return {
+      symbol,
+      htfTrend,
+      htfTimeframe,
+      ltfTrend,
+      ltfTimeframe,
+      trendAlignment,
+      htfEmaAlignment,
+      confidenceBoost,
+    };
+  }
+
+  private calculateSimpleEMA(prices: number[], period: number): number {
+    if (prices.length < period) return prices[prices.length - 1];
+    const multiplier = 2 / (period + 1);
+    let ema = prices.slice(0, period).reduce((a, b) => a + b) / period;
+    for (let i = period; i < prices.length; i++) {
+      ema = (prices[i] - ema) * multiplier + ema;
+    }
+    return ema;
   }
 }
 

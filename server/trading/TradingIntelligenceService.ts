@@ -28,7 +28,9 @@ import {
   type OrderFlowData,
   type SmartMoneyFlow,
   type LiquidationLevel,
-  type CrossChainFlow
+  type CrossChainFlow,
+  type MultiTimeframeAnalysis,
+  type DataQuality
 } from "./AdvancedIntelligence";
 
 const anthropic = new Anthropic({
@@ -563,7 +565,15 @@ export class TradingIntelligenceService {
     try {
       const currentPrice = await this.getMarketPrice(symbol);
       
-      const realCandles = await advancedIntelligence.fetchRealOHLCV(symbol, timeframe, 200);
+      const ohlcvResult = await advancedIntelligence.fetchRealOHLCVWithMetadata(symbol, timeframe, 200);
+      const realCandles = ohlcvResult.candles;
+      const isDataReal = ohlcvResult.source === 'real';
+      
+      if (!isDataReal) {
+        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Using synthetic OHLCV data, skipping signal generation`);
+        return null;
+      }
+      
       const candles: CandleData[] = realCandles.map(c => ({
         timestamp: c.timestamp,
         open: c.open,
@@ -584,6 +594,8 @@ export class TradingIntelligenceService {
       const smartMoney = advancedIntelligence.simulateSmartMoneyFlow(symbol);
       const liquidations = advancedIntelligence.simulateLiquidationLevels(symbol, currentPrice);
       
+      const mtfAnalysis = await advancedIntelligence.analyzeMultiTimeframe(symbol, timeframe);
+      
       const longConfluence = this.calculateConfluenceScore(indicators, "long");
       const shortConfluence = this.calculateConfluenceScore(indicators, "short");
       
@@ -593,10 +605,14 @@ export class TradingIntelligenceService {
       const intelligenceScore = await advancedIntelligence.calculateIntelligenceScore(
         symbol, 
         bestConfluence.score, 
-        bestDirection
+        bestDirection,
+        { source: isDataReal ? 'real' : 'synthetic' }
       );
       
-      console.log(`[TradingIntelligence] ${symbol} ENHANCED: Technical ${bestConfluence.score.toFixed(1)}%, Overall ${intelligenceScore.overallScore.toFixed(1)}%, Volatility: ${volatilityRegime.regime}, Patterns: ${patterns.length}`);
+      const htfAligned = (bestDirection === 'long' && mtfAnalysis.htfTrend === 'bullish') || 
+                         (bestDirection === 'short' && mtfAnalysis.htfTrend === 'bearish');
+      
+      console.log(`[TradingIntelligence] ${symbol} ENHANCED: Technical ${bestConfluence.score.toFixed(1)}%, Overall ${intelligenceScore.overallScore.toFixed(1)}%, Volatility: ${volatilityRegime.regime}, Patterns: ${patterns.length}, HTF: ${mtfAnalysis.htfTrend}, DataQuality: ${intelligenceScore.dataQuality.overallQuality}`);
       
       if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
         console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Insufficient confluence (${bestConfluence.score.toFixed(1)}% < 60%)`);
@@ -605,6 +621,16 @@ export class TradingIntelligenceService {
       
       if (intelligenceScore.overallScore < 50 && intelligenceScore.signals.some(s => s.includes('Unfavorable') || s.includes('Weak') || s.includes('Counter'))) {
         console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Intelligence warnings present with low score (${intelligenceScore.overallScore.toFixed(1)}%)`);
+        return null;
+      }
+      
+      if (!htfAligned && mtfAnalysis.htfTrend !== 'neutral') {
+        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - HTF trend not aligned (Signal: ${bestDirection}, HTF: ${mtfAnalysis.htfTrend})`);
+        return null;
+      }
+      
+      if (intelligenceScore.dataQuality.overallQuality === 'low' && intelligenceScore.overallScore < 65) {
+        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Low data quality with insufficient score`);
         return null;
       }
       
@@ -695,6 +721,24 @@ MULTI-DIMENSIONAL INTELLIGENCE SCORE
 - Pattern Score: ${intelligenceScore.patternScore.toFixed(1)}%
 - OVERALL SCORE: ${intelligenceScore.overallScore.toFixed(1)}%
 - Intelligence Signals: ${intelligenceScore.signals.join(', ') || 'None'}
+
+═══════════════════════════════════════════════════════════
+MULTI-TIMEFRAME ANALYSIS (CRITICAL FOR HIGH WIN RATE)
+═══════════════════════════════════════════════════════════
+- Higher Timeframe (${mtfAnalysis.htfTimeframe}): ${mtfAnalysis.htfTrend.toUpperCase()}
+- Lower Timeframe (${mtfAnalysis.ltfTimeframe}): ${mtfAnalysis.ltfTrend.toUpperCase()}
+- Trend Alignment: ${mtfAnalysis.trendAlignment ? 'ALIGNED' : 'NOT ALIGNED'}
+- HTF EMA Alignment (50/200): ${mtfAnalysis.htfEmaAlignment ? 'CONFIRMED' : 'NOT CONFIRMED'}
+- Confidence Boost: ${mtfAnalysis.confidenceBoost > 0 ? '+' : ''}${mtfAnalysis.confidenceBoost}%
+
+═══════════════════════════════════════════════════════════
+DATA QUALITY ASSESSMENT
+═══════════════════════════════════════════════════════════
+- OHLCV Source: ${intelligenceScore.dataQuality.ohlcvSource.toUpperCase()}
+- Funding Source: ${intelligenceScore.dataQuality.fundingSource.toUpperCase()}
+- Pattern Source: ${intelligenceScore.dataQuality.patternSource.toUpperCase()}
+- Quality Score: ${intelligenceScore.dataQuality.qualityScore.toFixed(0)}% (${intelligenceScore.dataQuality.realDataCount}/${intelligenceScore.dataQuality.totalModules} real sources)
+- Overall Quality: ${intelligenceScore.dataQuality.overallQuality.toUpperCase()}
 
 ═══════════════════════════════════════════════════════════
 CONFLUENCE ANALYSIS
