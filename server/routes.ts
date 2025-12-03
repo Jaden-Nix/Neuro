@@ -149,6 +149,16 @@ simulationEngine.on("simulationCompleted", async ({ simulationId, branches }) =>
     await storage.addSimulation(branch);
   }
 
+  // Guard against empty branch arrays
+  if (!branches || branches.length === 0) {
+    broadcastToClients({
+      type: "simulation",
+      data: { simulationId, status: "completed", branches: [], creditUpdate: null },
+      timestamp: Date.now(),
+    });
+    return;
+  }
+
   // Calculate simulation success metrics and update credit scores
   const successBranches = branches.filter((b: any) => b.outcome === "success");
   const failureBranches = branches.filter((b: any) => b.outcome === "failure");
@@ -161,7 +171,7 @@ simulationEngine.on("simulationCompleted", async ({ simulationId, branches }) =>
   // Update Meta-Agent credit (orchestrates simulations)
   const metaAgent = orchestrator.getAllAgents().find(a => a.type === AgentType.META);
   if (metaAgent) {
-    creditEconomy.recordTransaction({
+    await creditEconomy.recordTransaction({
       agentId: metaAgent.id,
       agentType: AgentType.META,
       amount: creditAmount,
@@ -176,7 +186,7 @@ simulationEngine.on("simulationCompleted", async ({ simulationId, branches }) =>
   const scoutAgent = orchestrator.getAllAgents().find(a => a.type === AgentType.SCOUT);
   if (scoutAgent) {
     const scoutCredit = isSuccessful ? Math.floor(5 + successBranches.length * 2) : Math.floor(-3);
-    creditEconomy.recordTransaction({
+    await creditEconomy.recordTransaction({
       agentId: scoutAgent.id,
       agentType: AgentType.SCOUT,
       amount: scoutCredit,
@@ -188,11 +198,13 @@ simulationEngine.on("simulationCompleted", async ({ simulationId, branches }) =>
   }
 
   // Update Risk-Agent credit (risk assessment accuracy)
+  // riskAccuracy = (non-failure branches) / total branches
   const riskAgent = orchestrator.getAllAgents().find(a => a.type === AgentType.RISK);
   if (riskAgent) {
-    const riskAccuracy = (successBranches.length + (branches.length - failureBranches.length - successBranches.length)) / branches.length;
+    const nonFailureBranches = branches.length - failureBranches.length;
+    const riskAccuracy = nonFailureBranches / branches.length;
     const riskCredit = riskAccuracy > 0.6 ? Math.floor(8 * riskAccuracy) : Math.floor(-5 * (1 - riskAccuracy));
-    creditEconomy.recordTransaction({
+    await creditEconomy.recordTransaction({
       agentId: riskAgent.id,
       agentType: AgentType.RISK,
       amount: riskCredit,

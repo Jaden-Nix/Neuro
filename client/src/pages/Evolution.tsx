@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -132,6 +133,14 @@ const agentColors: Record<string, string> = {
   Arbiter: "bg-red-500/20 text-red-400 border-red-500/30"
 };
 
+const agentGlows: Record<string, string> = {
+  Atlas: "shadow-purple-500/30",
+  Vega: "shadow-blue-500/30",
+  Nova: "shadow-orange-500/30",
+  Sentinel: "shadow-green-500/30",
+  Arbiter: "shadow-red-500/30"
+};
+
 const agentIcons: Record<string, typeof Brain> = {
   Atlas: Brain,
   Vega: Search,
@@ -149,6 +158,11 @@ function getAgentColor(agentName: string): string {
   return agentColors[baseName] || "bg-primary/20 text-primary border-primary/30";
 }
 
+function getAgentGlow(agentName: string): string {
+  const baseName = getAgentBaseName(agentName);
+  return agentGlows[baseName] || "shadow-primary/30";
+}
+
 function getAgentIcon(agentName: string): typeof Brain {
   const baseName = getAgentBaseName(agentName);
   return agentIcons[baseName] || Brain;
@@ -162,22 +176,40 @@ function StatCard({ icon: Icon, label, value, subValue, color }: {
   color: string;
 }) {
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${color}`}>
-            <Icon className="w-5 h-5" />
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Card className="overflow-visible">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-3">
+            <motion.div 
+              className={`p-2 rounded-lg ${color}`}
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Icon className="w-5 h-5" />
+            </motion.div>
+            <div>
+              <motion.p 
+                className="text-2xl font-bold"
+                key={String(value)}
+                initial={{ scale: 1.2, color: "hsl(var(--primary))" }}
+                animate={{ scale: 1, color: "hsl(var(--foreground))" }}
+                transition={{ duration: 0.3 }}
+              >
+                {value}
+              </motion.p>
+              <p className="text-sm text-muted-foreground">{label}</p>
+              {subValue && (
+                <p className="text-xs text-muted-foreground">{subValue}</p>
+              )}
+            </div>
           </div>
-          <div>
-            <p className="text-2xl font-bold">{value}</p>
-            <p className="text-sm text-muted-foreground">{label}</p>
-            {subValue && (
-              <p className="text-xs text-muted-foreground">{subValue}</p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </motion.div>
   );
 }
 
@@ -185,7 +217,12 @@ function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
   if (events.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        <motion.div
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+        >
+          <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
+        </motion.div>
         <p>No evolution events yet</p>
         <p className="text-sm">Generate demo data to see agent evolution</p>
       </div>
@@ -193,81 +230,152 @@ function EvolutionTimeline({ events }: { events: EvolutionEvent[] }) {
   }
 
   return (
-    <div className="space-y-4">
-      {events.map((event) => {
-        const Icon = getAgentIcon(event.childAgentName);
-        const isPositive = event.performanceImpact.roiChange > 0;
+    <div className="space-y-4 relative">
+      <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-primary/50 via-primary/20 to-transparent" />
+      
+      <AnimatePresence mode="popLayout">
+        {events.map((event, index) => {
+          const Icon = getAgentIcon(event.childAgentName);
+          const isPositive = event.performanceImpact.roiChange > 0;
 
-        return (
-          <div 
-            key={event.id} 
-            className={`p-4 rounded-lg border ${getAgentColor(event.childAgentName)}`}
-            data-testid={`card-evolution-event-${event.id}`}
-          >
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-full bg-background/50">
-                  <Icon className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{event.parentAgentName}</span>
-                    <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                    <span className="font-semibold">{event.childAgentName}</span>
+          return (
+            <motion.div 
+              key={event.id}
+              initial={{ opacity: 0, x: -50, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 50, scale: 0.9 }}
+              transition={{ 
+                duration: 0.5, 
+                delay: index * 0.1,
+                type: "spring",
+                stiffness: 100
+              }}
+              className={`relative p-4 rounded-lg border ml-8 ${getAgentColor(event.childAgentName)} shadow-lg ${getAgentGlow(event.childAgentName)}`}
+              data-testid={`card-evolution-event-${event.id}`}
+            >
+              <motion.div
+                className="absolute -left-10 top-4 w-4 h-4 rounded-full bg-primary border-2 border-background"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: index * 0.1 + 0.2 }}
+              >
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-primary"
+                  animate={{ scale: [1, 1.5, 1], opacity: [1, 0, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              </motion.div>
+
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="flex items-center gap-3">
+                  <motion.div 
+                    className="p-2 rounded-full bg-background/50"
+                    animate={{ rotate: isPositive ? [0, 360] : [0, -10, 10, -10, 0] }}
+                    transition={{ duration: isPositive ? 20 : 0.5, repeat: Infinity, repeatDelay: isPositive ? 0 : 3 }}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </motion.div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{event.parentAgentName}</span>
+                      <motion.div
+                        animate={{ x: [0, 5, 0] }}
+                        transition={{ duration: 1, repeat: Infinity }}
+                      >
+                        <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                      </motion.div>
+                      <span className="font-semibold">{event.childAgentName}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(event.timestamp).toLocaleString()}
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(event.timestamp).toLocaleString()}
-                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    Gen {event.childGeneration}
+                  </Badge>
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: index * 0.1 + 0.3, type: "spring" }}
+                  >
+                    <Badge 
+                      variant={isPositive ? "default" : "destructive"} 
+                      className="flex items-center gap-1"
+                    >
+                      {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                      {isPositive ? "+" : ""}{event.performanceImpact.roiChange.toFixed(1)}%
+                    </Badge>
+                  </motion.div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs">
-                  Gen {event.childGeneration}
-                </Badge>
-                <Badge 
-                  variant={isPositive ? "default" : "destructive"} 
-                  className="flex items-center gap-1"
+
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <motion.div 
+                  className="p-2 rounded bg-background/30"
+                  whileHover={{ scale: 1.02 }}
                 >
-                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  {isPositive ? "+" : ""}{event.performanceImpact.roiChange.toFixed(1)}%
-                </Badge>
+                  <p className="text-xs text-muted-foreground mb-1">Mutation</p>
+                  <p className="text-sm font-medium flex items-center gap-1">
+                    <motion.div
+                      animate={{ rotate: [0, 180, 360] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    >
+                      <Dna className="w-3 h-3" />
+                    </motion.div>
+                    {mutationTypeLabels[event.mutation.type] || event.mutation.type}
+                  </p>
+                </motion.div>
+                <motion.div 
+                  className="p-2 rounded bg-background/30"
+                  whileHover={{ scale: 1.02 }}
+                >
+                  <p className="text-xs text-muted-foreground mb-1">Trigger</p>
+                  <p className="text-sm font-medium capitalize">
+                    {event.trigger.replace(/_/g, ' ')}
+                  </p>
+                </motion.div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="p-2 rounded bg-background/30">
-                <p className="text-xs text-muted-foreground mb-1">Mutation</p>
-                <p className="text-sm font-medium flex items-center gap-1">
-                  <Dna className="w-3 h-3" />
-                  {mutationTypeLabels[event.mutation.type] || event.mutation.type}
+              <motion.div 
+                className="p-2 rounded bg-background/30"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                transition={{ delay: index * 0.1 + 0.4 }}
+              >
+                <p className="text-xs text-muted-foreground mb-1">Parameter Change</p>
+                <p className="text-sm flex items-center gap-2">
+                  <motion.span 
+                    className="opacity-60 line-through"
+                    initial={{ opacity: 1 }}
+                    animate={{ opacity: 0.4 }}
+                    transition={{ delay: index * 0.1 + 0.5 }}
+                  >
+                    {String(event.mutation.previousValue)}
+                  </motion.span>
+                  <ChevronRight className="w-3 h-3" />
+                  <motion.span 
+                    className="font-medium"
+                    initial={{ scale: 1.5, color: "hsl(var(--primary))" }}
+                    animate={{ scale: 1, color: "inherit" }}
+                    transition={{ delay: index * 0.1 + 0.6 }}
+                  >
+                    {String(event.mutation.newValue)}
+                  </motion.span>
+                  <span className="text-xs text-muted-foreground">
+                    ({event.mutation.parameterName})
+                  </span>
                 </p>
-              </div>
-              <div className="p-2 rounded bg-background/30">
-                <p className="text-xs text-muted-foreground mb-1">Trigger</p>
-                <p className="text-sm font-medium capitalize">
-                  {event.trigger.replace(/_/g, ' ')}
-                </p>
-              </div>
-            </div>
+              </motion.div>
 
-            <div className="p-2 rounded bg-background/30">
-              <p className="text-xs text-muted-foreground mb-1">Parameter Change</p>
-              <p className="text-sm flex items-center gap-2">
-                <span className="opacity-60 line-through">{String(event.mutation.previousValue)}</span>
-                <ChevronRight className="w-3 h-3" />
-                <span className="font-medium">{String(event.mutation.newValue)}</span>
-                <span className="text-xs text-muted-foreground">
-                  ({event.mutation.parameterName})
-                </span>
+              <p className="text-sm text-muted-foreground mt-2 italic">
+                "{event.reason}"
               </p>
-            </div>
-
-            <p className="text-sm text-muted-foreground mt-2 italic">
-              "{event.reason}"
-            </p>
-          </div>
-        );
-      })}
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
     </div>
   );
 }
@@ -281,12 +389,18 @@ function MutationHeatmap({ heatmap }: { heatmap: Record<string, MutationStats> }
 
   return (
     <div className="space-y-3">
-      {entries.map(([type, stats]) => {
+      {entries.map(([type, stats], index) => {
         const intensity = stats.totalApplications / maxApplications;
         const isSuccessful = stats.successRate > 0.5;
 
         return (
-          <div key={type} className="space-y-1">
+          <motion.div 
+            key={type} 
+            className="space-y-1"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.05 }}
+          >
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">
                 {mutationTypeLabels[type] || type}
@@ -306,7 +420,7 @@ function MutationHeatmap({ heatmap }: { heatmap: Record<string, MutationStats> }
               </div>
             </div>
             <div className="relative h-2 rounded-full bg-muted overflow-hidden">
-              <div 
+              <motion.div 
                 className={`absolute inset-y-0 left-0 rounded-full transition-all ${
                   stats.totalApplications === 0 
                     ? "bg-muted-foreground/20" 
@@ -314,15 +428,24 @@ function MutationHeatmap({ heatmap }: { heatmap: Record<string, MutationStats> }
                       ? "bg-green-500" 
                       : "bg-orange-500"
                 }`}
-                style={{ width: `${intensity * 100}%` }}
+                initial={{ width: 0 }}
+                animate={{ width: `${intensity * 100}%` }}
+                transition={{ duration: 1, delay: index * 0.1 }}
               />
+              {stats.totalApplications > 0 && isSuccessful && (
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
+              )}
             </div>
             {stats.totalApplications > 0 && (
               <p className="text-xs text-muted-foreground">
                 Avg impact: {stats.averagePerformanceImpact > 0 ? "+" : ""}{stats.averagePerformanceImpact.toFixed(1)}% ROI
               </p>
             )}
-          </div>
+          </motion.div>
         );
       })}
     </div>
@@ -333,6 +456,8 @@ function GenealogyTreeView({ tree, onSelectAgent }: {
   tree: GenealogyTree; 
   onSelectAgent: (agent: AgentGenealogy) => void;
 }) {
+  const [hoveredAgent, setHoveredAgent] = useState<string | null>(null);
+  
   const generations = tree.nodes.reduce((acc, node) => {
     const gen = node.generation;
     if (!acc[gen]) acc[gen] = [];
@@ -347,7 +472,18 @@ function GenealogyTreeView({ tree, onSelectAgent }: {
       <Card className="border-dashed">
         <CardContent className="py-12">
           <div className="text-center">
-            <GitBranch className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+            <motion.div
+              animate={{ 
+                rotate: [0, 360],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ 
+                rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+                scale: { duration: 2, repeat: Infinity }
+              }}
+            >
+              <GitBranch className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+            </motion.div>
             <h3 className="text-lg font-semibold mb-2">No Genealogy Data Yet</h3>
             <p className="text-muted-foreground mb-4">
               Generate demo evolutions to see the agent family tree
@@ -359,73 +495,161 @@ function GenealogyTreeView({ tree, onSelectAgent }: {
   }
 
   return (
-    <div className="space-y-6">
-      {sortedGens.map((gen) => (
-        <div key={gen} className="relative">
-          <div className="sticky top-0 z-10 bg-background py-2 mb-4">
+    <div className="space-y-6 relative">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ zIndex: 0 }}>
+        <defs>
+          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0.1" />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      {sortedGens.map((gen, genIndex) => (
+        <motion.div 
+          key={gen} 
+          className="relative"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: genIndex * 0.2 }}
+        >
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm py-2 mb-4">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-sm">
-                Generation {gen}
-              </Badge>
+              <motion.div
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 2, repeat: Infinity, delay: genIndex * 0.3 }}
+              >
+                <Badge variant="outline" className="text-sm">
+                  Generation {gen}
+                </Badge>
+              </motion.div>
               <span className="text-sm text-muted-foreground">
                 {generations[gen].length} agent{generations[gen].length !== 1 ? "s" : ""}
               </span>
             </div>
           </div>
+          
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            {generations[gen].map((agent) => {
+            {generations[gen].map((agent, agentIndex) => {
               const Icon = getAgentIcon(agent.agentName);
+              const isHovered = hoveredAgent === agent.agentName;
+              const isParentOfHovered = hoveredAgent && tree.edges.some(e => e.from === agent.agentName && e.to === hoveredAgent);
+              const isChildOfHovered = hoveredAgent && tree.edges.some(e => e.to === agent.agentName && e.from === hoveredAgent);
               
               return (
-                <div
+                <motion.div
                   key={agent.agentName}
-                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all hover-elevate ${
+                  className={`relative p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     !agent.isActive ? "opacity-60 border-dashed" : ""
-                  } ${getAgentColor(agent.agentName)}`}
+                  } ${getAgentColor(agent.agentName)} ${
+                    isHovered || isParentOfHovered || isChildOfHovered ? `shadow-lg ${getAgentGlow(agent.agentName)}` : ""
+                  }`}
                   onClick={() => onSelectAgent(agent)}
+                  onMouseEnter={() => setHoveredAgent(agent.agentName)}
+                  onMouseLeave={() => setHoveredAgent(null)}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: isHovered ? 1.05 : 1,
+                    y: isHovered ? -5 : 0
+                  }}
+                  transition={{ 
+                    delay: genIndex * 0.2 + agentIndex * 0.1,
+                    type: "spring",
+                    stiffness: 200
+                  }}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   data-testid={`card-genealogy-${agent.agentName}`}
                 >
                   {gen > 1 && (
-                    <div className="absolute -top-6 left-1/2 w-px h-6 bg-border" />
+                    <motion.div 
+                      className="absolute -top-6 left-1/2 w-px h-6 bg-gradient-to-b from-primary/50 to-primary/20"
+                      initial={{ scaleY: 0 }}
+                      animate={{ scaleY: 1 }}
+                      transition={{ delay: genIndex * 0.2 + agentIndex * 0.1 + 0.3 }}
+                    />
                   )}
                   
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-2 rounded-full bg-background/50">
+                  <motion.div
+                    className="absolute -inset-1 rounded-lg bg-gradient-to-br from-primary/20 to-transparent opacity-0"
+                    animate={{ opacity: isHovered ? 0.5 : 0 }}
+                  />
+
+                  <div className="flex items-center gap-2 mb-3 relative z-10">
+                    <motion.div 
+                      className="p-2 rounded-full bg-background/50"
+                      animate={agent.isActive ? { 
+                        scale: [1, 1.1, 1],
+                        rotate: [0, 5, -5, 0]
+                      } : {}}
+                      transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+                    >
                       <Icon className="w-4 h-4" />
-                    </div>
+                    </motion.div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm truncate">{agent.agentName}</p>
                       {!agent.isActive && (
-                        <span className="text-xs flex items-center gap-1">
+                        <motion.span 
+                          className="text-xs flex items-center gap-1"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
                           <Skull className="w-3 h-3" /> Retired
-                        </span>
+                        </motion.span>
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-1.5 rounded bg-background/50">
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs relative z-10">
+                    <motion.div 
+                      className="p-1.5 rounded bg-background/50"
+                      whileHover={{ scale: 1.05 }}
+                    >
                       <Trophy className="w-3 h-3 mx-auto mb-0.5 text-yellow-400" />
                       <p className="font-medium">{agent.cumulativePerformance.toFixed(1)}%</p>
-                    </div>
-                    <div className="p-1.5 rounded bg-background/50">
+                    </motion.div>
+                    <motion.div 
+                      className="p-1.5 rounded bg-background/50"
+                      whileHover={{ scale: 1.05 }}
+                    >
                       <GitFork className="w-3 h-3 mx-auto mb-0.5 text-blue-400" />
                       <p className="font-medium">{agent.totalDescendants}</p>
-                    </div>
+                    </motion.div>
                   </div>
 
-                  <div className="mt-2">
+                  <div className="mt-2 relative z-10">
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-muted-foreground">Lineage</span>
                       <span>{agent.lineageStrength.toFixed(0)}%</span>
                     </div>
-                    <Progress value={agent.lineageStrength} className="h-1" />
+                    <div className="relative h-1 rounded-full bg-muted overflow-hidden">
+                      <motion.div
+                        className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${agent.lineageStrength}%` }}
+                        transition={{ duration: 1, delay: genIndex * 0.2 + agentIndex * 0.1 + 0.5 }}
+                      />
+                    </div>
                   </div>
-                </div>
+
+                  {agent.children.length > 0 && (
+                    <motion.div
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2"
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: genIndex * 0.2 + agentIndex * 0.1 + 0.6 }}
+                    >
+                      <Badge className="text-[10px] px-1.5 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30">
+                        {agent.children.length} child{agent.children.length !== 1 ? "ren" : ""}
+                      </Badge>
+                    </motion.div>
+                  )}
+                </motion.div>
               );
             })}
           </div>
-        </div>
+        </motion.div>
       ))}
     </div>
   );
@@ -443,7 +667,11 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
   );
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className="space-y-6"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={onBack} data-testid="button-back-genealogy">
           <ChevronRight className="w-4 h-4 rotate-180 mr-2" />
@@ -452,18 +680,30 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 overflow-visible">
           <CardHeader>
             <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-full ${getAgentColor(agent.agentName)}`}>
+              <motion.div 
+                className={`p-3 rounded-full ${getAgentColor(agent.agentName)}`}
+                animate={{ 
+                  scale: [1, 1.1, 1],
+                  rotate: [0, 5, -5, 0]
+                }}
+                transition={{ duration: 3, repeat: Infinity }}
+              >
                 <Icon className="w-8 h-8" />
-              </div>
+              </motion.div>
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 flex-wrap">
                   {agent.agentName}
                   <Badge variant="outline">Generation {agent.generation}</Badge>
                   {agent.isActive ? (
-                    <Badge variant="default" className="bg-green-500/20 text-green-400">Active</Badge>
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                    >
+                      <Badge variant="default" className="bg-green-500/20 text-green-400">Active</Badge>
+                    </motion.div>
                   ) : (
                     <Badge variant="secondary">Retired</Badge>
                   )}
@@ -479,21 +719,45 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-3 mb-6">
-              <div className="text-center p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-                <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-400" />
+              <motion.div 
+                className="text-center p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30"
+                whileHover={{ scale: 1.02 }}
+              >
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Trophy className="w-8 h-8 mx-auto mb-2 text-yellow-400" />
+                </motion.div>
                 <p className="text-3xl font-bold">{agent.cumulativePerformance.toFixed(1)}%</p>
                 <p className="text-sm text-muted-foreground">Cumulative ROI</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/30">
-                <Sparkles className="w-8 h-8 mx-auto mb-2 text-green-400" />
+              </motion.div>
+              <motion.div 
+                className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/30"
+                whileHover={{ scale: 1.02 }}
+              >
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <Sparkles className="w-8 h-8 mx-auto mb-2 text-green-400" />
+                </motion.div>
                 <p className="text-3xl font-bold">{agent.lineageStrength.toFixed(0)}%</p>
                 <p className="text-sm text-muted-foreground">Lineage Strength</p>
-              </div>
-              <div className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/30">
-                <GitFork className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+              </motion.div>
+              <motion.div 
+                className="text-center p-4 rounded-lg bg-blue-500/10 border border-blue-500/30"
+                whileHover={{ scale: 1.02 }}
+              >
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                >
+                  <GitFork className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+                </motion.div>
                 <p className="text-3xl font-bold">{agent.totalDescendants}</p>
                 <p className="text-sm text-muted-foreground">Descendants</p>
-              </div>
+              </motion.div>
             </div>
 
             <Separator className="my-4" />
@@ -505,7 +769,12 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
 
             {agentEvents.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <Dna className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+                >
+                  <Dna className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                </motion.div>
                 <p>No evolution events for this agent</p>
               </div>
             ) : (
@@ -515,79 +784,122 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
         </Card>
 
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <div>
-                    <p className="text-sm font-medium">Created</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(agent.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-                {agent.retiredAt && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-red-400" />
-                    <div>
-                      <p className="text-sm font-medium">Retired</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(agent.retiredAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {agent.parentName && (
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+          >
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <GitBranch className="w-5 h-5" />
-                  Parent
+                  <Clock className="w-5 h-5" />
+                  Timeline
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className={`p-3 rounded-lg border ${getAgentColor(agent.parentName)}`}>
-                  <p className="font-medium">{agent.parentName}</p>
-                  <p className="text-xs text-muted-foreground">Previous generation</p>
+                <div className="space-y-4 relative">
+                  <div className="absolute left-1 top-0 bottom-0 w-px bg-gradient-to-b from-green-400 via-primary/30 to-red-400/30" />
+                  
+                  <motion.div 
+                    className="flex items-center gap-3 relative"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                  >
+                    <motion.div 
+                      className="w-2 h-2 rounded-full bg-green-400 relative z-10"
+                      animate={{ scale: [1, 1.5, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">Created</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(agent.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  </motion.div>
+                  {agent.retiredAt && (
+                    <motion.div 
+                      className="flex items-center gap-3 relative"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.1 }}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-red-400 relative z-10" />
+                      <div>
+                        <p className="text-sm font-medium">Retired</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(agent.retiredAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
                 </div>
               </CardContent>
             </Card>
+          </motion.div>
+
+          {agent.parentName && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GitBranch className="w-5 h-5" />
+                    Parent
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <motion.div 
+                    className={`p-3 rounded-lg border ${getAgentColor(agent.parentName)}`}
+                    whileHover={{ scale: 1.02 }}
+                  >
+                    <p className="font-medium">{agent.parentName}</p>
+                    <p className="text-xs text-muted-foreground">Previous generation</p>
+                  </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
 
           {agent.children.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <GitFork className="w-5 h-5" />
-                  Children ({agent.children.length})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {agent.children.map((child) => (
-                    <div key={child} className={`p-3 rounded-lg border ${getAgentColor(child)}`}>
-                      <p className="font-medium">{child}</p>
-                      <p className="text-xs text-muted-foreground">Evolved offspring</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GitFork className="w-5 h-5" />
+                    Children ({agent.children.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {agent.children.map((child, index) => (
+                      <motion.div 
+                        key={child} 
+                        className={`p-3 rounded-lg border ${getAgentColor(child)}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{ scale: 1.02 }}
+                      >
+                        <p className="font-medium">{child}</p>
+                        <p className="text-xs text-muted-foreground">Evolved offspring</p>
+                      </motion.div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -622,88 +934,93 @@ export default function Evolution() {
   });
 
   if (selectedAgent) {
-    return <AgentDetail agent={selectedAgent} onBack={() => setSelectedAgent(null)} />;
+    return (
+      <div className="p-6">
+        <AgentDetail agent={selectedAgent} onBack={() => setSelectedAgent(null)} />
+      </div>
+    );
   }
 
-  const isLoading = statsLoading || historyLoading || treeLoading;
-  const hasData = (stats?.totalMutations ?? 0) > 0;
-
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+    <div className="p-6 space-y-6">
+      <motion.div 
+        className="flex items-center justify-between gap-4 flex-wrap"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3" data-testid="text-evolution-title">
-            <GitBranch className="w-8 h-8 text-primary" />
-            Evolution Tree
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            >
+              <Dna className="w-8 h-8 text-primary" />
+            </motion.div>
+            Evolution Engine
           </h1>
           <p className="text-muted-foreground mt-1">
-            Track agent genealogy, mutations, and performance inheritance
+            Track agent mutations, lineages, and performance evolution
           </p>
         </div>
         <Button 
-          onClick={() => generateDemoMutation.mutate()} 
+          onClick={() => generateDemoMutation.mutate()}
           disabled={generateDemoMutation.isPending}
-          data-testid="button-generate-demo"
+          className="flex items-center gap-2"
+          data-testid="button-generate-evolution"
         >
           {generateDemoMutation.isPending ? (
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+              <RefreshCw className="w-4 h-4" />
+            </motion.div>
           ) : (
-            <Zap className="w-4 h-4 mr-2" />
+            <Zap className="w-4 h-4" />
           )}
-          {generateDemoMutation.isPending ? "Generating..." : "Generate Demo Evolutions"}
+          Generate Evolution
         </Button>
-      </div>
+      </motion.div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-          icon={GitBranch}
-          label="Generations"
-          value={stats?.totalGenerations ?? 0}
-          color="bg-primary/10 text-primary"
+          icon={Activity} 
+          label="Total Generations" 
+          value={stats?.totalGenerations || 0}
+          color="bg-purple-500/20 text-purple-400" 
         />
         <StatCard 
-          icon={Dna}
-          label="Mutations"
-          value={stats?.totalMutations ?? 0}
-          color="bg-purple-500/10 text-purple-400"
+          icon={Dna} 
+          label="Total Mutations" 
+          value={stats?.totalMutations || 0}
+          color="bg-blue-500/20 text-blue-400" 
         />
         <StatCard 
-          icon={Zap}
-          label="Active Agents"
-          value={stats?.activeAgents ?? 0}
-          subValue={`${stats?.retiredAgents ?? 0} retired`}
-          color="bg-green-500/10 text-green-400"
+          icon={Brain} 
+          label="Active Agents" 
+          value={`${stats?.activeAgents || 0} / ${stats?.totalAgents || 0}`}
+          subValue={`${stats?.retiredAgents || 0} retired`}
+          color="bg-green-500/20 text-green-400" 
         />
         <StatCard 
-          icon={Sparkles}
-          label="Avg Lineage"
-          value={`${stats?.averageLineageStrength ?? 0}%`}
-          color="bg-yellow-500/10 text-yellow-400"
-        />
-        <StatCard 
-          icon={Trophy}
-          label="Best Mutation"
-          value={stats?.mostSuccessfulMutation 
-            ? mutationTypeLabels[stats.mostSuccessfulMutation]?.split(' ')[0] || "-"
-            : "-"
-          }
-          color="bg-orange-500/10 text-orange-400"
+          icon={Trophy} 
+          label="Avg Lineage" 
+          value={`${(stats?.averageLineageStrength || 0).toFixed(0)}%`}
+          subValue={stats?.mostSuccessfulMutation ? `Best: ${mutationTypeLabels[stats.mostSuccessfulMutation] || stats.mostSuccessfulMutation}` : undefined}
+          color="bg-yellow-500/20 text-yellow-400" 
         />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="timeline" className="flex items-center gap-2">
-            <Activity className="w-4 h-4" />
+        <TabsList className="grid w-full max-w-md grid-cols-3">
+          <TabsTrigger value="timeline" data-testid="tab-evolution-timeline">
+            <Activity className="w-4 h-4 mr-2" />
             Timeline
           </TabsTrigger>
-          <TabsTrigger value="genealogy" className="flex items-center gap-2">
-            <GitFork className="w-4 h-4" />
-            Genealogy Tree
+          <TabsTrigger value="genealogy" data-testid="tab-evolution-genealogy">
+            <GitBranch className="w-4 h-4 mr-2" />
+            Genealogy
           </TabsTrigger>
-          <TabsTrigger value="heatmap" className="flex items-center gap-2">
-            <Flame className="w-4 h-4" />
-            Mutation Heatmap
+          <TabsTrigger value="heatmap" data-testid="tab-evolution-heatmap">
+            <Flame className="w-4 h-4 mr-2" />
+            Heatmap
           </TabsTrigger>
         </TabsList>
 
@@ -711,17 +1028,22 @@ export default function Evolution() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5" />
-                Recent Evolution Events
+                <LineChart className="w-5 h-5" />
+                Evolution Timeline
               </CardTitle>
               <CardDescription>
-                Latest mutations and performance changes across all agents
+                Recent agent mutations and their performance impacts
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {historyLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <RefreshCw className="w-8 h-8 text-muted-foreground" />
+                  </motion.div>
                 </div>
               ) : (
                 <ScrollArea className="h-[600px] pr-4">
@@ -733,50 +1055,63 @@ export default function Evolution() {
         </TabsContent>
 
         <TabsContent value="genealogy" className="mt-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : tree ? (
-            <GenealogyTreeView 
-              tree={tree} 
-              onSelectAgent={setSelectedAgent}
-            />
-          ) : (
-            <Card className="border-dashed">
-              <CardContent className="py-12">
-                <div className="text-center">
-                  <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground">No genealogy data available</p>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GitBranch className="w-5 h-5" />
+                Agent Genealogy Tree
+              </CardTitle>
+              <CardDescription>
+                Visualize agent lineages and evolutionary branches
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {treeLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <RefreshCw className="w-8 h-8 text-muted-foreground" />
+                  </motion.div>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              ) : (
+                <GenealogyTreeView 
+                  tree={tree || { nodes: [], edges: [] }} 
+                  onSelectAgent={setSelectedAgent}
+                />
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="heatmap" className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Flame className="w-5 h-5" />
-                Mutation Success Heatmap
+                <BarChart3 className="w-5 h-5" />
+                Mutation Heatmap
               </CardTitle>
               <CardDescription>
-                Track which mutations have been most beneficial across generations
+                Analyze which mutations are most successful
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {statsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <RefreshCw className="w-8 h-8 text-muted-foreground" />
+                  </motion.div>
                 </div>
               ) : stats?.mutationHeatmap ? (
                 <MutationHeatmap heatmap={stats.mutationHeatmap} />
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  <Flame className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No mutation data available</p>
-                  <p className="text-sm">Generate demo evolutions to see the heatmap</p>
                 </div>
               )}
             </CardContent>
