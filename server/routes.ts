@@ -5039,6 +5039,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/village/signals", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const status = req.query.status as "active" | "closed" | "all" | undefined;
+      const signals = tradingVillage.getTradeSignals(limit, status);
+      res.json(signals);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get trade signals" });
+    }
+  });
+
   tradingVillage.on("thought", (thought) => {
     broadcastToClients({
       type: "log",
@@ -5047,10 +5058,18 @@ export async function registerRoutes(
     });
   });
 
-  tradingVillage.on("signalClaimed", ({ agent, claim }) => {
+  tradingVillage.on("signalClaimed", ({ agent, claim, tradeSignal }) => {
     broadcastToClients({
       type: "log",
-      data: { event: "village_signal_claimed", agent: agent.name, claim },
+      data: { event: "village_signal_claimed", agent: agent.name, claim, tradeSignal },
+      timestamp: Date.now(),
+    });
+  });
+
+  tradingVillage.on("signalValidated", (signal) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_signal_validated", signal },
       timestamp: Date.now(),
     });
   });

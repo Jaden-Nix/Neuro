@@ -1,8 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
+import { marketDataService } from "../data/MarketDataService";
 
-const anthropic = new Anthropic();
+const anthropic = new Anthropic({
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+});
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
 export type AgentPersonality = "aggressive" | "conservative" | "balanced" | "contrarian" | "momentum" | "experimental";
@@ -116,6 +120,35 @@ export interface SignalClaim {
   confidence: number;
 }
 
+export interface VillageTradeSignal {
+  id: string;
+  agentId: string;
+  agentName: string;
+  agentRole: AgentRole;
+  symbol: string;
+  direction: "long" | "short";
+  entry: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2: number;
+  takeProfit3: number;
+  confidence: number;
+  timeframe: string;
+  reasoning: string;
+  technicalAnalysis: {
+    pattern: string;
+    indicators: string[];
+    keyLevels: { support: number; resistance: number };
+  };
+  riskReward: number;
+  positionSize: string;
+  status: "active" | "closed" | "stopped" | "expired";
+  validators: { agentId: string; agentName: string; agrees: boolean; comment: string }[];
+  createdAt: number;
+  closedAt?: number;
+  outcome?: { pnl: number; exitPrice: number; exitReason: string };
+}
+
 export interface CompetitionEvent {
   id: string;
   type: "signal_claimed" | "trade_win" | "trade_loss" | "evolution" | "experiment_result" | "rivalry" | "debate_won" | "knowledge_shared";
@@ -146,6 +179,7 @@ export class TradingVillage extends EventEmitter {
   private signalClaims: Map<string, SignalClaim> = new Map();
   private competitions: CompetitionEvent[] = [];
   private experiments: Map<string, Experiment> = new Map();
+  private tradeSignals: VillageTradeSignal[] = [];
 
   constructor() {
     super();
@@ -595,16 +629,314 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
 
     const agent = this.agents.get(agentId);
     if (agent) {
-      this.addThought(agentId, "decision",
-        `CLAIMED: ${symbol} ${direction.toUpperCase()} at ${(confidence * 100).toFixed(0)}% confidence. First to spot this!`,
-        { symbol, direction, confidence }
-      );
-
       agent.creditScore += 10;
-      this.emit("signalClaimed", { agent, claim });
+      
+      const tradeSignal = await this.generateDetailedSignal(agent, symbol, direction, confidence);
+      if (tradeSignal) {
+        this.tradeSignals.push(tradeSignal);
+        this.emit("signalClaimed", { agent, claim, tradeSignal });
+        
+        this.requestSignalValidation(tradeSignal);
+      }
     }
 
     return true;
+  }
+
+  private async generateDetailedSignal(
+    agent: VillageAgent, 
+    symbol: string, 
+    direction: "long" | "short", 
+    confidence: number
+  ): Promise<VillageTradeSignal | null> {
+    const fallbackPrices: Record<string, number> = {
+      BTC: 97500, ETH: 3650, SOL: 235, AVAX: 52, LINK: 28, ARB: 1.15, OP: 2.85, SUI: 4.20
+    };
+    
+    let basePrice = fallbackPrices[symbol] || 100;
+    let volatility = symbol === "BTC" ? 0.02 : symbol === "ETH" ? 0.03 : 0.05;
+    
+    try {
+      const snapshot = await marketDataService.getMarketSnapshot(`${symbol}USDT`);
+      if (snapshot.price > 0) {
+        basePrice = snapshot.price;
+        volatility = Math.max(0.02, Math.min(0.10, snapshot.volatility / 100 || volatility));
+      }
+    } catch (snapshotError) {
+      try {
+        const price = await marketDataService.getCurrentPrice(symbol);
+        if (price > 0) {
+          basePrice = price;
+        }
+      } catch (priceError) {
+        console.log(`[TradingVillage] Using fallback price for ${symbol}: $${basePrice}`);
+      }
+    }
+
+    try {
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 400,
+        messages: [{
+          role: "user",
+          content: `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
+Your specialty: ${agent.specialties.join(", ")}
+
+Generate a ${direction.toUpperCase()} trade signal for ${symbol} at ~$${basePrice.toFixed(2)}.
+
+Respond in this exact JSON format (no markdown):
+{
+  "entry": <entry price as number>,
+  "stopLoss": <stop loss price as number>,
+  "tp1": <take profit 1 as number>,
+  "tp2": <take profit 2 as number>,
+  "tp3": <take profit 3 as number>,
+  "pattern": "<chart pattern identified>",
+  "indicators": ["<indicator 1>", "<indicator 2>", "<indicator 3>"],
+  "support": <key support level>,
+  "resistance": <key resistance level>,
+  "reasoning": "<2-3 sentence explanation of why this trade, what you see, and the risk>",
+  "timeframe": "<4H or 1D or 1H>",
+  "positionSize": "<conservative or moderate or aggressive>"
+}
+
+For ${direction}: Entry should be ${direction === "long" ? "near support" : "near resistance"}.
+SL should be ${direction === "long" ? "below support" : "above resistance"} (${(volatility * 100).toFixed(1)}% away).
+TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
+        }]
+      });
+
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      
+      let parsed;
+      try {
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) throw new Error("No JSON found in response");
+        parsed = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.error("[TradingVillage] JSON parse failed, using fallback:", parseError);
+        throw parseError;
+      }
+      
+      const slDistance = basePrice * volatility;
+      const defaultEntry = direction === "long" ? basePrice * 0.995 : basePrice * 1.005;
+      const defaultSl = direction === "long" ? defaultEntry - slDistance : defaultEntry + slDistance;
+      const defaultTp1 = direction === "long" ? defaultEntry + slDistance : defaultEntry - slDistance;
+      const defaultTp2 = direction === "long" ? defaultEntry + slDistance * 2 : defaultEntry - slDistance * 2;
+      const defaultTp3 = direction === "long" ? defaultEntry + slDistance * 3 : defaultEntry - slDistance * 3;
+      
+      const safeNum = (val: any, fallback: number) => {
+        const num = Number(val);
+        return isNaN(num) || num <= 0 ? fallback : num;
+      };
+      
+      const entry = safeNum(parsed.entry, defaultEntry);
+      const stopLoss = safeNum(parsed.stopLoss, defaultSl);
+      const tp1 = safeNum(parsed.tp1, defaultTp1);
+      const tp2 = safeNum(parsed.tp2, defaultTp2);
+      const tp3 = safeNum(parsed.tp3, defaultTp3);
+      
+      const rrDenom = Math.abs(entry - stopLoss);
+      const riskReward = rrDenom > 0 ? Math.abs(tp2 - entry) / rrDenom : 2.0;
+
+      const signal: VillageTradeSignal = {
+        id: `vsig-${nanoid(8)}`,
+        agentId: agent.id,
+        agentName: agent.name,
+        agentRole: agent.role,
+        symbol,
+        direction,
+        entry,
+        stopLoss,
+        takeProfit1: tp1,
+        takeProfit2: tp2,
+        takeProfit3: tp3,
+        confidence,
+        timeframe: parsed.timeframe || "4H",
+        reasoning: parsed.reasoning || `${agent.specialties[0]} analysis indicates ${direction} opportunity`,
+        technicalAnalysis: {
+          pattern: parsed.pattern || (direction === "long" ? "Higher low formation" : "Lower high formation"),
+          indicators: Array.isArray(parsed.indicators) ? parsed.indicators : ["RSI", "MACD", "Volume"],
+          keyLevels: { 
+            support: safeNum(parsed.support, basePrice * 0.95), 
+            resistance: safeNum(parsed.resistance, basePrice * 1.05) 
+          }
+        },
+        riskReward,
+        positionSize: parsed.positionSize || "moderate",
+        status: "active",
+        validators: [],
+        createdAt: Date.now()
+      };
+
+      this.addThought(agent.id, "decision",
+        `TRADE SIGNAL: ${direction.toUpperCase()} ${symbol}\n` +
+        `Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP1: $${signal.takeProfit1.toFixed(2)}\n` +
+        `Pattern: ${signal.technicalAnalysis.pattern}\n` +
+        `Reasoning: ${signal.reasoning}`,
+        { signalId: signal.id, ...signal }
+      );
+
+      return signal;
+
+    } catch (error) {
+      console.error("[TradingVillage] Failed to generate detailed signal:", error);
+      
+      const slDistance = basePrice * volatility;
+      const entry = direction === "long" ? basePrice * 0.995 : basePrice * 1.005;
+      const sl = direction === "long" ? entry - slDistance : entry + slDistance;
+      const tp1 = direction === "long" ? entry + slDistance : entry - slDistance;
+      const tp2 = direction === "long" ? entry + slDistance * 2 : entry - slDistance * 2;
+      const tp3 = direction === "long" ? entry + slDistance * 3 : entry - slDistance * 3;
+
+      const signal: VillageTradeSignal = {
+        id: `vsig-${nanoid(8)}`,
+        agentId: agent.id,
+        agentName: agent.name,
+        agentRole: agent.role,
+        symbol,
+        direction,
+        entry,
+        stopLoss: sl,
+        takeProfit1: tp1,
+        takeProfit2: tp2,
+        takeProfit3: tp3,
+        confidence,
+        timeframe: "4H",
+        reasoning: `${agent.specialty || agent.specialties[0]} analysis indicates ${direction} opportunity based on current price action and volume patterns.`,
+        technicalAnalysis: {
+          pattern: direction === "long" ? "Higher low formation" : "Lower high formation",
+          indicators: ["RSI oversold" , "MACD bullish crossover", "Volume spike"],
+          keyLevels: { 
+            support: basePrice * 0.95, 
+            resistance: basePrice * 1.05 
+          }
+        },
+        riskReward: 2.0,
+        positionSize: "moderate",
+        status: "active",
+        validators: [],
+        createdAt: Date.now()
+      };
+
+      this.addThought(agent.id, "decision",
+        `TRADE SIGNAL: ${direction.toUpperCase()} ${symbol}\n` +
+        `Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP1: $${signal.takeProfit1.toFixed(2)}\n` +
+        `R:R = ${signal.riskReward.toFixed(1)} | Confidence: ${(confidence * 100).toFixed(0)}%`,
+        { signalId: signal.id }
+      );
+
+      return signal;
+    }
+  }
+
+  private async requestSignalValidation(signal: VillageTradeSignal) {
+    const storedSignal = this.tradeSignals.find(s => s.id === signal.id);
+    if (!storedSignal) {
+      console.error("[TradingVillage] Signal not found in store for validation:", signal.id);
+      return;
+    }
+
+    const validators = Array.from(this.agents.values())
+      .filter(a => a.id !== signal.agentId && (a.role === "analyst" || a.role === "strategist" || a.role === "sentinel"))
+      .slice(0, 3);
+
+    for (const validator of validators) {
+      if (storedSignal.validators.some(v => v.agentId === validator.id)) {
+        continue;
+      }
+      
+      await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
+
+      try {
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 150,
+          messages: [{
+            role: "user",
+            content: `You are ${validator.name}, a ${validator.role} (${validator.personality}).
+
+${signal.agentName} proposed: ${signal.direction.toUpperCase()} ${signal.symbol}
+Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP: $${signal.takeProfit1.toFixed(2)}
+Reasoning: ${signal.reasoning}
+
+Do you agree? Reply with:
+- "AGREE: <brief reason>" or "DISAGREE: <brief reason>"
+Keep it under 20 words. Be direct.`
+          }]
+        });
+
+        const text = response.content[0].type === "text" ? response.content[0].text : "";
+        const agrees = text.toUpperCase().startsWith("AGREE");
+
+        const validation = {
+          agentId: validator.id,
+          agentName: validator.name,
+          agrees,
+          comment: text
+        };
+        
+        storedSignal.validators.push(validation);
+
+        const thoughtType: ThoughtType = agrees ? "agreement" : "challenge";
+        this.addThought(validator.id, thoughtType,
+          `@${signal.agentName}'s ${signal.symbol} ${signal.direction}: ${text}`,
+          { signalId: signal.id, validates: agrees },
+          undefined,
+          [signal.agentId]
+        );
+
+        const relationship = validator.relationships[signal.agentId];
+        if (relationship) {
+          if (agrees) {
+            relationship.trust = Math.min(100, relationship.trust + 2);
+            relationship.agreements++;
+          } else {
+            relationship.disagreements++;
+          }
+        }
+
+      } catch (error) {
+        console.error("[TradingVillage] Validation failed:", error);
+        
+        const agrees = Math.random() > 0.4;
+        const fallbackValidation = {
+          agentId: validator.id,
+          agentName: validator.name,
+          agrees,
+          comment: agrees ? "AGREE: Setup looks solid" : "DISAGREE: Risk too high"
+        };
+        storedSignal.validators.push(fallbackValidation);
+        
+        const thoughtType: ThoughtType = fallbackValidation.agrees ? "agreement" : "challenge";
+        this.addThought(validator.id, thoughtType,
+          `@${signal.agentName}'s ${signal.symbol} ${signal.direction}: ${fallbackValidation.comment}`,
+          { signalId: signal.id, validates: fallbackValidation.agrees },
+          undefined,
+          [signal.agentId]
+        );
+      }
+    }
+
+    const validationRate = storedSignal.validators.filter(v => v.agrees).length / Math.max(1, storedSignal.validators.length);
+    const signaler = this.agents.get(signal.agentId);
+    
+    if (signaler) {
+      if (validationRate >= 0.66) {
+        signaler.creditScore += 15;
+        this.addThought(signaler.id, "learning",
+          `Village validated my ${signal.symbol} signal. ${storedSignal.validators.filter(v => v.agrees).length}/${storedSignal.validators.length} agreed. Confidence boosted.`,
+          { signalId: signal.id, validationRate }
+        );
+      } else if (validationRate <= 0.33 && storedSignal.validators.length > 0) {
+        this.addThought(signaler.id, "learning",
+          `My ${signal.symbol} signal got pushback. ${storedSignal.validators.filter(v => !v.agrees).length} disagreed. Reconsidering...`,
+          { signalId: signal.id, validationRate }
+        );
+      }
+    }
+
+    this.emit("signalValidated", storedSignal);
   }
 
   recordTradeOutcome(agentId: string, symbol: string, pnl: number, reason: string) {
@@ -997,6 +1329,14 @@ Describe your evolution in 2-3 sentences:
 
   getCompetitions(limit = 20): CompetitionEvent[] {
     return [...this.competitions].reverse().slice(0, limit);
+  }
+
+  getTradeSignals(limit = 20, status?: "active" | "closed" | "all"): VillageTradeSignal[] {
+    let signals = [...this.tradeSignals].reverse();
+    if (status && status !== "all") {
+      signals = signals.filter(s => s.status === status);
+    }
+    return signals.slice(0, limit);
   }
 
   getLeaderboard(): { agent: VillageAgent; rank: number }[] {

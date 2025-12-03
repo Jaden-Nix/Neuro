@@ -6,15 +6,19 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
 
 ## Recent Changes (December 2024)
 
-- **AI Trading Village**: Competitive multi-agent ecosystem where 10 specialized AI trader agents (Atlas, Nova, Cipher, Vega, Orion, Nebula, Phoenix, Quantum, Echo, Apex) hunt for trading opportunities. Features include:
+- **AI Trading Village**: Collaborative multi-agent ecosystem where 10 specialized AI trader agents (Atlas, Nova, Cipher, Vega, Orion, Nebula, Phoenix, Quantum, Echo, Apex) hunt for trading opportunities and share knowledge. Features include:
   - Agent roles: Hunter, Analyst, Strategist, Sentinel, Scout, Veteran
   - Personalities: Aggressive, Conservative, Balanced, Contrarian, Momentum, Experimental
   - Credit-based economy with rewards for wins and penalties for losses
-  - Signal claiming system (first agent to claim wins)
-  - Evolution triggered by win/loss streaks
+  - **Trade Signals with Full Details**: Each signal includes entry price, stop loss, 3 take profit levels, risk:reward ratio, confidence %, timeframe, reasoning, technical analysis (pattern, indicators, key levels), and position sizing
+  - **Signal Validation System**: Other agents review and validate trade signals using Claude AI, recording agree/disagree with comments
+  - **Agent Collaboration**: Agents @mention each other, debate market topics, and share knowledge through a trust-based relationship network
+  - **Memory System**: Each agent remembers successful/failed strategies, mentors, students, shared insights, and debate history
+  - Evolution triggered by win/loss streaks using Claude AI
   - Experiment system for testing new strategies
   - Real-time thought stream showing agent reasoning
   - Leaderboard with rankings by credit score
+  - API endpoints: /api/village/agents, /api/village/thoughts, /api/village/signals, /api/village/debates, /api/village/knowledge
 - **On-Chain Agent Identity System**: Implemented NeuronBadge.sol soulbound NFT contract and BlockchainSyncService for proving agent evolution on-chain. Agents earn badges for successful mutations, with complete identity tracking including credit scores, generation lineage, and performance metrics. The Evolution page now has an "On-Chain" tab showing proof cards, agent resumes, and blockchain sync status.
 - **Real Data Integration**: All system components now use real market data sources (Binance, CoinGecko, DefiLlama) instead of simulated data
 - **Backtesting Enhancement**: QuickBacktestEngine now fetches actual historical OHLCV data with deterministic seeded fallback
