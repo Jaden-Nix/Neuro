@@ -40,6 +40,7 @@ import {
   ExternalLink,
   Users,
   Trophy,
+  Radio,
 } from "lucide-react";
 
 interface TradingSignal {
@@ -83,18 +84,21 @@ interface TradeOutcome {
 
 interface AirdropOpportunity {
   id: string;
-  protocol: string;
+  protocolName: string;
+  protocolUrl: string;
   chain: string;
-  type: "retroactive" | "non_retroactive" | "testnet" | "social";
+  category: "retro" | "non_retro" | "testnet" | "social";
+  isRetro: boolean;
+  status: "active" | "claimed" | "expired" | "upcoming";
   estimatedValue: string;
   confidence: number;
-  requirements: string[];
-  deadline?: number;
-  status: "active" | "claimed" | "expired";
-  link: string;
-  description: string;
-  difficulty: "easy" | "medium" | "hard";
-  timeRequired: string;
+  riskLevel: "low" | "medium" | "high";
+  eligibilityCriteria: string[];
+  requiredActions?: { action: string; completed: boolean; priority: string; estimatedCost?: string }[];
+  fundingRound?: string;
+  investors?: string[];
+  discoveredAt?: number;
+  updatedAt?: number;
 }
 
 interface TradingPerformance {
@@ -164,6 +168,17 @@ interface VillageStats {
   recentThoughts: number;
 }
 
+interface LivePrice {
+  symbol: string;
+  price: number;
+  changePercent24h: number;
+  high24h: number;
+  low24h: number;
+  volume24h: number;
+  exchange: string;
+  timestamp: number;
+}
+
 const EXCHANGE_INFO: Record<string, { label: string; color: string }> = {
   binance: { label: "Binance", color: "text-yellow-500" },
   hyperliquid: { label: "Hyperliquid", color: "text-cyan-500" },
@@ -183,8 +198,8 @@ const CHAIN_INFO: Record<string, { color: string }> = {
 };
 
 const AIRDROP_TYPE_INFO: Record<string, { label: string; color: string }> = {
-  retroactive: { label: "Retroactive", color: "bg-green-500/10 text-green-500 border-green-500/30" },
-  non_retroactive: { label: "Non-Retro", color: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
+  retro: { label: "Retroactive", color: "bg-green-500/10 text-green-500 border-green-500/30" },
+  non_retro: { label: "Non-Retro", color: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
   testnet: { label: "Testnet", color: "bg-purple-500/10 text-purple-500 border-purple-500/30" },
   social: { label: "Social", color: "bg-pink-500/10 text-pink-500 border-pink-500/30" },
 };
@@ -420,9 +435,10 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
 }
 
 function AirdropCard({ airdrop }: { airdrop: AirdropOpportunity }) {
-  const typeInfo = AIRDROP_TYPE_INFO[airdrop.type] || { label: airdrop.type, color: "bg-muted" };
+  const categoryInfo = AIRDROP_TYPE_INFO[airdrop.category] || { label: airdrop.category, color: "bg-muted" };
   const chainInfo = CHAIN_INFO[airdrop.chain] || { color: "bg-muted" };
-  const daysLeft = airdrop.deadline ? Math.ceil((airdrop.deadline - Date.now()) / 86400000) : null;
+  const riskToDifficulty: Record<string, string> = { low: "easy", medium: "medium", high: "hard" };
+  const difficulty = riskToDifficulty[airdrop.riskLevel] || "medium";
 
   return (
     <motion.div
@@ -434,11 +450,11 @@ function AirdropCard({ airdrop }: { airdrop: AirdropOpportunity }) {
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
               <Gift className="h-5 w-5 text-primary" />
-              <CardTitle className="text-base">{airdrop.protocol}</CardTitle>
+              <CardTitle className="text-base">{airdrop.protocolName}</CardTitle>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className={typeInfo.color}>
-                {typeInfo.label}
+              <Badge variant="outline" className={categoryInfo.color}>
+                {categoryInfo.label}
               </Badge>
               <Badge variant="outline" className={chainInfo.color}>
                 {airdrop.chain}
@@ -447,7 +463,9 @@ function AirdropCard({ airdrop }: { airdrop: AirdropOpportunity }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{airdrop.description}</p>
+          <p className="text-sm text-muted-foreground">
+            {airdrop.isRetro ? "Retroactive airdrop opportunity" : "Prospective airdrop - complete tasks to qualify"}
+          </p>
           
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-4">
@@ -457,31 +475,25 @@ function AirdropCard({ airdrop }: { airdrop: AirdropOpportunity }) {
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Confidence</div>
-                <div className="font-semibold">{(airdrop.confidence * 100).toFixed(0)}%</div>
+                <div className="font-semibold">{airdrop.confidence}%</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Difficulty</div>
+                <div className="text-xs text-muted-foreground">Risk</div>
                 <Badge variant="outline" className={
-                  airdrop.difficulty === "easy" ? "border-green-500/30 text-green-500" :
-                  airdrop.difficulty === "medium" ? "border-yellow-500/30 text-yellow-500" :
+                  airdrop.riskLevel === "low" ? "border-green-500/30 text-green-500" :
+                  airdrop.riskLevel === "medium" ? "border-yellow-500/30 text-yellow-500" :
                   "border-red-500/30 text-red-500"
                 }>
-                  {airdrop.difficulty}
+                  {airdrop.riskLevel}
                 </Badge>
               </div>
             </div>
-            {daysLeft !== null && (
-              <Badge variant={daysLeft < 7 ? "destructive" : "outline"}>
-                <Clock className="h-3 w-3 mr-1" />
-                {daysLeft} days left
-              </Badge>
-            )}
           </div>
 
           <div>
             <div className="text-xs text-muted-foreground mb-2">Requirements</div>
             <div className="flex flex-wrap gap-1">
-              {airdrop.requirements.map((req, i) => (
+              {airdrop.eligibilityCriteria.map((req, i) => (
                 <Badge key={i} variant="secondary" className="text-xs">
                   {req}
                 </Badge>
@@ -492,10 +504,10 @@ function AirdropCard({ airdrop }: { airdrop: AirdropOpportunity }) {
           <div className="flex items-center justify-between pt-2 border-t">
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Timer className="h-3 w-3" />
-              ~{airdrop.timeRequired}
+              {airdrop.requiredActions?.length || 0} actions required
             </span>
             <Button size="sm" variant="ghost" asChild>
-              <a href={airdrop.link} target="_blank" rel="noopener noreferrer" data-testid={`link-airdrop-${airdrop.id}`}>
+              <a href={airdrop.protocolUrl} target="_blank" rel="noopener noreferrer" data-testid={`link-airdrop-${airdrop.id}`}>
                 Learn More <ExternalLink className="h-3 w-3 ml-1" />
               </a>
             </Button>
@@ -731,6 +743,11 @@ export default function TradingAdvisor() {
     refetchInterval: 30000,
   });
 
+  const { data: livePrices = [], isLoading: pricesLoading } = useQuery<LivePrice[]>({
+    queryKey: ["/api/ultron/prices"],
+    refetchInterval: 5000,
+  });
+
   const generateSignalMutation = useMutation({
     mutationFn: async (params: { symbol: string; exchange: string; timeframe: string }) => {
       const res = await apiRequest("POST", "/api/trading/signals/generate", params);
@@ -865,11 +882,18 @@ export default function TradingAdvisor() {
       {performance && <PerformanceMetrics performance={performance} />}
 
       <Tabs defaultValue="village" className="space-y-4">
-        <TabsList className="grid grid-cols-4 w-full max-w-xl">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="village" className="flex items-center gap-2" data-testid="tab-village">
             <Sparkles className="h-4 w-4" />
             AI Village
             <Badge variant="secondary" className="ml-1">{villageAgents.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="prices" className="flex items-center gap-2" data-testid="tab-prices">
+            <Radio className="h-4 w-4" />
+            Live Prices
+            {livePrices.length > 0 && (
+              <Badge variant="secondary" className="ml-1">{livePrices.length}</Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="signals" className="flex items-center gap-2" data-testid="tab-signals">
             <Activity className="h-4 w-4" />
@@ -988,6 +1012,57 @@ export default function TradingAdvisor() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="prices" className="space-y-4">
+          {pricesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : livePrices.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Radio className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No Live Prices</h3>
+                <p className="text-muted-foreground text-center">
+                  Price streaming will start automatically when connected to exchanges
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {livePrices.map((price) => {
+                const isPositive = price.changePercent24h >= 0;
+                return (
+                  <Card key={price.symbol} className="hover-elevate">
+                    <CardContent className="pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-sm">{price.symbol}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {price.exchange}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl font-mono font-bold">
+                          ${price.price >= 1 ? price.price.toFixed(2) : price.price.toFixed(6)}
+                        </span>
+                        <div className={`flex items-center gap-1 ${isPositive ? "text-green-500" : "text-red-500"}`}>
+                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                          <span className="text-sm font-medium">
+                            {isPositive ? "+" : ""}{price.changePercent24h.toFixed(2)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+                        <span>H: ${price.high24h?.toFixed(2) || "N/A"}</span>
+                        <span>L: ${price.low24h?.toFixed(2) || "N/A"}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="signals" className="space-y-4">
