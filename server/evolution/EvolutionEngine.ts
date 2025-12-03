@@ -207,18 +207,23 @@ export class EvolutionEngine {
   private mutationStats: Map<MutationType, MutationStats> = new Map();
   private autoEvolutionTimer: NodeJS.Timeout | null = null;
   private autoEvolutionConfig: AutoEvolutionConfig = {
-    enabled: false,
-    intervalMs: 30000,
-    minIntervalMs: 10000,
-    maxIntervalMs: 120000,
-    agentsPerCycle: 1,
-    evolutionChance: 0.7
+    enabled: true,
+    intervalMs: 60000,
+    minIntervalMs: 30000,
+    maxIntervalMs: 180000,
+    agentsPerCycle: 2,
+    evolutionChance: 0.6
   };
   private eventCallbacks: Set<EvolutionEventCallback> = new Set();
   
   constructor() {
     this.initializeMutationStats();
     this.seedInitialEvolutionEvents();
+    
+    setTimeout(() => {
+      this.startAutoEvolution();
+      console.log('[Evolution] Auto-evolution enabled - agents will self-heal and adapt');
+    }, 5000);
   }
 
   onEvolution(callback: EvolutionEventCallback): () => void {
