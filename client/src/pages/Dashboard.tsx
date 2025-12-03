@@ -11,9 +11,6 @@ import { LiveSystemStatus } from "@/components/LiveSystemStatus";
 import { ControlPanel } from "@/components/ControlPanel";
 import { TimeWarpSlider } from "@/components/TimeWarpSlider";
 import { DeveloperPanel } from "@/components/DeveloperPanel";
-import { TradingSignalsSummary } from "@/components/TradingSignalsSummary";
-import { LiveMarketPulse } from "@/components/LiveMarketPulse";
-import { AgentIntelligenceFeed } from "@/components/AgentIntelligenceFeed";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -262,12 +259,12 @@ export default function Dashboard() {
             <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
           </motion.div>
 
-          {/* Main Grid Layout - 5 Columns */}
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-            {/* Left Column - Controls & Market Pulse */}
+          {/* Main Grid Layout - Clean 4 Columns */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Left Column - Controls */}
             <motion.div variants={itemVariants} className="space-y-4">
               <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
+                <CardContent className="p-5">
                   <ControlPanel
                     autonomousMode={systemState?.autonomousMode || false}
                     onRunSimulation={handleRunSimulation}
@@ -280,13 +277,7 @@ export default function Dashboard() {
               </Card>
 
               <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
-                  <LiveMarketPulse />
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
+                <CardContent className="p-5">
                   <RiskHeatmap />
                 </CardContent>
               </Card>
@@ -295,7 +286,7 @@ export default function Dashboard() {
             {/* Center - Core Visualization */}
             <motion.div variants={itemVariants} className="lg:col-span-2">
               <Card className="h-full shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
+                <CardContent className="p-5">
                   <NeuroNetCore
                     agents={agents}
                     systemHealth={systemState?.systemHealth || 85}
@@ -304,30 +295,14 @@ export default function Dashboard() {
               </Card>
             </motion.div>
 
-            {/* Right Column - Trading Signals */}
+            {/* Right Column - Logs */}
             <motion.div variants={itemVariants}>
               <Card className="h-full shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
-                  <TradingSignalsSummary />
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Far Right Column - AI Intelligence & Logs */}
-            <motion.div variants={itemVariants} className="space-y-4">
-              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4">
-                  <AgentIntelligenceFeed />
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-4 h-[280px] flex flex-col">
+                <CardContent className="p-5 h-full flex flex-col">
                   <LogStream 
                     logs={logs}
                     onClearLogs={() => clearLogsMutation.mutate()}
                     isClearing={clearLogsMutation.isPending}
-                    maxLogs={50}
                   />
                 </CardContent>
               </Card>

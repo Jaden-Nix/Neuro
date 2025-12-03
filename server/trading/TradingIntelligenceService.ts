@@ -110,9 +110,9 @@ export class TradingIntelligenceService {
     } catch (error) {
       console.error(`[TradingIntelligence] Failed to get price for ${symbol}:`, error);
       const fallbackPrices: Record<string, number> = {
-        "BTC": 97000, "ETH": 3600, "SOL": 230, "AVAX": 45,
-        "LINK": 25, "UNI": 12, "AAVE": 180, "ARB": 1.1,
-        "OP": 2.5, "MATIC": 0.55, "DOGE": 0.42, "PEPE": 0.000022
+        "BTC": 96500, "ETH": 3580, "SOL": 145, "AVAX": 48,
+        "LINK": 24, "UNI": 14, "AAVE": 380, "ARB": 1.05,
+        "OP": 2.50, "MATIC": 0.52, "DOGE": 0.43, "PEPE": 0.000025, "SUI": 4.65
       };
       const base = symbol.replace("-USD", "").replace("USDT", "");
       return fallbackPrices[base] || 100;

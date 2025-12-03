@@ -247,9 +247,11 @@ function formatDuration(ms: number): string {
 
 function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: string, price: number) => void }) {
   const isLong = signal.direction === "long";
-  const riskReward = ((signal.takeProfit1 - signal.entryPrice) / (signal.entryPrice - signal.stopLoss)).toFixed(2);
-  const potentialGain = (((signal.takeProfit1 - signal.entryPrice) / signal.entryPrice) * 100).toFixed(2);
-  const potentialLoss = (((signal.entryPrice - signal.stopLoss) / signal.entryPrice) * 100).toFixed(2);
+  const riskDiff = Math.abs(signal.entryPrice - signal.stopLoss);
+  const rewardDiff = Math.abs(signal.takeProfit1 - signal.entryPrice);
+  const riskReward = riskDiff > 0 ? (rewardDiff / riskDiff).toFixed(1) : "N/A";
+  const potentialGain = signal.entryPrice > 0 ? (((signal.takeProfit1 - signal.entryPrice) / signal.entryPrice) * 100).toFixed(1) : "0";
+  const potentialLoss = signal.entryPrice > 0 ? (((signal.entryPrice - signal.stopLoss) / signal.entryPrice) * 100).toFixed(1) : "0";
   const timeRemaining = signal.expiresAt - Date.now();
   const isExpiring = timeRemaining < 3600000;
 

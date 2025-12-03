@@ -290,8 +290,8 @@ export class AdvancedIntelligenceService extends EventEmitter {
 
   private generateSyntheticOHLCV(symbol: string, limit: number): CandleData[] {
     const basePrices: Record<string, number> = {
-      'BTC': 97000, 'ETH': 3650, 'SOL': 235, 'AVAX': 52, 'LINK': 24,
-      'UNI': 17, 'AAVE': 365, 'ARB': 1.05, 'OP': 2.4, 'DOGE': 0.42,
+      'BTC': 96500, 'ETH': 3580, 'SOL': 145, 'AVAX': 48, 'LINK': 24,
+      'UNI': 14, 'AAVE': 380, 'ARB': 1.05, 'OP': 2.50, 'DOGE': 0.43, 'SUI': 4.65, 'PEPE': 0.000025,
     };
     
     const basePrice = basePrices[symbol] || 100;

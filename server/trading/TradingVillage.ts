@@ -650,7 +650,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     confidence: number
   ): Promise<VillageTradeSignal | null> {
     const fallbackPrices: Record<string, number> = {
-      BTC: 97500, ETH: 3650, SOL: 235, AVAX: 52, LINK: 28, ARB: 1.15, OP: 2.85, SUI: 4.20
+      BTC: 96500, ETH: 3580, SOL: 145, AVAX: 48, LINK: 24, ARB: 1.05, OP: 2.50, SUI: 4.65
     };
     
     let basePrice = fallbackPrices[symbol] || 100;

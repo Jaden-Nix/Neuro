@@ -42,12 +42,6 @@ const menuItems = [
     testId: "nav-trading",
   },
   {
-    title: "Ultron Signals",
-    url: "/signals",
-    icon: Signal,
-    testId: "nav-signals",
-  },
-  {
     title: "AI Insights",
     url: "/insights",
     icon: Brain,
