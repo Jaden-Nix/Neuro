@@ -327,6 +327,43 @@ blockchainSync.on('creditUpdated', ({ agentName, creditDelta, newBalance, reason
   });
 });
 
+evolutionEngine.onEvolution(async (event) => {
+  try {
+    await blockchainSync.queueEvolutionBadge(event);
+    
+    broadcastToClients({
+      type: "evolution",
+      data: { 
+        event: "agent_evolved",
+        parentAgent: event.parentAgentName,
+        childAgent: event.childAgentName,
+        generation: event.childGeneration,
+        mutationType: event.mutation.type,
+        performanceChange: event.performanceImpact.roiChange,
+        trigger: event.trigger,
+        reason: event.reason,
+        timestamp: event.timestamp
+      },
+      timestamp: Date.now(),
+    });
+    
+    broadcastToClients({
+      type: "log",
+      data: {
+        id: `log-evolution-${Date.now()}`,
+        agentType: AgentType.META,
+        level: "success",
+        message: `${event.parentAgentName} evolved into ${event.childAgentName} (Gen ${event.childGeneration}) | ${event.mutation.type} | ${event.performanceImpact.roiChange > 0 ? '+' : ''}${event.performanceImpact.roiChange.toFixed(1)}% ROI`,
+        timestamp: Date.now(),
+        personality: "Natural selection in progress...",
+      },
+      timestamp: Date.now(),
+    });
+  } catch (err) {
+    console.error('[Evolution] Failed to process evolution event:', err);
+  }
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -3898,6 +3935,92 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to generate demo evolutions:", error);
       res.status(500).json({ error: "Failed to generate demo evolutions" });
+    }
+  });
+
+  // ============================================
+  // Automatic Evolution Control Routes
+  // ============================================
+
+  app.get("/api/evolution/auto/status", async (req, res) => {
+    try {
+      const config = evolutionEngine.getAutoEvolutionConfig();
+      res.json(config);
+    } catch (error) {
+      console.error("Failed to get auto-evolution status:", error);
+      res.status(500).json({ error: "Failed to get auto-evolution status" });
+    }
+  });
+
+  app.post("/api/evolution/auto/start", writeLimiter, async (req, res) => {
+    try {
+      const { intervalMs, agentsPerCycle, evolutionChance } = req.body;
+      
+      const config = evolutionEngine.setAutoEvolutionConfig({
+        enabled: true,
+        ...(intervalMs && { intervalMs: Math.max(10000, Math.min(120000, intervalMs)) }),
+        ...(agentsPerCycle && { agentsPerCycle: Math.max(1, Math.min(5, agentsPerCycle)) }),
+        ...(evolutionChance && { evolutionChance: Math.max(0.1, Math.min(1.0, evolutionChance)) })
+      });
+
+      broadcastToClients({
+        type: "log",
+        data: { 
+          event: "auto_evolution_started", 
+          config,
+          message: `Automatic evolution started - agents will evolve every ${config.intervalMs / 1000} seconds`
+        },
+        timestamp: Date.now(),
+      });
+
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Failed to start auto-evolution:", error);
+      res.status(500).json({ error: "Failed to start auto-evolution" });
+    }
+  });
+
+  app.post("/api/evolution/auto/stop", writeLimiter, async (req, res) => {
+    try {
+      evolutionEngine.setAutoEvolutionConfig({ enabled: false });
+      const config = evolutionEngine.getAutoEvolutionConfig();
+
+      broadcastToClients({
+        type: "log",
+        data: { 
+          event: "auto_evolution_stopped",
+          message: "Automatic evolution has been stopped"
+        },
+        timestamp: Date.now(),
+      });
+
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Failed to stop auto-evolution:", error);
+      res.status(500).json({ error: "Failed to stop auto-evolution" });
+    }
+  });
+
+  app.post("/api/evolution/auto/configure", writeLimiter, async (req, res) => {
+    try {
+      const { intervalMs, agentsPerCycle, evolutionChance } = req.body;
+      
+      const config = evolutionEngine.setAutoEvolutionConfig({
+        ...(intervalMs && { intervalMs: Math.max(10000, Math.min(120000, intervalMs)) }),
+        ...(agentsPerCycle && { agentsPerCycle: Math.max(1, Math.min(5, agentsPerCycle)) }),
+        ...(evolutionChance && { evolutionChance: Math.max(0.1, Math.min(1.0, evolutionChance)) })
+      });
+
+      broadcastToClients({
+        type: "log",
+        data: { event: "auto_evolution_configured", config },
+        timestamp: Date.now(),
+      });
+
+      res.json({ success: true, config });
+    } catch (error) {
+      console.error("Failed to configure auto-evolution:", error);
+      res.status(500).json({ error: "Failed to configure auto-evolution" });
     }
   });
 

@@ -32,7 +32,9 @@ import {
   ArrowRight,
   RefreshCw,
   AlertCircle,
-  Link2
+  Link2,
+  Play,
+  Pause
 } from "lucide-react";
 import { EvolutionProofs } from "@/components/EvolutionProofs";
 
@@ -906,6 +908,13 @@ function AgentDetail({ agent, onBack }: { agent: AgentGenealogy; onBack: () => v
   );
 }
 
+interface AutoEvolutionConfig {
+  enabled: boolean;
+  intervalMs: number;
+  agentsPerCycle: number;
+  evolutionChance: number;
+}
+
 export default function Evolution() {
   const [selectedAgent, setSelectedAgent] = useState<AgentGenealogy | null>(null);
   const [activeTab, setActiveTab] = useState("timeline");
@@ -925,6 +934,11 @@ export default function Evolution() {
     refetchInterval: 5000,
   });
 
+  const { data: autoConfig } = useQuery<AutoEvolutionConfig>({
+    queryKey: ["/api/evolution/auto/status"],
+    refetchInterval: 3000,
+  });
+
   const generateDemoMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/evolution/engine/demo");
@@ -933,6 +947,24 @@ export default function Evolution() {
       queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/evolution/engine/genealogy"] });
+    },
+  });
+
+  const startAutoEvolution = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/evolution/auto/start", { intervalMs: 30000 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/auto/status"] });
+    },
+  });
+
+  const stopAutoEvolution = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/evolution/auto/stop");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/evolution/auto/status"] });
     },
   });
 
@@ -965,21 +997,69 @@ export default function Evolution() {
             Track agent mutations, lineages, and performance evolution
           </p>
         </div>
-        <Button 
-          onClick={() => generateDemoMutation.mutate()}
-          disabled={generateDemoMutation.isPending}
-          className="flex items-center gap-2"
-          data-testid="button-generate-evolution"
-        >
-          {generateDemoMutation.isPending ? (
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
-              <RefreshCw className="w-4 h-4" />
-            </motion.div>
+        <div className="flex items-center gap-3 flex-wrap">
+          {autoConfig?.enabled ? (
+            <Button 
+              onClick={() => stopAutoEvolution.mutate()}
+              disabled={stopAutoEvolution.isPending}
+              variant="destructive"
+              className="flex items-center gap-2"
+              data-testid="button-stop-auto-evolution"
+            >
+              {stopAutoEvolution.isPending ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                  <RefreshCw className="w-4 h-4" />
+                </motion.div>
+              ) : (
+                <Pause className="w-4 h-4" />
+              )}
+              Stop Auto
+            </Button>
           ) : (
-            <Zap className="w-4 h-4" />
+            <Button 
+              onClick={() => startAutoEvolution.mutate()}
+              disabled={startAutoEvolution.isPending}
+              variant="default"
+              className="flex items-center gap-2"
+              data-testid="button-start-auto-evolution"
+            >
+              {startAutoEvolution.isPending ? (
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                  <RefreshCw className="w-4 h-4" />
+                </motion.div>
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+              Auto Evolve
+            </Button>
           )}
-          Generate Evolution
-        </Button>
+          {autoConfig?.enabled && (
+            <Badge variant="secondary" className="flex items-center gap-1">
+              <motion.div
+                className="w-2 h-2 rounded-full bg-green-500"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              />
+              Every {(autoConfig.intervalMs / 1000).toFixed(0)}s
+            </Badge>
+          )}
+          <Button 
+            onClick={() => generateDemoMutation.mutate()}
+            disabled={generateDemoMutation.isPending}
+            variant="outline"
+            className="flex items-center gap-2"
+            data-testid="button-generate-evolution"
+          >
+            {generateDemoMutation.isPending ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                <RefreshCw className="w-4 h-4" />
+              </motion.div>
+            ) : (
+              <Zap className="w-4 h-4" />
+            )}
+            Demo Batch
+          </Button>
+        </div>
       </motion.div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

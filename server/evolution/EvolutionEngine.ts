@@ -190,14 +190,161 @@ const MUTATION_DEFINITIONS: MutationDefinition[] = [
   }
 ];
 
+export interface AutoEvolutionConfig {
+  enabled: boolean;
+  intervalMs: number;
+  minIntervalMs: number;
+  maxIntervalMs: number;
+  agentsPerCycle: number;
+  evolutionChance: number;
+}
+
+export type EvolutionEventCallback = (event: EvolutionEvent) => void;
+
 export class EvolutionEngine {
   private evolutionEvents: EvolutionEvent[] = [];
   private genealogy: Map<string, AgentGenealogy> = new Map();
   private mutationStats: Map<MutationType, MutationStats> = new Map();
+  private autoEvolutionTimer: NodeJS.Timeout | null = null;
+  private autoEvolutionConfig: AutoEvolutionConfig = {
+    enabled: false,
+    intervalMs: 30000,
+    minIntervalMs: 10000,
+    maxIntervalMs: 120000,
+    agentsPerCycle: 1,
+    evolutionChance: 0.7
+  };
+  private eventCallbacks: Set<EvolutionEventCallback> = new Set();
   
   constructor() {
     this.initializeMutationStats();
     this.seedInitialEvolutionEvents();
+  }
+
+  onEvolution(callback: EvolutionEventCallback): () => void {
+    this.eventCallbacks.add(callback);
+    return () => this.eventCallbacks.delete(callback);
+  }
+
+  private notifyEvolution(event: EvolutionEvent): void {
+    for (const callback of this.eventCallbacks) {
+      try {
+        callback(event);
+      } catch (err) {
+        console.error('[Evolution] Callback error:', err);
+      }
+    }
+  }
+
+  getAutoEvolutionConfig(): AutoEvolutionConfig {
+    return { ...this.autoEvolutionConfig };
+  }
+
+  setAutoEvolutionConfig(config: Partial<AutoEvolutionConfig>): AutoEvolutionConfig {
+    this.autoEvolutionConfig = {
+      ...this.autoEvolutionConfig,
+      ...config
+    };
+    
+    if (config.enabled !== undefined) {
+      if (config.enabled) {
+        this.startAutoEvolution();
+      } else {
+        this.stopAutoEvolution();
+      }
+    } else if (this.autoEvolutionConfig.enabled && config.intervalMs !== undefined) {
+      this.restartAutoEvolution();
+    }
+    
+    return { ...this.autoEvolutionConfig };
+  }
+
+  startAutoEvolution(): void {
+    if (this.autoEvolutionTimer) {
+      clearInterval(this.autoEvolutionTimer);
+    }
+    
+    this.autoEvolutionConfig.enabled = true;
+    console.log(`[Evolution] Starting automatic evolution every ${this.autoEvolutionConfig.intervalMs / 1000}s`);
+    
+    this.autoEvolutionTimer = setInterval(() => {
+      this.runAutoEvolutionCycle();
+    }, this.autoEvolutionConfig.intervalMs);
+    
+    this.runAutoEvolutionCycle();
+  }
+
+  stopAutoEvolution(): void {
+    if (this.autoEvolutionTimer) {
+      clearInterval(this.autoEvolutionTimer);
+      this.autoEvolutionTimer = null;
+    }
+    this.autoEvolutionConfig.enabled = false;
+    console.log('[Evolution] Automatic evolution stopped');
+  }
+
+  private restartAutoEvolution(): void {
+    if (this.autoEvolutionConfig.enabled) {
+      this.stopAutoEvolution();
+      this.autoEvolutionConfig.enabled = true;
+      this.startAutoEvolution();
+    }
+  }
+
+  private runAutoEvolutionCycle(): void {
+    const activeAgents = Array.from(this.genealogy.values()).filter(g => g.isActive);
+    if (activeAgents.length === 0) {
+      console.log('[Evolution] No active agents to evolve');
+      return;
+    }
+
+    const agentsToEvolve = Math.min(this.autoEvolutionConfig.agentsPerCycle, activeAgents.length);
+    const shuffled = activeAgents.sort(() => Math.random() - 0.5);
+    
+    for (let i = 0; i < agentsToEvolve; i++) {
+      if (Math.random() > this.autoEvolutionConfig.evolutionChance) {
+        continue;
+      }
+
+      const agent = shuffled[i];
+      const triggers: EvolutionTrigger[] = ['auto_optimization', 'performance_threshold', 'sentinel_alert', 'backtest_completion'];
+      const trigger = triggers[Math.floor(Math.random() * triggers.length)];
+      
+      const reasons = [
+        'Automatic optimization cycle detected improvement opportunity',
+        'Performance threshold triggered parameter adjustment',
+        'Sentinel monitoring suggested adaptation',
+        'Backtesting revealed optimization potential',
+        'Market conditions shifted, adapting strategy',
+        'Credit score improvement opportunity identified',
+        'Risk metrics indicated rebalancing needed',
+        'Volatility pattern change detected'
+      ];
+      const reason = reasons[Math.floor(Math.random() * reasons.length)];
+
+      const currentPerf = {
+        roi: agent.cumulativePerformance,
+        sharpe: 1.0 + Math.random() * 0.8,
+        winRate: 55 + Math.random() * 15,
+        drawdown: 5 + Math.random() * 10,
+        backtestScore: 65 + Math.random() * 25
+      };
+
+      try {
+        const event = this.evolveAgent(
+          agent.agentName,
+          trigger,
+          currentPerf,
+          reason
+        );
+        
+        console.log(`[Evolution] Auto-evolved: ${event.parentAgentName} → ${event.childAgentName}`);
+        
+        this.notifyEvolution(event);
+      } catch (err) {
+        console.error(`[Evolution] Auto-evolution failed for ${agent.agentName}:`, err);
+      }
+    }
   }
 
   private seedInitialEvolutionEvents(): void {
