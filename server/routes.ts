@@ -28,6 +28,8 @@ import { walletManager } from "./wallets/WalletManager";
 import { rpcClient } from "./blockchain/RPCClient";
 import { aiInsightsEngine } from "./insights/AIInsightsEngine";
 import { parliamentEngine } from "./parliament/ParliamentEngine";
+import { blockchainSync } from "./blockchain/BlockchainSyncService";
+import { evolutionEngine } from "./evolution/EvolutionEngine";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -238,6 +240,89 @@ simulationEngine.on("simulationCompleted", async ({ simulationId, branches }) =>
   broadcastToClients({
     type: "simulation",
     data: { simulationId, status: "completed", branches, creditUpdate: { isSuccessful, creditAmount, avgEV } },
+    timestamp: Date.now(),
+  });
+});
+
+// Blockchain sync event handlers - queue evolution badges on-chain
+blockchainSync.on('badgeQueued', ({ requestId, request }) => {
+  broadcastToClients({
+    type: "onchain",
+    data: { 
+      event: "badgeQueued", 
+      requestId,
+      agentName: request.agentName,
+      generation: request.generation,
+      mutationType: request.mutationType,
+      creditDelta: request.creditDelta,
+    },
+    timestamp: Date.now(),
+  });
+});
+
+blockchainSync.on('badgeMinted', ({ request, proof }) => {
+  broadcastToClients({
+    type: "onchain",
+    data: { 
+      event: "badgeMinted", 
+      agentName: request?.agentName,
+      proof,
+    },
+    timestamp: Date.now(),
+  });
+  
+  // Log the on-chain proof
+  broadcastToClients({
+    type: "log",
+    data: {
+      id: `log-onchain-${Date.now()}`,
+      agentType: AgentType.META,
+      level: "success",
+      message: `Neuron Badge minted on-chain: ${request?.agentName} Gen ${request?.generation} | TX: ${proof.transactionHash.slice(0, 10)}...`,
+      timestamp: Date.now(),
+      personality: "Recording evolution proof on-chain...",
+    },
+    timestamp: Date.now(),
+  });
+});
+
+blockchainSync.on('agentHealed', ({ agentName, failureType, resolution, recoveryTimeMs }) => {
+  broadcastToClients({
+    type: "agentEvent",
+    data: { 
+      event: "healed",
+      agentName,
+      failureType,
+      resolution,
+      recoveryTimeMs,
+    },
+    timestamp: Date.now(),
+  });
+  
+  // Log the healing event
+  broadcastToClients({
+    type: "log",
+    data: {
+      id: `log-heal-${Date.now()}`,
+      agentType: AgentType.META,
+      level: "success",
+      message: `Agent ${agentName} self-healed: ${failureType} -> ${resolution} (${recoveryTimeMs}ms)`,
+      timestamp: Date.now(),
+      personality: "Self-healing protocol activated...",
+    },
+    timestamp: Date.now(),
+  });
+});
+
+blockchainSync.on('creditUpdated', ({ agentName, creditDelta, newBalance, reason }) => {
+  broadcastToClients({
+    type: "creditUpdate",
+    data: { 
+      agentName,
+      creditDelta,
+      newBalance,
+      reason,
+    },
     timestamp: Date.now(),
   });
 });
@@ -3802,6 +3887,11 @@ export async function registerRoutes(
       const events = evolutionEngine.generateDemoEvolutions();
       const stats = evolutionEngine.getEvolutionStats();
 
+      // Queue evolution badges on-chain for each event
+      for (const event of events) {
+        await blockchainSync.queueEvolutionBadge(event);
+      }
+
       broadcastToClients({
         type: "log",
         data: { event: "demo_evolutions_generated", count: events.length },
@@ -3811,11 +3901,106 @@ export async function registerRoutes(
       res.json({ 
         count: events.length, 
         events: events.slice(-10),
-        stats 
+        stats,
+        onchainProofs: blockchainSync.getAllProofs().slice(-10)
       });
     } catch (error) {
       console.error("Failed to generate demo evolutions:", error);
       res.status(500).json({ error: "Failed to generate demo evolutions" });
+    }
+  });
+
+  // ============================================
+  // Blockchain Sync & On-Chain Identity Routes
+  // ============================================
+
+  app.get("/api/blockchain/status", async (req, res) => {
+    try {
+      res.json(blockchainSync.getStatus());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get blockchain status" });
+    }
+  });
+
+  app.get("/api/blockchain/identities", async (req, res) => {
+    try {
+      const identities = blockchainSync.getAllIdentities();
+      res.json(identities);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent identities" });
+    }
+  });
+
+  app.get("/api/blockchain/identity/:agentName", async (req, res) => {
+    try {
+      const identity = blockchainSync.getAgentIdentity(req.params.agentName);
+      if (!identity) {
+        return res.status(404).json({ error: "Agent identity not found" });
+      }
+      res.json(identity);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent identity" });
+    }
+  });
+
+  app.get("/api/blockchain/proofs", async (req, res) => {
+    try {
+      const proofs = blockchainSync.getAllProofs();
+      res.json(proofs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get on-chain proofs" });
+    }
+  });
+
+  app.get("/api/blockchain/proofs/:agentName", async (req, res) => {
+    try {
+      const proofs = blockchainSync.getAgentProofs(req.params.agentName);
+      res.json(proofs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent proofs" });
+    }
+  });
+
+  app.post("/api/blockchain/heal", writeLimiter, async (req, res) => {
+    try {
+      const { agentName, failureType, resolution, recoveryTimeMs } = req.body;
+      
+      if (!agentName || !failureType || !resolution) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const requestId = await blockchainSync.queueHealingBadge(
+        agentName,
+        failureType,
+        resolution,
+        recoveryTimeMs || 1000
+      );
+      
+      res.json({ success: true, requestId });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to queue healing badge" });
+    }
+  });
+
+  app.post("/api/blockchain/stress-test", writeLimiter, async (req, res) => {
+    try {
+      const { agentId, agentName, scenarioName, resilienceScore, passed } = req.body;
+      
+      if (!agentName || !scenarioName || resilienceScore === undefined) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const requestId = await blockchainSync.queueStressTestBadge(
+        agentId || agentName,
+        agentName,
+        scenarioName,
+        resilienceScore,
+        passed ?? resilienceScore >= 70
+      );
+      
+      res.json({ success: true, requestId });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to queue stress test badge" });
     }
   });
 

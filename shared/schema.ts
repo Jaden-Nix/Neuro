@@ -235,7 +235,7 @@ export interface LiveMetrics {
 
 // WebSocket Message Types
 export interface WSMessage {
-  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits" | "autonomousCycle" | "transactionMonitor" | "selfHealing";
+  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits" | "autonomousCycle" | "transactionMonitor" | "selfHealing" | "onchain" | "agentEvent" | "creditUpdate";
   data: any;
   timestamp: number;
 }
