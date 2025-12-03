@@ -16,6 +16,20 @@ import {
 } from "@shared/schema";
 import { MarketDataService } from "../data/MarketDataService";
 import { nanoid } from "nanoid";
+import { 
+  advancedIntelligence, 
+  type CandleData as AdvancedCandleData,
+  type IntelligenceScore,
+  type VolatilityRegime,
+  type PatternMatch,
+  type FundingRateData,
+  type WhaleTransaction,
+  type SentimentSignal,
+  type OrderFlowData,
+  type SmartMoneyFlow,
+  type LiquidationLevel,
+  type CrossChainFlow
+} from "./AdvancedIntelligence";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -548,8 +562,27 @@ export class TradingIntelligenceService {
   ): Promise<TradingSignal | null> {
     try {
       const currentPrice = await this.getMarketPrice(symbol);
-      const candles = await this.generateMockCandles(currentPrice, 200);
+      
+      const realCandles = await advancedIntelligence.fetchRealOHLCV(symbol, timeframe, 200);
+      const candles: CandleData[] = realCandles.map(c => ({
+        timestamp: c.timestamp,
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+        volume: c.volume,
+      }));
+      
       const indicators = this.calculateIndicators(candles);
+      
+      const volatilityRegime = advancedIntelligence.calculateVolatilityRegime(realCandles);
+      const patterns = advancedIntelligence.detectPatterns(realCandles, symbol, timeframe);
+      const funding = await advancedIntelligence.fetchFundingRates(symbol);
+      const sentiment = advancedIntelligence.simulateSentiment(symbol);
+      const orderFlow = advancedIntelligence.simulateOrderFlow(symbol);
+      const whaleActivity = advancedIntelligence.simulateWhaleActivity(symbol);
+      const smartMoney = advancedIntelligence.simulateSmartMoneyFlow(symbol);
+      const liquidations = advancedIntelligence.simulateLiquidationLevels(symbol, currentPrice);
       
       const longConfluence = this.calculateConfluenceScore(indicators, "long");
       const shortConfluence = this.calculateConfluenceScore(indicators, "short");
@@ -557,10 +590,21 @@ export class TradingIntelligenceService {
       const bestDirection = longConfluence.score > shortConfluence.score ? "long" : "short";
       const bestConfluence = bestDirection === "long" ? longConfluence : shortConfluence;
       
-      console.log(`[TradingIntelligence] ${symbol} confluence: Long ${longConfluence.score.toFixed(1)}% (${longConfluence.recommendation}), Short ${shortConfluence.score.toFixed(1)}% (${shortConfluence.recommendation})`);
+      const intelligenceScore = await advancedIntelligence.calculateIntelligenceScore(
+        symbol, 
+        bestConfluence.score, 
+        bestDirection
+      );
+      
+      console.log(`[TradingIntelligence] ${symbol} ENHANCED: Technical ${bestConfluence.score.toFixed(1)}%, Overall ${intelligenceScore.overallScore.toFixed(1)}%, Volatility: ${volatilityRegime.regime}, Patterns: ${patterns.length}`);
       
       if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
         console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Insufficient confluence (${bestConfluence.score.toFixed(1)}% < 60%)`);
+        return null;
+      }
+      
+      if (intelligenceScore.overallScore < 50 && intelligenceScore.signals.some(s => s.includes('Unfavorable') || s.includes('Weak') || s.includes('Counter'))) {
+        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Intelligence warnings present with low score (${intelligenceScore.overallScore.toFixed(1)}%)`);
         return null;
       }
       
@@ -569,15 +613,33 @@ export class TradingIntelligenceService {
       const obvStr = indicators.obv ? `OBV Trend: ${indicators.obv.trend}` : "N/A";
       const vwapStr = indicators.vwap ? `VWAP: $${indicators.vwap.toFixed(2)}` : "N/A";
       
-      const analysisPrompt = `You are an elite crypto trading AI with expertise across all markets including Binance and Hyperliquid. 
-Analyze this market data and provide a trading signal ONLY if there's a high-confidence opportunity (>70%).
+      const patternStr = patterns.length > 0 
+        ? patterns.map(p => `${p.pattern} (${p.confidence}% ${p.direction})`).join(', ')
+        : 'None detected';
+      
+      const fundingStr = funding 
+        ? `Rate: ${(funding.rate * 100).toFixed(4)}%, OI: $${(funding.openInterest / 1e6).toFixed(1)}M`
+        : 'N/A';
+      
+      const whaleStr = whaleActivity.length > 0
+        ? `${whaleActivity.length} txns, Smart money: ${whaleActivity.filter(w => w.isSmartMoney).length}`
+        : 'No recent activity';
+      
+      const nearestLiqLong = liquidations.filter(l => l.price < currentPrice).sort((a, b) => b.price - a.price)[0];
+      const nearestLiqShort = liquidations.filter(l => l.price > currentPrice).sort((a, b) => a.price - b.price)[0];
+      const liqStr = `Long cascade: $${nearestLiqLong?.price.toFixed(2) || 'N/A'}, Short cascade: $${nearestLiqShort?.price.toFixed(2) || 'N/A'}`;
+      
+      const analysisPrompt = `You are an ULTRON-level trading AI with multi-dimensional market intelligence.
+Analyze this ENHANCED market data and provide a trading signal ONLY if there's a high-confidence opportunity (>70%).
 
 Symbol: ${symbol}
 Current Price: $${currentPrice.toFixed(2)}
 Exchange: ${exchange}
 Timeframe: ${timeframe}
 
-Technical Indicators:
+═══════════════════════════════════════════════════════════
+TECHNICAL ANALYSIS (Real OHLCV Data from Exchanges)
+═══════════════════════════════════════════════════════════
 - RSI: ${indicators.rsi.toFixed(1)} (${indicators.rsiSignal})
 - MACD: ${indicators.macd.value.toFixed(4)} (Signal: ${indicators.macd.signal.toFixed(4)}, Histogram: ${indicators.macd.histogram.toFixed(4)})
 - EMA20: $${indicators.ema20.toFixed(2)}, EMA50: $${indicators.ema50.toFixed(2)}, EMA200: $${indicators.ema200.toFixed(2)}
@@ -592,7 +654,51 @@ Technical Indicators:
 - 24h Volume Change: ${indicators.volumeChange.toFixed(1)}%
 - 24h Price Change: ${indicators.priceChange24h.toFixed(2)}%
 
-MULTI-INDICATOR CONFLUENCE ANALYSIS (Pre-filtered for high probability):
+═══════════════════════════════════════════════════════════
+VOLATILITY & PATTERN RECOGNITION
+═══════════════════════════════════════════════════════════
+- Volatility Regime: ${volatilityRegime.regime.toUpperCase()} (ratio: ${volatilityRegime.volatilityRatio.toFixed(2)})
+- Threshold Multiplier: ${volatilityRegime.thresholdMultiplier}x (adaptive stops/targets)
+- Detected Patterns: ${patternStr}
+
+═══════════════════════════════════════════════════════════
+FUNDING & LEVERAGE SENTIMENT
+═══════════════════════════════════════════════════════════
+- ${fundingStr}
+- Long/Short Ratio: ${funding?.longShortRatio?.toFixed(2) || 'N/A'}
+- Liquidation Levels: ${liqStr}
+
+═══════════════════════════════════════════════════════════
+WHALE & SMART MONEY ACTIVITY
+═══════════════════════════════════════════════════════════
+- Whale Activity: ${whaleStr}
+- Smart Money Flow: ${smartMoney.flowSignal.toUpperCase()} (net: $${(smartMoney.netFlow / 1e6).toFixed(1)}M)
+- Exchange Flow: In $${(smartMoney.exchangeInflow / 1e6).toFixed(1)}M / Out $${(smartMoney.exchangeOutflow / 1e6).toFixed(1)}M
+
+═══════════════════════════════════════════════════════════
+ORDER FLOW & SENTIMENT
+═══════════════════════════════════════════════════════════
+- Buy Volume: $${(orderFlow.buyVolume / 1e6).toFixed(1)}M, Sell Volume: $${(orderFlow.sellVolume / 1e6).toFixed(1)}M
+- Delta: ${(orderFlow.delta * 100).toFixed(1)}%, CVD: $${(orderFlow.cvd / 1e6).toFixed(1)}M
+- Large Orders: ${orderFlow.largeOrdersCount} (Buy $${(orderFlow.largeBuyVolume / 1e6).toFixed(1)}M / Sell $${(orderFlow.largeSellVolume / 1e6).toFixed(1)}M)
+- Sentiment Score: ${(sentiment.sentiment * 100).toFixed(0)}%, Momentum: ${(sentiment.momentum * 100).toFixed(0)}%
+- Influencer Mentions: ${sentiment.influencerMentions}
+
+═══════════════════════════════════════════════════════════
+MULTI-DIMENSIONAL INTELLIGENCE SCORE
+═══════════════════════════════════════════════════════════
+- Technical Score: ${intelligenceScore.technicalScore.toFixed(1)}%
+- Sentiment Score: ${intelligenceScore.sentimentScore.toFixed(1)}%
+- Flow Score: ${intelligenceScore.flowScore.toFixed(1)}%
+- Whale Score: ${intelligenceScore.whaleScore.toFixed(1)}%
+- Funding Score: ${intelligenceScore.fundingScore.toFixed(1)}%
+- Pattern Score: ${intelligenceScore.patternScore.toFixed(1)}%
+- OVERALL SCORE: ${intelligenceScore.overallScore.toFixed(1)}%
+- Intelligence Signals: ${intelligenceScore.signals.join(', ') || 'None'}
+
+═══════════════════════════════════════════════════════════
+CONFLUENCE ANALYSIS
+═══════════════════════════════════════════════════════════
 - Direction: ${bestDirection.toUpperCase()}
 - Confluence Score: ${bestConfluence.score.toFixed(1)}%
 - Recommendation: ${bestConfluence.recommendation.toUpperCase()}
@@ -609,17 +715,19 @@ Provide your analysis in this exact JSON format:
   "takeProfit2": number,
   "takeProfit3": number,
   "leverage": 1-10,
-  "reasoning": "detailed explanation including confluence factors",
+  "reasoning": "detailed explanation using ALL intelligence dimensions",
   "patterns": ["pattern1", "pattern2"],
-  "riskRewardRatio": number
+  "riskRewardRatio": number,
+  "intelligenceFactors": ["factor1", "factor2"]
 }
 
-CRITICAL RULES:
-1. Only suggest trades with R:R ratio >= 2:1
-2. Stop loss must be tight (max 3% for spot, 1.5% for leverage)
-3. Be VERY conservative - protect capital above all
-4. This signal has ALREADY passed confluence filtering (${bestConfluence.signals.length} indicators aligned)
-5. If no clear setup exists despite confluence, return hasSignal: false`;
+ULTRON DECISION RULES:
+1. Use volatility regime to set adaptive stops (${volatilityRegime.thresholdMultiplier}x normal)
+2. Favor trades aligned with smart money flow (${smartMoney.flowSignal})
+3. Beware of liquidation cascades near price
+4. Weight pattern confidence in final decision
+5. Only signal when OVERALL intelligence score > 60%
+6. This signal has ALREADY passed multi-layer filtering`;
 
       const response = await this.callClaude(analysisPrompt);
       

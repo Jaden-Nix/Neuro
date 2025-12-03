@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, forwardRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -112,69 +112,72 @@ function ConfidenceGauge({ confidence }: { confidence: number }) {
   );
 }
 
-function LivePriceCard({ token, onSelect }: { token: TokenWithPrice; onSelect: () => void }) {
-  const price = token.livePrice;
-  const changePercent = price?.changePercent24h || 0;
-  const isPositive = changePercent >= 0;
+const LivePriceCard = forwardRef<HTMLDivElement, { token: TokenWithPrice; onSelect: () => void }>(
+  function LivePriceCard({ token, onSelect }, ref) {
+    const price = token.livePrice;
+    const changePercent = price?.changePercent24h || 0;
+    const isPositive = changePercent >= 0;
 
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-    >
-      <Card 
-        className="cursor-pointer hover-elevate border-border/50 bg-card/50 backdrop-blur-sm"
-        onClick={onSelect}
-        data-testid={`token-card-${token.symbol}`}
+    return (
+      <motion.div
+        ref={ref}
+        layout
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        whileHover={{ scale: 1.02 }}
+        transition={{ duration: 0.2 }}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-bold text-lg" data-testid={`token-symbol-${token.symbol}`}>{token.symbol}</span>
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${CATEGORY_COLORS[token.category] || ""}`}>
-                  {CATEGORY_LABELS[token.category] || token.category}
-                </Badge>
+        <Card 
+          className="cursor-pointer hover-elevate border-border/50 bg-card/50 backdrop-blur-sm"
+          onClick={onSelect}
+          data-testid={`token-card-${token.symbol}`}
+        >
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-bold text-lg" data-testid={`token-symbol-${token.symbol}`}>{token.symbol}</span>
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${CATEGORY_COLORS[token.category] || ""}`}>
+                    {CATEGORY_LABELS[token.category] || token.category}
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground truncate">{token.name}</div>
               </div>
-              <div className="text-sm text-muted-foreground truncate">{token.name}</div>
+              
+              <div className="text-right flex-shrink-0">
+                <div className="font-mono font-semibold text-lg" data-testid={`token-price-${token.symbol}`}>
+                  ${price ? formatPrice(price.price) : "--"}
+                </div>
+                <div className={`flex items-center justify-end gap-1 text-sm ${isPositive ? "text-green-400" : "text-red-400"}`}>
+                  {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  <span data-testid={`token-change-${token.symbol}`}>{formatChange(changePercent)}</span>
+                </div>
+              </div>
             </div>
-            
-            <div className="text-right flex-shrink-0">
-              <div className="font-mono font-semibold text-lg" data-testid={`token-price-${token.symbol}`}>
-                ${price ? formatPrice(price.price) : "--"}
-              </div>
-              <div className={`flex items-center justify-end gap-1 text-sm ${isPositive ? "text-green-400" : "text-red-400"}`}>
-                {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                <span data-testid={`token-change-${token.symbol}`}>{formatChange(changePercent)}</span>
-              </div>
-            </div>
-          </div>
 
-          {price && (
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <div>
-                <div className="text-muted-foreground">24h High</div>
-                <div className="font-mono">${formatPrice(price.high24h)}</div>
+            {price && (
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div>
+                  <div className="text-muted-foreground">24h High</div>
+                  <div className="font-mono">${formatPrice(price.high24h)}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">24h Low</div>
+                  <div className="font-mono">${formatPrice(price.low24h)}</div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">Volume</div>
+                  <div className="font-mono">{formatVolume(price.volumeUsd24h)}</div>
+                </div>
               </div>
-              <div>
-                <div className="text-muted-foreground">24h Low</div>
-                <div className="font-mono">${formatPrice(price.low24h)}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Volume</div>
-                <div className="font-mono">{formatVolume(price.volumeUsd24h)}</div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+);
 
 function TokenDetailPanel({ token, onClose }: { token: TokenWithPrice; onClose: () => void }) {
   const { data: analysis, isLoading } = useQuery({

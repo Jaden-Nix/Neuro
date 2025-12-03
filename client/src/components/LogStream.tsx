@@ -87,11 +87,11 @@ function TypewriterText({ text, speed = 15, onComplete }: { text: string; speed?
 const LogEntryItem = forwardRef<HTMLDivElement, { log: LogEntry; isNew: boolean }>(
   function LogEntryItem({ log, isNew }, ref) {
     const [showTypewriter, setShowTypewriter] = useState(isNew);
-    const AgentIcon = agentIcons[log.agentType];
-    const LevelIcon = levelIcons[log.level];
-    const agentColorClass = agentColors[log.agentType];
-    const glowColorClass = agentGlowColors[log.agentType];
-    const levelColorClass = levelColors[log.level];
+    const AgentIcon = agentIcons[log.agentType] || Terminal;
+    const LevelIcon = levelIcons[log.level] || Info;
+    const agentColorClass = agentColors[log.agentType] || "text-muted-foreground bg-muted/10 border-muted/30";
+    const glowColorClass = agentGlowColors[log.agentType] || "shadow-muted/30";
+    const levelColorClass = levelColors[log.level] || "text-muted-foreground";
 
     const formatTimestamp = (timestamp: number) => {
       const date = new Date(timestamp);
