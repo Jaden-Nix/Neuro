@@ -31,8 +31,10 @@ import {
   LineChart,
   ArrowRight,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Link2
 } from "lucide-react";
+import { EvolutionProofs } from "@/components/EvolutionProofs";
 
 interface MutationType {
   type: string;
@@ -1009,7 +1011,7 @@ export default function Evolution() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-3">
+        <TabsList className="grid w-full max-w-xl grid-cols-4">
           <TabsTrigger value="timeline" data-testid="tab-evolution-timeline">
             <Activity className="w-4 h-4 mr-2" />
             Timeline
@@ -1021,6 +1023,10 @@ export default function Evolution() {
           <TabsTrigger value="heatmap" data-testid="tab-evolution-heatmap">
             <Flame className="w-4 h-4 mr-2" />
             Heatmap
+          </TabsTrigger>
+          <TabsTrigger value="onchain" data-testid="tab-evolution-onchain">
+            <Link2 className="w-4 h-4 mr-2" />
+            On-Chain
           </TabsTrigger>
         </TabsList>
 
@@ -1116,6 +1122,10 @@ export default function Evolution() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="onchain" className="mt-6">
+          <EvolutionProofs />
         </TabsContent>
       </Tabs>
     </div>
