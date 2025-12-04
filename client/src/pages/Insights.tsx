@@ -703,7 +703,7 @@ export default function Insights() {
           </TabsList>
         </div>
 
-        <TabsContent value="opportunities" className="flex-1 m-0 p-4">
+        <TabsContent value="opportunities" className="flex-1 m-0 p-4 overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
               <div className="flex items-center gap-4 flex-wrap">
@@ -741,18 +741,18 @@ export default function Insights() {
               </ScrollArea>
             </div>
 
-            <Card className="overflow-hidden">
-              <CardHeader className="border-b bg-muted/30">
+            <Card className="flex flex-col overflow-hidden">
+              <CardHeader className="border-b bg-muted/30 shrink-0">
                 <CardTitle className="text-sm">Agent Analysis</CardTitle>
               </CardHeader>
-              <ScrollArea className="h-[calc(100vh-400px)]">
+              <ScrollArea className="flex-1">
                 {renderOpportunityDetails()}
               </ScrollArea>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="patterns" className="flex-1 m-0 p-4">
+        <TabsContent value="patterns" className="flex-1 m-0 p-4 overflow-hidden">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
               <div className="flex items-center gap-4 flex-wrap">
@@ -818,11 +818,11 @@ export default function Insights() {
               </ScrollArea>
             </div>
 
-            <Card className="overflow-hidden">
-              <CardHeader className="border-b bg-muted/30">
+            <Card className="flex flex-col overflow-hidden">
+              <CardHeader className="border-b bg-muted/30 shrink-0">
                 <CardTitle className="text-sm">Insight Details</CardTitle>
               </CardHeader>
-              <ScrollArea className="h-[calc(100vh-400px)]">
+              <ScrollArea className="flex-1">
                 {renderInsightDetails()}
               </ScrollArea>
             </Card>
