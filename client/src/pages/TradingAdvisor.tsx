@@ -748,10 +748,9 @@ export default function TradingAdvisor() {
     refetchInterval: 60000,
   });
 
-  const { data: airdrops = [], isLoading: airdropsLoading } = useQuery<AirdropOpportunity[]>({
-    queryKey: ["/api/airdrops"],
-    refetchInterval: 120000,
-  });
+  // Airdrops temporarily disabled - will be re-enabled later
+  const airdrops: AirdropOpportunity[] = [];
+  const airdropsLoading = false;
 
   const { data: outcomes = [] } = useQuery<TradeOutcome[]>({
     queryKey: ["/api/trading/outcomes"],
@@ -859,7 +858,7 @@ export default function TradingAdvisor() {
             Trading Advisor
           </h1>
           <p className="text-muted-foreground mt-1">
-            AI-powered trading signals, market analysis, and airdrop opportunities
+            AI-powered trading signals and real-time market analysis
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -911,7 +910,7 @@ export default function TradingAdvisor() {
       {performance && <PerformanceMetrics performance={performance} />}
 
       <Tabs defaultValue="village" className="space-y-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
           <TabsTrigger value="village" className="flex items-center gap-2" data-testid="tab-village">
             <Sparkles className="h-4 w-4" />
             AI Village
@@ -929,13 +928,6 @@ export default function TradingAdvisor() {
             Signals
             {activeSignals.length > 0 && (
               <Badge variant="secondary" className="ml-1">{activeSignals.length}</Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="airdrops" className="flex items-center gap-2" data-testid="tab-airdrops">
-            <Gift className="h-4 w-4" />
-            Airdrops
-            {activeAirdrops.length > 0 && (
-              <Badge variant="secondary" className="ml-1">{activeAirdrops.length}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2" data-testid="tab-history">
@@ -1145,30 +1137,6 @@ export default function TradingAdvisor() {
                   />
                 ))}
               </AnimatePresence>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="airdrops" className="space-y-4">
-          {airdropsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : activeAirdrops.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Gift className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Active Airdrops</h3>
-                <p className="text-muted-foreground text-center">
-                  Check back soon for new airdrop opportunities
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {activeAirdrops.map((airdrop) => (
-                <AirdropCard key={airdrop.id} airdrop={airdrop} />
-              ))}
             </div>
           )}
         </TabsContent>

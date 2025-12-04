@@ -81,38 +81,43 @@ export class TradingIntelligenceService {
   }
 
   private startLiveAirdropDiscovery(): void {
-    console.log("[AirdropScout] Starting LIVE airdrop discovery - no static data");
+    // Airdrop discovery temporarily disabled - will be re-enabled later
+    console.log("[AirdropScout] Airdrop discovery disabled - feature paused for improvements");
+    this.airdrops.clear();
     
-    setTimeout(() => this.discoverCurrentAirdrops(), 5000);
-    
-    setInterval(() => this.discoverCurrentAirdrops(), 3 * 60 * 1000);
+    // Commented out for now:
+    // setTimeout(() => this.discoverCurrentAirdrops(), 5000);
+    // setInterval(() => this.discoverCurrentAirdrops(), 3 * 60 * 1000);
   }
 
   private async discoverCurrentAirdrops(): Promise<void> {
     console.log("[AirdropScout] Discovering live December 2025 airdrops via AI...");
     
-    const discoveryPrompt = `You are an elite DeFi airdrop researcher with real-time market knowledge. It is December 2025.
+    const discoveryPrompt = `You are an elite DeFi airdrop researcher. Today is December 4, 2025.
 
-CRITICAL: Only list airdrops that are ACTIVELY running RIGHT NOW in December 2025. NO old, ended, or historical airdrops.
+Focus on UNDERRATED and EMERGING opportunities that most farmers overlook. Avoid suggesting the most hyped/obvious airdrops that everyone knows about.
 
-Find the TOP 5 highest-value airdrop opportunities that users can farm TODAY. Focus on:
-1. L2s launching tokens soon (Monad, Berachain, MegaETH, etc.)
-2. DEXs with active points programs (Jupiter, Hyperliquid, etc.)
-3. Lending protocols with ongoing campaigns
-4. New chains with testnet/mainnet incentives
-5. Projects with major VC backing but no token yet
+SKIP these overfarmed opportunities (everyone already knows): Scroll, Berachain, Monad, Hyperliquid, LayerZero, zkSync Era, Starknet
 
-For each, provide:
-- Exact actions users should take NOW
-- Estimated value based on similar recent airdrops
-- Urgency level (some snapshots may be imminent)
+Instead find 5 HIDDEN GEMS:
+1. Lesser-known L2s/L3s with active testnets (Eclipse, Fuel, Aztec, Taiko, etc.)
+2. New Solana ecosystem DEXs or protocols with points (not Jupiter - already known)
+3. DeFi protocols on newer chains (Sui, Aptos, Sei) with ongoing incentives
+4. Intent-based or chain abstraction protocols (Across, Socket, etc.)
+5. New AI x Crypto projects with token plans
+6. Restaking/liquid staking protocols beyond the obvious ones
 
-Return ONLY valid JSON array (no markdown):
+For each opportunity:
+- Why it's a hidden gem (not widely farmed)
+- Specific actions to take NOW
+- Realistic value estimate
+
+Return ONLY valid JSON array:
 [
   {
     "protocolName": "string",
     "protocolUrl": "string",
-    "chain": "ethereum"|"solana"|"base"|"arbitrum"|"optimism"|"other",
+    "chain": "ethereum"|"solana"|"base"|"arbitrum"|"optimism"|"sui"|"aptos"|"other",
     "category": "retro"|"non_retro"|"testnet",
     "isRetro": boolean,
     "estimatedValue": "$X-$Y",
@@ -123,60 +128,67 @@ Return ONLY valid JSON array (no markdown):
     "fundingRound": "string",
     "investors": ["investor1"],
     "urgency": "urgent"|"high"|"medium"|"low",
-    "snapshotDate": "if known, or 'TBA'",
-    "whyNow": "why this is hot in Dec 2025"
+    "snapshotDate": "TBA",
+    "whyNow": "why this is a hidden gem worth farming"
   }
 ]`;
 
     try {
       console.log("[AirdropScout] Using Gemini for faster discovery...");
       let response: string;
+      let usedClaude = false;
       try {
         response = await this.callGemini(discoveryPrompt);
+        console.log("[AirdropScout] Gemini response length:", response.length);
       } catch (geminiErr) {
         console.log("[AirdropScout] Gemini failed, falling back to Claude...");
         response = await this.callClaude(discoveryPrompt);
+        usedClaude = true;
+        console.log("[AirdropScout] Claude response length:", response.length);
       }
+      
+      console.log("[AirdropScout] AI response preview:", response.substring(0, 500));
       
       let discovered: any[] = [];
       
-      const objectMatches = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
-      if (objectMatches) {
-        for (const objStr of objectMatches) {
-          try {
-            const cleaned = objStr
-              .replace(/,\s*}/g, '}')
-              .replace(/,\s*]/g, ']')
-              .replace(/[\x00-\x1F\x7F]/g, ' ')
-              .replace(/\n/g, ' ');
-            const obj = JSON.parse(cleaned);
-            if (obj.protocolName) {
-              discovered.push(obj);
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-      }
-      
-      if (discovered.length === 0) {
+      const jsonArrayMatch = response.match(/\[\s*\{[\s\S]*?\}\s*\]/);
+      if (jsonArrayMatch) {
         try {
-          const jsonMatch = response.match(/\[[\s\S]*\]/);
-          if (jsonMatch) {
-            const cleanJson = jsonMatch[0]
-              .replace(/,\s*]/g, ']')
-              .replace(/,\s*}/g, '}')
-              .replace(/[\x00-\x1F\x7F]/g, ' ')
-              .replace(/\n/g, ' ');
-            discovered = JSON.parse(cleanJson);
-          }
+          const cleanJson = jsonArrayMatch[0]
+            .replace(/,\s*]/g, ']')
+            .replace(/,\s*}/g, '}')
+            .replace(/[\x00-\x1F\x7F]/g, ' ');
+          discovered = JSON.parse(cleanJson);
+          console.log("[AirdropScout] Parsed array of", discovered.length, "items");
         } catch (e) {
-          console.log("[AirdropScout] All JSON parsing methods failed");
+          console.log("[AirdropScout] Array parse failed, trying object extraction");
         }
       }
       
       if (discovered.length === 0) {
-        console.log("[AirdropScout] No valid airdrops parsed from AI response");
+        const objectMatches = response.match(/\{[^{}]*"protocolName"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
+        if (objectMatches) {
+          console.log("[AirdropScout] Found", objectMatches.length, "potential objects");
+          for (const objStr of objectMatches) {
+            try {
+              const cleaned = objStr
+                .replace(/,\s*}/g, '}')
+                .replace(/,\s*]/g, ']')
+                .replace(/[\x00-\x1F\x7F]/g, ' ')
+                .replace(/\n/g, ' ');
+              const obj = JSON.parse(cleaned);
+              if (obj.protocolName) {
+                discovered.push(obj);
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+      
+      if (discovered.length === 0) {
+        console.log("[AirdropScout] No valid airdrops parsed. Full response:", response.substring(0, 1000));
         return;
       }
       
