@@ -8,6 +8,7 @@ import type {
   TokenCategory 
 } from '@shared/schema';
 import { coinGeckoClient } from './CoinGeckoClient';
+import { cryptoCompareClient } from './CryptoCompareClient';
 
 const FALLBACK_PRICES: Record<string, number> = {
   'BTC': 92000, 'ETH': 3180, 'SOL': 145, 'XRP': 2.35, 'BNB': 640,
@@ -371,14 +372,20 @@ export class CCXTAdapter extends EventEmitter {
           this.priceCache.set(`${symbol}:${exchange}`, { price, timestamp: Date.now() });
         }
         
-        if (results.size >= symbols.length * 0.7) break;
+        if (results.size >= symbols.length * 0.7) {
+          console.log(`[CCXT] Got ${results.size}/${symbols.length} prices from exchanges, stopping early`);
+          break;
+        }
       } catch (error) {
         continue;
       }
     }
     
+    console.log(`[CCXT] After exchanges: ${results.size}/${symbols.length} prices found`);
+    
     const missingSymbols = symbols.filter(s => !results.has(s));
     if (missingSymbols.length > 0) {
+      console.log(`[CCXT] Missing ${missingSymbols.length} after exchanges, trying CoinGecko: ${missingSymbols.slice(0, 5).join(', ')}${missingSymbols.length > 5 ? '...' : ''}`);
       try {
         const geckoPrices = await coinGeckoClient.getCurrentPrice(missingSymbols);
         for (const [symbol, priceValue] of Object.entries(geckoPrices)) {
@@ -403,15 +410,35 @@ export class CCXTAdapter extends EventEmitter {
       }
     }
     
+    let cachedCount = 0;
     for (const symbol of symbols) {
       if (!results.has(symbol)) {
         for (const exchange of EXCHANGE_PRIORITY) {
           const cached = this.priceCache.get(`${symbol}:${exchange}`);
           if (cached && Date.now() - cached.timestamp < this.CACHE_TTL * 10) {
             results.set(symbol, cached.price);
+            cachedCount++;
             break;
           }
         }
+      }
+    }
+    if (cachedCount > 0) {
+      console.log(`[CCXT] Used ${cachedCount} cached prices`);
+    }
+    
+    const stillMissing = symbols.filter(s => !results.has(s));
+    if (stillMissing.length > 0) {
+      console.log(`[CCXT] Still missing ${stillMissing.length} tokens after all providers, trying CryptoCompare: ${stillMissing.slice(0, 10).join(', ')}${stillMissing.length > 10 ? '...' : ''}`);
+      try {
+        const cryptoComparePrices = await cryptoCompareClient.fetchPrices(stillMissing);
+        for (const [symbol, price] of cryptoComparePrices) {
+          if (!results.has(symbol)) {
+            results.set(symbol, price);
+            this.lastPrices.set(symbol, price.price);
+          }
+        }
+      } catch {
       }
     }
     
@@ -428,7 +455,7 @@ export class CCXTAdapter extends EventEmitter {
             low24h: fallbackPrice,
             volume24h: 0,
             volumeUsd24h: 0,
-            exchange: 'coinbase' as SupportedExchange,
+            exchange: 'kucoin' as SupportedExchange,
             timestamp: Date.now(),
           };
           results.set(symbol, price);
@@ -481,9 +508,13 @@ export class CCXTAdapter extends EventEmitter {
     const fetchBatch = async () => {
       const tokens = this.getActiveTokens();
       const batchSize = 20;
+      const totalBatches = Math.ceil(tokens.length / batchSize);
+      console.log(`[CCXT] Fetching ${tokens.length} tokens in ${totalBatches} batches`);
       
       for (let i = 0; i < tokens.length; i += batchSize) {
+        const batchNum = Math.floor(i / batchSize) + 1;
         const batch = tokens.slice(i, i + batchSize);
+        console.log(`[CCXT] Processing batch ${batchNum}/${totalBatches}: ${batch.slice(0, 3).join(', ')}...`);
         try {
           const prices = await this.fetchMultiplePrices(batch);
           
