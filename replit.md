@@ -6,17 +6,27 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
 
 ## Recent Changes (December 2025)
 
+- **LIVE AI Airdrop Discovery**: Pure AI-driven airdrop discovery with NO static/seeded data:
+  - **Gemini + Claude Hybrid**: Gemini for fast discovery, Claude as fallback for reliability
+  - **Robust JSON Parsing**: Multi-strategy extraction handles malformed AI responses
+  - **Current Discoveries**: Berachain ($3k-$8k), Monad ($2.5k-$6k), Hyperliquid ($4k-$12k), Scroll ($1.5k-$4k)
+  - **Auto-refresh**: Discovery runs every 3 minutes to catch new opportunities
+
+- **Trading Signal Generation & Validation**:
+  - **5+ Active Signals**: BTC, ETH, SOL, AVAX, OP with detailed reasoning
+  - **Agent Debates**: Each signal is validated by 3+ agents who agree/disagree with comments
+  - **Technical Analysis**: Pattern recognition, RSI, MACD, volume, key levels
+  - **Risk Management**: Entry, stop-loss, 3 take-profit levels, position sizing
+
+- **Agent Evolution System (Active)**:
+  - Auto-evolution every 60 seconds (Arbiter_v2 → Arbiter_v3, Atlas_v2 → Atlas_v3)
+  - Mutations: risk_rebalancing, volatility_adaptation, confidence_calibration
+  - On-chain badge queuing via BlockchainSyncService
+
 - **Hybrid AI System**: Full integration of both Gemini and Claude AI for different agent roles:
   - **Gemini AI** (via Replit AI Integrations): Scout and Execution agents for fast, real-time analysis
   - **Claude AI** (via Replit AI Integrations): Risk and Meta agents for complex reasoning and strategic decisions
   - **HybridAIService**: Intelligent routing between providers with automatic fallback, rate limiting (p-limit), and retry logic (p-retry)
-  - **AI-Powered Airdrop Discovery**: AirdropScout uses Claude to discover current December 2025 airdrop opportunities (Berachain, Hyperliquid, Monad, etc.)
-  - **Real Trading Signals**: Agents generate actionable signals with entry, stop-loss, and take-profit levels
-
-- **December 2025 Airdrop Database**: Updated with current active opportunities:
-  - LayerZero V2 (multi-chain), Starknet Ecosystem, Scroll Mainnet, Linea Network
-  - Meteora Season 2 (Solana), Abstract Chain, Axiom (Solana), Hylo Finance
-  - AI discovery pipeline adds new opportunities: Berachain, Hyperliquid, Monad
 
 - **Ultron Signals - Live Price Streaming**: Real-time price streaming for 103 tokens across 9 exchanges (KuCoin, MEXC, Gate, Bitget, Kraken, Bybit, OKX, Coinbase, Huobi). Features:
   - **CCXT Multi-Exchange Adapter**: Unified interface for fetching live prices with intelligent fallback chain

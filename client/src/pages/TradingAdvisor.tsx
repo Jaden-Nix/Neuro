@@ -709,10 +709,39 @@ export default function TradingAdvisor() {
   const [selectedExchange, setSelectedExchange] = useState<string>("all");
   const [selectedSymbol, setSelectedSymbol] = useState<string>("BTC-USD");
 
-  const { data: signals = [], isLoading: signalsLoading, refetch: refetchSignals } = useQuery<TradingSignal[]>({
-    queryKey: ["/api/trading/signals"],
-    refetchInterval: 30000,
+  const { data: villageSignals = [], isLoading: signalsLoading, refetch: refetchSignals } = useQuery<any[]>({
+    queryKey: ["/api/village/signals"],
+    refetchInterval: 15000,
   });
+
+  const signals = villageSignals.map(s => ({
+    id: s.id,
+    symbol: s.symbol,
+    direction: s.direction,
+    entryPrice: s.entry,
+    stopLoss: s.stopLoss,
+    takeProfit1: s.takeProfit1,
+    takeProfit2: s.takeProfit2,
+    takeProfit3: s.takeProfit3,
+    confidence: s.confidence,
+    timeframe: s.timeframe,
+    exchange: "hyperliquid",
+    reasoning: s.reasoning,
+    indicators: {
+      rsi: 50,
+      macd: { line: 0, signal: 0, histogram: 0 },
+      ema20: 0,
+      ema50: 0,
+      volume24h: 0,
+      volatility: 0
+    },
+    status: s.status || "active",
+    createdAt: s.createdAt,
+    expiresAt: s.createdAt + 86400000,
+    agentId: s.agentId,
+    agentName: s.agentName,
+    validators: s.validators || []
+  } as TradingSignal & { agentName?: string; validators?: any[] }));
 
   const { data: performance, isLoading: performanceLoading } = useQuery<TradingPerformance>({
     queryKey: ["/api/trading/performance"],
@@ -754,7 +783,7 @@ export default function TradingAdvisor() {
       return res.json() as Promise<TradingSignal | { message: string }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trading/signals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/village/signals"] });
       if ("id" in data) {
         toast({
           title: "New Signal Generated",
@@ -784,7 +813,7 @@ export default function TradingAdvisor() {
       return res.json() as Promise<{ signals: TradingSignal[]; count: number }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trading/signals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/village/signals"] });
       toast({
         title: "Market Scan Complete",
         description: `Found ${data.count} trading opportunities`,
@@ -801,7 +830,7 @@ export default function TradingAdvisor() {
       return res.json() as Promise<TradeOutcome>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trading/signals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/village/signals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trading/outcomes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trading/performance"] });
       const profit = data.profitLossPercent;

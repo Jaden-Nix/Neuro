@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import pLimit from "p-limit";
 import pRetry from "p-retry";
 import { 
@@ -36,6 +37,10 @@ import {
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
+});
+
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GOOGLE_AI_API_KEY,
 });
 
 const limit = pLimit(2);
@@ -124,15 +129,58 @@ Return ONLY valid JSON array (no markdown):
 ]`;
 
     try {
-      const response = await this.callClaude(discoveryPrompt);
+      console.log("[AirdropScout] Using Gemini for faster discovery...");
+      let response: string;
+      try {
+        response = await this.callGemini(discoveryPrompt);
+      } catch (geminiErr) {
+        console.log("[AirdropScout] Gemini failed, falling back to Claude...");
+        response = await this.callClaude(discoveryPrompt);
+      }
       
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.log("[AirdropScout] No valid JSON in discovery response");
+      let discovered: any[] = [];
+      
+      const objectMatches = response.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
+      if (objectMatches) {
+        for (const objStr of objectMatches) {
+          try {
+            const cleaned = objStr
+              .replace(/,\s*}/g, '}')
+              .replace(/,\s*]/g, ']')
+              .replace(/[\x00-\x1F\x7F]/g, ' ')
+              .replace(/\n/g, ' ');
+            const obj = JSON.parse(cleaned);
+            if (obj.protocolName) {
+              discovered.push(obj);
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+      }
+      
+      if (discovered.length === 0) {
+        try {
+          const jsonMatch = response.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            const cleanJson = jsonMatch[0]
+              .replace(/,\s*]/g, ']')
+              .replace(/,\s*}/g, '}')
+              .replace(/[\x00-\x1F\x7F]/g, ' ')
+              .replace(/\n/g, ' ');
+            discovered = JSON.parse(cleanJson);
+          }
+        } catch (e) {
+          console.log("[AirdropScout] All JSON parsing methods failed");
+        }
+      }
+      
+      if (discovered.length === 0) {
+        console.log("[AirdropScout] No valid airdrops parsed from AI response");
         return;
       }
       
-      const discovered = JSON.parse(jsonMatch[0]);
+      console.log(`[AirdropScout] Successfully parsed ${discovered.length} airdrops from AI`);
       const now = Date.now();
       
       for (const item of discovered) {
@@ -1209,6 +1257,26 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
           retries: 3,
           minTimeout: 2000,
           maxTimeout: 10000,
+          factor: 2,
+        }
+      )
+    );
+  }
+
+  private async callGemini(prompt: string): Promise<string> {
+    return limit(() =>
+      pRetry(
+        async () => {
+          const response = await gemini.models.generateContent({
+            model: "gemini-2.0-flash",
+            contents: prompt,
+          });
+          return response.text || "";
+        },
+        {
+          retries: 2,
+          minTimeout: 1000,
+          maxTimeout: 5000,
           factor: 2,
         }
       )
