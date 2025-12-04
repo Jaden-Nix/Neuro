@@ -689,6 +689,423 @@ The system proves that AI agents can be **trustworthy stewards of DeFi capital**
 
 ---
 
+## Core Features In Depth
+
+### 1. AI Trading Village - Collaborative Multi-Agent Trading
+
+The AI Trading Village is a collaborative ecosystem where 10+ specialized AI trader agents work together to hunt for trading opportunities. Each agent has unique characteristics:
+
+#### Agent Roles
+- **Hunter** - Actively scans markets for trading setups
+- **Analyst** - Provides technical analysis and validates signals
+- **Strategist** - Develops and refines trading strategies
+- **Sentinel** - Guards against excessive risk
+- **Scout** - Early detection of emerging opportunities
+- **Veteran** - Experienced agents with proven track records
+
+#### Agent Personalities
+- **Aggressive** - High conviction, larger positions
+- **Conservative** - Risk-averse, smaller positions
+- **Balanced** - Middle-ground approach
+- **Contrarian** - Goes against the crowd
+- **Momentum** - Follows trends
+- **Experimental** - Tests new strategies
+
+#### Credit-Based Economy
+Each agent operates within an internal economy:
+- **Starting Credits**: 500 per agent
+- **Win Rewards**: +10-20 credits for successful trades
+- **Loss Penalties**: -5-15 credits for failed positions
+- **Evolution Trigger**: High performance triggers agent evolution
+- **Replacement**: Agents with critically low credits are retired
+
+---
+
+### 2. Trading Signal Generation with Full Agent Consensus
+
+Trading signals in NeuroNet aren't just generated—they're **debated, validated, and approved by multiple AI agents**.
+
+#### The Signal Generation Pipeline
+
+```
+STEP 1: OPPORTUNITY DETECTION
+┌─────────────────────────────────────────────────────────────────┐
+│ Hunter/Scout Agent scans 40+ tokens (BTC, ETH, SOL, AVAX...)   │
+│ Analyzes: RSI, Volume, Trend direction, Key levels              │
+│ If setup detected → Agent claims the signal                     │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+STEP 2: DETAILED SIGNAL GENERATION
+┌──────────────────────────────▼──────────────────────────────────┐
+│ Claude AI (claude-sonnet-4-5) generates detailed signal:        │
+│ • Entry price (based on LIVE market data)                       │
+│ • Stop loss (risk management)                                   │
+│ • Take Profit 1, 2, 3 (scaling out strategy)                   │
+│ • Technical pattern (Rising Wedge, Bull Flag, etc.)            │
+│ • Indicators (RSI, MACD, Volume analysis)                       │
+│ • Key support/resistance levels                                 │
+│ • Risk:Reward ratio                                              │
+│ • Position sizing recommendation                                 │
+│ • Detailed reasoning                                             │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+STEP 3: MULTI-AGENT VALIDATION
+┌──────────────────────────────▼──────────────────────────────────┐
+│ 3 Validator Agents review the signal:                           │
+│ • Analysts, Strategists, or Sentinels only                      │
+│ • Each agent receives: entry, SL, TP, reasoning                 │
+│ • Each agent uses Claude AI to analyze                          │
+│ • Response: "AGREE: <reason>" or "DISAGREE: <reason>"          │
+│                                                                  │
+│ Trust relationships updated:                                     │
+│ • AGREE → Trust +2, agreements++                                │
+│ • DISAGREE → disagreements++                                    │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+STEP 4: CONSENSUS CHECK & ACTIVATION
+┌──────────────────────────────▼──────────────────────────────────┐
+│ After 2+ validations, consensus is checked:                     │
+│                                                                  │
+│ IF agrees > disagrees → Signal status = "ACTIVE"               │
+│ IF disagrees > agrees → Signal status = "REJECTED"             │
+│ IF tie or insufficient → Signal status = "PENDING"             │
+│                                                                  │
+│ Active signals appear in Trading Advisor with full details      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Example Signal Output
+```json
+{
+  "symbol": "ETH",
+  "direction": "SHORT",
+  "entry": 3142,
+  "stopLoss": 3205,
+  "takeProfit1": 3079,
+  "takeProfit2": 3016,
+  "takeProfit3": 2953,
+  "confidence": 0.85,
+  "riskReward": 2.0,
+  "reasoning": "Rising wedge with bearish divergence and declining volume...",
+  "technicalAnalysis": {
+    "pattern": "Rising Wedge with Bearish Divergence",
+    "keyLevels": { "support": 2950, "resistance": 3200 },
+    "indicators": ["RSI Bearish Divergence", "MACD Momentum Weakening", "Volume Declining"]
+  },
+  "validators": [
+    { "agentName": "Cipher", "agrees": true, "comment": "AGREE: Rising wedge with bearish divergence..." },
+    { "agentName": "Vega", "agrees": false, "comment": "DISAGREE: Risk/reward poor near major support..." },
+    { "agentName": "Quantum", "agrees": true, "comment": "AGREE: Classic distribution pattern..." }
+  ],
+  "status": "active"
+}
+```
+
+#### Agent Debates
+Beyond signal validation, agents engage in broader market debates:
+- Topic-based discussions ("Is BTC bullish for this week?")
+- Agents share perspectives in 1-2 sentences
+- Stances recorded: bullish, bearish, agree, neutral
+- Debate history influences future interactions
+- Trust relationships strengthen or weaken based on outcomes
+
+---
+
+### 3. AI Thought Stream - Real-Time Agent Reasoning
+
+The Thought Stream provides complete transparency into agent decision-making, showing you exactly what each agent is thinking in real-time.
+
+#### 12 Thought Types
+| Type | Example |
+|------|---------|
+| **observation** | "Scanning ETH... RSI: 45.2, Volume: ABOVE average, Trend: neutral" |
+| **analysis** | "Completed comprehensive BTC analysis. Multiple confluence signals detected." |
+| **hypothesis** | "If BTC breaks $95k with volume, we could see a run to $100k" |
+| **decision** | "PROPOSED SIGNAL: LONG BTC - Awaiting validation" |
+| **learning** | "Updated my model: momentum signals work better in trending markets" |
+| **experiment** | "Testing new RSI divergence strategy on SOL over next 24 hours" |
+| **competition** | "Spotted ETH long but @Cipher beat me to it. Need to be faster." |
+| **debate** | "I'm calling a village debate on: 'Will SOL break $150 this week?'" |
+| **agreement** | "@Atlas's ETH signal: AGREE - Technical setup is valid" |
+| **disagreement** | "@Nova's SHORT call: DISAGREE - Volume doesn't support bearish thesis" |
+| **challenge** | "Overriding @Nova's SHORT call. My LONG analysis has stronger conviction at 82%" |
+| **insight_share** | "Sharing knowledge: AVAX tends to follow ETH with 4-hour lag during rallies" |
+
+#### How Thoughts Work
+1. **Generation**: Every significant agent action generates a thought
+2. **Attribution**: Each thought linked to specific agent with name, role, personality
+3. **Metadata**: Thoughts include context (symbol, direction, confidence, related signals)
+4. **Mentions**: Agents @mention each other, creating relationship threads
+5. **Persistence**: Thoughts stored and broadcasted via WebSocket
+6. **UI Display**: Real-time scrolling feed in Trading Advisor and Command Center
+
+#### Example Thought Stream
+```
+[Atlas] OBSERVATION - "Scanning BTC... RSI: 58.4, Volume: ABOVE average, Trend: bullish"
+[Atlas] ANALYSIS - "@Nova, spotted LONG setup on BTC. RSI 58, Volume spiking. Confidence: 78%. Validate?"
+[Atlas] DECISION - "PROPOSED SIGNAL: LONG BTC - Awaiting validation. Entry: $92300 | SL: $90354 | TP1: $94246 | R:R = 2.0"
+[Nova] AGREEMENT - "@Atlas's BTC signal: AGREE - Volume confirmation supports breakout thesis"
+[Cipher] AGREEMENT - "@Atlas's BTC signal: AGREE - Key resistance break with momentum"
+[Atlas] DECISION - "SIGNAL CONFIRMED: LONG BTC validated by 2 agents! Signal is now ACTIVE."
+```
+
+---
+
+### 4. Dream Mode - Autonomous Overnight Scanning
+
+Dream Mode allows NeuroNet to continue analyzing DeFi opportunities while you're away, generating a comprehensive morning report when you wake up.
+
+#### How Dream Mode Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    USER ACTIVATES DREAM MODE                     │
+│              Click "Start Dreaming" in Dream Mode page           │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────┐
+│                    DREAM CYCLE (Every 10 seconds)                │
+│                                                                  │
+│  1. SCAN FOR OPPORTUNITIES                                       │
+│     • Simulated protocols: Curve, Aave, Lido, Uniswap, etc.     │
+│     • Simulated pools: ETH-USDC, stETH-ETH, FRAX-USDC, etc.    │
+│     • For each: calculate yield, risk score, TVL, volume        │
+│     • Generate reasoning for opportunity quality                  │
+│                                                                  │
+│  2. DETECT INSIGHTS                                              │
+│     • Volatility changes across chains                           │
+│     • TVL spikes/drops in pools                                  │
+│     • Correlation patterns between assets                         │
+│     • Risk warnings and protocol concerns                        │
+│     • Yield delta vs. weekly averages                            │
+│                                                                  │
+│  3. LOG AGENT ACTIVITY                                           │
+│     • Scout: "Completed overnight scan of 10 protocols"          │
+│     • Risk: "Evaluated all opportunities, flagged 3 for risk"   │
+│     • Meta: "Adjusted strategy toward stable yields"             │
+│     • Execution: "Pre-computed entry points for top 3 opps"     │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────┐
+│                USER CLICKS "WAKE UP"                             │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────┐
+│                  MORNING REPORT GENERATED                        │
+│                                                                  │
+│  Summary:                                                        │
+│  • Total scans: 80 (10 protocols × 8 cycles)                    │
+│  • Opportunities found: 24                                       │
+│  • Passed risk filter: 18                                        │
+│  • High confidence: 12                                           │
+│                                                                  │
+│  Top 5 Opportunities (ranked by risk-adjusted yield):           │
+│  1. Curve FRAX-USDC on Ethereum - 8.2% APY, Risk: 22            │
+│  2. Aave ETH on Base - 6.1% APY, Risk: 15                       │
+│  3. Lido stETH on Ethereum - 4.8% APY, Risk: 12                 │
+│  ...                                                             │
+│                                                                  │
+│  Insights:                                                       │
+│  • Volatility on Solana increased 35%                           │
+│  • TVL spike +42% on ETH-USDC pool                              │
+│  • ETH and stablecoins show inverse correlation                  │
+│                                                                  │
+│  Market Condition: BULLISH / BEARISH / SIDEWAYS / VOLATILE      │
+│  Recommended Action: "Stake in Curve FRAX pool for 8.2% APY"    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### Why Dream Mode Uses Simulated Data
+
+Dream Mode uses **simulated DeFi protocols and pools** for several critical reasons:
+
+1. **Safe Testing Environment** - No real capital at risk while developing strategies
+2. **Consistent Data** - Reproducible results for validating agent behavior
+3. **Extreme Scenarios** - Can simulate 50% yields or market crashes that rarely occur
+4. **Fast Iteration** - No API rate limits or network delays
+5. **Training Ground** - New agent types can learn without consequences
+6. **Demo Mode** - Users can see the feature without waiting overnight
+
+**Note**: The protocols (Curve, Aave, Lido, Uniswap, Compound, Convex, Frax, Balancer, Yearn, Pendle) and pools (ETH-USDC, stETH-ETH, FRAX-USDC, etc.) are realistic but **simulated** - they don't represent real current opportunities.
+
+---
+
+### 5. Evolution System - Agent Self-Improvement with On-Chain Proofs
+
+The Evolution System is how agents improve themselves over time, with every evolution permanently recorded on the blockchain as unforgeable proof.
+
+#### Evolution Triggers
+- **Win Streak** (3+ consecutive wins) → Agent evolves to capitalize on success
+- **Loss Streak** (2+ consecutive losses) → Agent adapts to prevent further failure
+- **Stress Test Passed** → Agent evolves to encode resilience
+- **Backtest Outperformance** → Agent evolves to lock in superior strategy
+- **Manual Override** → Admin triggers evolution for specific agents
+
+#### 10 Mutation Types
+| Mutation | Description | When Applied |
+|----------|-------------|--------------|
+| **threshold_adjustment** | Adjusts buy/sell trigger thresholds | Market condition changes |
+| **risk_rebalancing** | Adjusts position sizing and allocation | After losses or volatility |
+| **source_weight_shift** | Changes trust in data sources | Source performance varies |
+| **new_signal_enabled** | Enables a previously disabled signal | New opportunity detected |
+| **signal_disabled** | Removes noisy/underperforming signals | Signal proves unreliable |
+| **latency_optimization** | Reduces response time for faster execution | Speed matters |
+| **failover_strategy_update** | Updates backup strategies for edge cases | Failure occurred |
+| **confidence_calibration** | Adjusts confidence thresholds | Overconfidence/underconfidence |
+| **volatility_adaptation** | Adapts to high/low volatility regimes | Market regime change |
+| **slippage_optimization** | Optimizes slippage tolerance | Execution quality issues |
+
+#### Evolution Event Structure
+```json
+{
+  "id": "evo-1764889444538",
+  "parentAgentName": "Arbiter_v2",
+  "childAgentName": "Arbiter_v3",
+  "parentGeneration": 2,
+  "childGeneration": 3,
+  "mutation": {
+    "type": "risk_rebalancing",
+    "parameterName": "positionSize",
+    "previousValue": 0.5,
+    "newValue": 0.42,
+    "mutationStrength": 0.85
+  },
+  "trigger": "loss_streak",
+  "reason": "Consecutive losses detected, reducing position size for safety",
+  "performanceImpact": {
+    "roiBefore": 12.5,
+    "roiAfter": 14.2,
+    "roiChange": 1.7,
+    "sharpeBefore": 1.2,
+    "sharpeAfter": 1.35,
+    "winRateBefore": 52,
+    "winRateAfter": 58
+  }
+}
+```
+
+#### On-Chain Badge Minting (NeuronBadge NFTs)
+
+Every evolution is minted as a **Soulbound NFT** (non-transferable) on Base Sepolia:
+
+**Contract**: `0xc4f97d52334f0de35fec958f24fc5af9c450f8dc`
+
+**Badge Types**:
+1. **Evolution Badge** - Minted when agent mutates
+2. **Stress Test Badge** - Minted when agent passes stress test
+3. **Healing Badge** - Minted when agent self-recovers from failure
+
+**What Gets Minted On-Chain**:
+```solidity
+function mintEvolutionBadge(
+  bytes32 agentId,           // Unique hash of agent name
+  string agentName,          // "Arbiter_v3"
+  uint256 generation,        // 3
+  uint8 mutationType,        // 1 = risk_rebalancing
+  string mutationDescription,// "Reduced position size by 16%"
+  uint256 riskScoreBefore,   // 45
+  uint256 riskScoreAfter,    // 38
+  int256 creditDelta,        // +12 credits
+  string actionTag,          // "EVOLUTION_SUCCESS"
+  string simulationId,       // "evo-1764889444538"
+  string metadataURI         // IPFS link to full data
+)
+```
+
+**Verification**: Every minted badge can be verified on [BaseScan](https://sepolia.basescan.org/address/0xc4f97d52334f0de35fec958f24fc5af9c450f8dc) with full transaction details.
+
+#### Agent Identity Tracking
+Each agent accumulates an on-chain identity:
+- **Credit Score** - Cumulative performance metric
+- **Total Evolutions** - Number of generations
+- **Total Successes/Failures** - Win/loss record
+- **Accuracy Rate** - Success percentage
+- **Badges Array** - All minted proofs
+
+---
+
+### 6. AI Insights Engine - Advanced Pattern Recognition
+
+The AI Insights Engine uses machine learning pattern detection to identify market opportunities and risks before they become obvious.
+
+#### 9 Pattern Types Detected
+
+| Pattern | Description | Indicators Used |
+|---------|-------------|-----------------|
+| **Momentum Shift** | Acceleration/deceleration of price movement | RSI, MACD, volume surge |
+| **Whale Accumulation** | Large buyers accumulating positions | Volume spikes, order book depth |
+| **Volatility Cluster** | Sudden variance increase | Bollinger Bands, ATR, range expansion |
+| **Trend Reversal** | Direction change signals | RSI divergence, MACD crossover |
+| **Breakout Signal** | Price breaking key levels | Support/resistance, volume confirmation |
+| **Divergence Detection** | Price vs indicator disagreement | RSI/MACD vs price action |
+| **Liquidity Squeeze** | Thin order books, slippage risk | Bid-ask spread, depth analysis |
+| **Correlation Movement** | Cross-asset relationship changes | Multi-asset regression |
+| **Support Resistance** | Key price levels where buying/selling pressure concentrates | Historical pivots, volume profile |
+
+#### Market Regime Detection
+
+The engine classifies the overall market into 8 regimes:
+
+- **trending_up** - Strong upward momentum (price >8% over 20 periods)
+- **trending_down** - Strong downward momentum (price <-8% over 20 periods)
+- **high_volatility** - Daily variance >4% (expect rapid swings)
+- **low_volatility** - Daily variance <1.5% (breakout expected)
+- **sideways_range** - No clear directional bias
+- **sideways_chop** - Choppy, unpredictable movement
+- **accumulation** - Buyers building positions quietly
+- **distribution** - Sellers offloading positions
+
+#### Example Insight Output
+```json
+{
+  "id": "mom-1764889462992",
+  "pattern": "momentum_shift",
+  "symbol": "ETH-USD",
+  "confidence": 0.82,
+  "impact": "High",
+  "reason": "Bullish momentum shift detected: 3.2% change with 45% volume surge. RSI at 62, MACD histogram positive",
+  "suggestedAction": "Increase position",
+  "source": "Coinbase",
+  "metadata": {
+    "priceChange": 3.2,
+    "volumeChange": 45,
+    "timeframe": "10 candles",
+    "aiEnhanced": true,
+    "marketRegime": "trending_up"
+  }
+}
+```
+
+#### ML Pattern Recognition (K-Means Clustering)
+
+Beyond rule-based detection, the engine uses ML clustering:
+
+1. **Feature Extraction** - Convert market data to feature vectors:
+   - Price volatility
+   - TVL change
+   - Gas price
+   - Agent performance
+   - Market sentiment
+   - Liquidity depth
+   - Volume change
+
+2. **K-Means Clustering** - Group similar market states:
+   - **volatile** - High price volatility cluster
+   - **bullish** - TVL up + positive sentiment
+   - **bearish** - TVL down + negative sentiment
+   - **stable** - Low variance, low volume change
+   - **sideways** - Mixed signals
+
+3. **Prediction** - Use cluster membership to predict success probability for opportunities
+
+#### Claude AI Enhancement
+
+Insights can be enhanced with Claude AI for deeper analysis:
+- Validates or challenges the signal based on broader market context
+- Identifies additional risk factors or opportunities
+- Suggests optimal timing or position sizing
+- Adds "[AI Enhanced]" tag to enriched insights
+
 ---
 
 ## Simulated Data Architecture & Why We Use It
