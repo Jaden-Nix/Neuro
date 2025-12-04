@@ -673,12 +673,21 @@ function VillageAgentCard({ agent, rank }: { agent: VillageAgent; rank: number }
 }
 
 function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
+  const [, forceUpdate] = useState(0);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      forceUpdate(n => n + 1);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <ScrollArea className="h-[500px] pr-4">
       <div className="space-y-3">
         {thoughts.map((thought) => {
           const typeInfo = THOUGHT_TYPE_INFO[thought.type] || { color: "border-l-gray-500" };
-          const topic = thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
+          const topic = thought.metadata?.symbol || thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
           return (
             <motion.div
               key={thought.id}
@@ -686,19 +695,19 @@ function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
               animate={{ opacity: 1, x: 0 }}
               className={`p-4 rounded-md bg-muted/30 border-l-4 ${typeInfo.color}`}
             >
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-sm">{thought.agentName}</span>
                   <Badge variant="outline" className="text-xs capitalize">{thought.type}</Badge>
+                  {topic && (
+                    <Badge variant="secondary" className="text-xs font-mono bg-primary/10 text-primary">
+                      {topic}
+                    </Badge>
+                  )}
                 </div>
-                {topic && (
-                  <Badge variant="secondary" className="text-xs font-mono">
-                    {topic}
-                  </Badge>
-                )}
+                <span className="text-xs text-muted-foreground/70">{formatTimeAgo(thought.timestamp)}</span>
               </div>
-              <p className="text-sm text-muted-foreground leading-relaxed">{thought.content}</p>
-              <div className="mt-2 text-xs text-muted-foreground/70">{formatTimeAgo(thought.timestamp)}</div>
+              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">{thought.content}</p>
             </motion.div>
           );
         })}

@@ -54,8 +54,8 @@ export function DeveloperPanel({
         </Button>
       </div>
 
-      <Tabs defaultValue="logs" className="flex-1 flex flex-col">
-        <TabsList className="w-full grid grid-cols-5 rounded-none border-b border-border">
+      <Tabs defaultValue="logs" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <TabsList className="w-full grid grid-cols-5 rounded-none border-b border-border flex-shrink-0">
           <TabsTrigger value="logs" data-testid="tab-logs" className="text-xs">
             <Code className="w-3 h-3 mr-1" />
             Logs
@@ -78,7 +78,7 @@ export function DeveloperPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="logs" className="flex-1 p-4 overflow-y-auto">
+        <TabsContent value="logs" className="flex-1 p-4 overflow-y-auto min-h-0">
           <div className="space-y-2 text-xs">
             {logs.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No logs yet</p>
@@ -118,7 +118,7 @@ export function DeveloperPanel({
           </div>
         </TabsContent>
 
-        <TabsContent value="simulations" className="flex-1 p-4 overflow-y-auto">
+        <TabsContent value="simulations" className="flex-1 p-4 overflow-y-auto min-h-0">
           <div className="space-y-3">
               {simulationTree.map((branch) => (
                 <Card key={branch.id} className="p-3">
@@ -159,7 +159,7 @@ export function DeveloperPanel({
             </div>
         </TabsContent>
 
-        <TabsContent value="credits" className="flex-1 p-4 overflow-y-auto">
+        <TabsContent value="credits" className="flex-1 p-4 overflow-y-auto min-h-0">
           <div className="space-y-3">
               {creditScores.map((score) => (
                 <Card key={score.agentId} className="p-4">
@@ -196,7 +196,7 @@ export function DeveloperPanel({
             </div>
         </TabsContent>
 
-        <TabsContent value="memory" className="flex-1 p-4 overflow-y-auto">
+        <TabsContent value="memory" className="flex-1 p-4 overflow-y-auto min-h-0">
           <div className="space-y-3">
               {memoryEntries.map((entry) => (
                 <Card key={entry.id} className="p-3">
@@ -261,7 +261,7 @@ export function DeveloperPanel({
             </div>
         </TabsContent>
 
-        <TabsContent value="status" className="flex-1 p-4 overflow-y-auto">
+        <TabsContent value="status" className="flex-1 p-4 overflow-y-auto min-h-0">
           <LiveSystemStatus />
         </TabsContent>
       </Tabs>
