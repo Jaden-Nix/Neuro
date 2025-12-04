@@ -83,9 +83,9 @@ export function DeveloperPanel({
             {logs.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No logs yet</p>
             ) : (
-              logs.map((log) => (
+              logs.filter(log => log && log.level && log.agentType).map((log) => (
                 <div
-                  key={log.id}
+                  key={log.id || `log-${log.timestamp}`}
                   className="p-3 rounded bg-muted/50 border border-border/50 space-y-1"
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -250,7 +250,13 @@ export function DeveloperPanel({
               ))}
 
               {memoryEntries.length === 0 && (
-                <p className="text-center text-muted-foreground text-sm py-8">No memories</p>
+                <div className="text-center py-8 space-y-2">
+                  <Database className="w-8 h-8 mx-auto text-muted-foreground/50" />
+                  <p className="text-muted-foreground text-sm">No memories yet</p>
+                  <p className="text-muted-foreground/70 text-xs max-w-[250px] mx-auto">
+                    Memory stores successful trading patterns, risk decisions, and learned strategies. Run simulations to build agent memory.
+                  </p>
+                </div>
               )}
             </div>
         </TabsContent>
