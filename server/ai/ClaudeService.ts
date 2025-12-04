@@ -3,8 +3,9 @@ import pLimit from "p-limit";
 import pRetry from "p-retry";
 import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 
+// Using Replit's AI Integrations service for Anthropic access (billed to Replit credits)
 const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
 
@@ -105,12 +106,12 @@ export class ClaudeService {
 
   constructor() {
     this.isConfigured = !!(
-      (process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY)
+      process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY &&
+      process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL
     );
     
     if (this.isConfigured) {
-      const source = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY ? "Replit AI Integrations" : "ANTHROPIC_API_KEY";
-      console.log(`[Claude] Service initialized with ${source}`);
+      console.log("[Claude] Service initialized with Replit AI Integrations");
     } else {
       console.warn("[Claude] API not configured - will use fallback responses");
     }
