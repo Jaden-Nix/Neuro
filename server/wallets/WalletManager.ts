@@ -79,19 +79,19 @@ export class WalletManager {
   }
 
   private initializeDefaultPrices() {
-    this.tokenPrices.set("ETH", 2400);
-    this.tokenPrices.set("WETH", 2400);
+    this.tokenPrices.set("ETH", 3180);
+    this.tokenPrices.set("WETH", 3180);
     this.tokenPrices.set("USDC", 1);
     this.tokenPrices.set("USDT", 1);
     this.tokenPrices.set("DAI", 1);
     this.tokenPrices.set("FRAX", 1);
-    this.tokenPrices.set("SOL", 120);
-    this.tokenPrices.set("WSOL", 120);
-    this.tokenPrices.set("WBTC", 95000);
-    this.tokenPrices.set("LINK", 15);
-    this.tokenPrices.set("UNI", 8);
-    this.tokenPrices.set("AAVE", 180);
-    this.tokenPrices.set("CRV", 0.5);
+    this.tokenPrices.set("SOL", 145);
+    this.tokenPrices.set("WSOL", 145);
+    this.tokenPrices.set("WBTC", 92000);
+    this.tokenPrices.set("LINK", 24);
+    this.tokenPrices.set("UNI", 14);
+    this.tokenPrices.set("AAVE", 193);
+    this.tokenPrices.set("CRV", 0.55);
     this.tokenPrices.set("FXS", 3);
   }
 

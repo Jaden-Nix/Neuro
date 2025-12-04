@@ -794,11 +794,11 @@ export class AIInsightsEngine extends EventEmitter {
 
   private initializeFallbackData(symbol: string): void {
     const basePrice: Record<string, number> = {
-      "ETH-USD": 2400,
-      "BTC-USD": 42000,
-      "LINK-USD": 15,
-      "UNI-USD": 7,
-      "AAVE-USD": 95,
+      "ETH-USD": 3180,
+      "BTC-USD": 92000,
+      "LINK-USD": 24,
+      "UNI-USD": 14,
+      "AAVE-USD": 193,
     };
 
     const data: MarketDataPoint[] = [];

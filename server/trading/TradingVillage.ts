@@ -715,10 +715,10 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     confidence: number
   ): Promise<VillageTradeSignal | null> {
     const fallbackPrices: Record<string, number> = {
-      BTC: 96000, ETH: 3200, SOL: 143, AVAX: 25, LINK: 15, ARB: 0.50, OP: 1.20, SUI: 2.0,
-      DOGE: 0.32, PEPE: 0.000012, XRP: 0.62, ADA: 0.45, DOT: 7.5, MATIC: 0.85, ATOM: 9.5, UNI: 8.0,
-      AAVE: 180, LDO: 2.5, CRV: 0.55, MKR: 1800, SNX: 3.5, COMP: 85, INJ: 25, TIA: 8.5,
-      SEI: 0.45, APT: 9.5, NEAR: 5.5, FTM: 0.75, RUNE: 5.0, RENDER: 8.5, FET: 1.8, TAO: 450,
+      BTC: 92000, ETH: 3180, SOL: 145, AVAX: 38, LINK: 24, ARB: 0.75, OP: 1.80, SUI: 3.60,
+      DOGE: 0.32, PEPE: 0.000018, XRP: 2.35, ADA: 1.05, DOT: 7.5, MATIC: 0.52, ATOM: 9.5, UNI: 14,
+      AAVE: 193, LDO: 2.0, CRV: 0.55, MKR: 1800, SNX: 2.5, COMP: 65, INJ: 22, TIA: 5.5,
+      SEI: 0.45, APT: 12, NEAR: 5.5, FTM: 0.75, RUNE: 5.0, RENDER: 8.5, FET: 1.8, TAO: 450,
       WIF: 2.5, BONK: 0.000025, JUP: 0.85, PYTH: 0.45, W: 0.35, STRK: 0.55, MANTA: 1.2, DYM: 2.5
     };
     

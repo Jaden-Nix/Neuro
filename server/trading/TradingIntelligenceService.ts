@@ -279,9 +279,9 @@ Return ONLY valid JSON array:
     } catch (error) {
       console.error(`[TradingIntelligence] Failed to get price for ${symbol}:`, error);
       const fallbackPrices: Record<string, number> = {
-        "BTC": 96500, "ETH": 3580, "SOL": 145, "AVAX": 48,
-        "LINK": 24, "UNI": 14, "AAVE": 380, "ARB": 1.05,
-        "OP": 2.50, "MATIC": 0.52, "DOGE": 0.43, "PEPE": 0.000025, "SUI": 4.65
+        "BTC": 92000, "ETH": 3180, "SOL": 145, "AVAX": 38,
+        "LINK": 24, "UNI": 14, "AAVE": 193, "ARB": 0.75,
+        "OP": 1.80, "MATIC": 0.52, "DOGE": 0.32, "PEPE": 0.000018, "SUI": 3.60
       };
       const base = symbol.replace("-USD", "").replace("USDT", "");
       return fallbackPrices[base] || 100;

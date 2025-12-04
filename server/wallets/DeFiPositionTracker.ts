@@ -118,16 +118,16 @@ export class DeFiPositionTracker {
   };
 
   private tokenPrices: Map<string, number> = new Map([
-    ["ETH", 2400],
-    ["WETH", 2400],
-    ["stETH", 2380],
-    ["sfrxETH", 2420],
+    ["ETH", 3180],
+    ["WETH", 3180],
+    ["stETH", 3150],
+    ["sfrxETH", 3200],
     ["USDC", 1],
     ["USDT", 1],
     ["DAI", 1],
     ["FRAX", 1],
-    ["SOL", 120],
-    ["AAVE", 180],
+    ["SOL", 145],
+    ["AAVE", 193],
   ]);
 
   constructor() {

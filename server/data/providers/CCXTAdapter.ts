@@ -10,11 +10,11 @@ import type {
 import { coinGeckoClient } from './CoinGeckoClient';
 
 const FALLBACK_PRICES: Record<string, number> = {
-  'BTC': 93000, 'ETH': 3200, 'SOL': 143, 'XRP': 0.52, 'BNB': 320,
-  'ADA': 0.45, 'AVAX': 25, 'DOGE': 0.15, 'TRX': 0.28, 'DOT': 2.35,
-  'LINK': 15, 'MATIC': 0.45, 'SHIB': 0.000012, 'LTC': 75, 'UNI': 8.5,
-  'ATOM': 2.4, 'ETC': 14, 'XLM': 0.12, 'NEAR': 3.5, 'APT': 2.0,
-  'ARB': 0.50, 'OP': 1.2, 'AAVE': 180, 'MKR': 1200, 'CRV': 0.35,
+  'BTC': 92000, 'ETH': 3180, 'SOL': 145, 'XRP': 2.35, 'BNB': 640,
+  'ADA': 1.05, 'AVAX': 38, 'DOGE': 0.32, 'TRX': 0.26, 'DOT': 7.5,
+  'LINK': 24, 'MATIC': 0.52, 'SHIB': 0.000024, 'LTC': 105, 'UNI': 14,
+  'ATOM': 9.5, 'ETC': 28, 'XLM': 0.42, 'NEAR': 5.5, 'APT': 12,
+  'ARB': 0.75, 'OP': 1.80, 'AAVE': 193, 'MKR': 1800, 'CRV': 0.55,
   'LDO': 1.0, 'SNX': 1.5, 'COMP': 45, 'INJ': 15, 'FIL': 3.5,
   'SUI': 2.0, 'SEI': 0.25, 'FTM': 0.45, 'IMX': 0.80, 'MANA': 0.30,
   'SAND': 0.35, 'AXS': 4.5, 'GALA': 0.025, 'APE': 0.80, 'PEPE': 0.000012,
