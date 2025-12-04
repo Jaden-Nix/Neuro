@@ -41,6 +41,7 @@ import {
   Users,
   Trophy,
   Radio,
+  Download,
 } from "lucide-react";
 
 interface TradingSignal {
@@ -258,6 +259,19 @@ function formatDuration(ms: number): string {
   const minutes = Math.floor((ms % 3600000) / 60000);
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m`;
+}
+
+function exportToJson(data: unknown, filename: string) {
+  const jsonString = JSON.stringify(data, null, 2);
+  const blob = new Blob([jsonString], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}_${new Date().toISOString().split("T")[0]}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: string, price: number, exitType: "tp1" | "tp2" | "tp3" | "sl") => void }) {
@@ -672,7 +686,7 @@ function VillageAgentCard({ agent, rank }: { agent: VillageAgent; rank: number }
   );
 }
 
-function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
+function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; className?: string }) {
   const [, forceUpdate] = useState(0);
   
   useEffect(() => {
@@ -683,8 +697,8 @@ function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
   }, []);
 
   return (
-    <ScrollArea className="h-[500px] pr-4">
-      <div className="space-y-3">
+    <ScrollArea className={className || "h-[600px]"}>
+      <div className="space-y-3 pr-4">
         {thoughts.map((thought) => {
           const typeInfo = THOUGHT_TYPE_INFO[thought.type] || { color: "border-l-gray-500" };
           const topic = thought.metadata?.symbol || thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
@@ -1111,40 +1125,64 @@ export default function TradingAdvisor() {
             </div>
           )}
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-500" />
-                  Agent Leaderboard
-                </CardTitle>
-                <CardDescription>Ranked by credit score and performance</CardDescription>
+          <div className="grid md:grid-cols-2 gap-6 items-stretch">
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Trophy className="h-5 w-5 text-yellow-500" />
+                    Agent Leaderboard
+                  </CardTitle>
+                  <CardDescription>Ranked by credit score and performance</CardDescription>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => exportToJson(villageAgents, "village_agents")}
+                  title="Export agents data"
+                  data-testid="button-export-agents"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-1">
                 {villageLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {villageAgents.slice(0, 6).map((agent, index) => (
-                      <VillageAgentCard key={agent.id} agent={agent} rank={index} />
-                    ))}
-                  </div>
+                  <ScrollArea className="h-[600px]">
+                    <div className="space-y-3 pr-4">
+                      {villageAgents.map((agent, index) => (
+                        <VillageAgentCard key={agent.id} agent={agent} rank={index} />
+                      ))}
+                    </div>
+                  </ScrollArea>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-purple-500" />
-                  Agent Thought Stream
-                </CardTitle>
-                <CardDescription>Real-time insights and decisions from the village</CardDescription>
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Brain className="h-5 w-5 text-purple-500" />
+                    Agent Thought Stream
+                  </CardTitle>
+                  <CardDescription>Real-time insights and decisions from the village</CardDescription>
+                </div>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => exportToJson(villageThoughts, "agent_thoughts")}
+                  title="Export thoughts data"
+                  data-testid="button-export-thoughts"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
               </CardHeader>
-              <CardContent>
-                <ThoughtStream thoughts={villageThoughts} />
+              <CardContent className="flex-1">
+                <ThoughtStream thoughts={villageThoughts} className="h-[600px]" />
               </CardContent>
             </Card>
           </div>

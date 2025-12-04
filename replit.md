@@ -48,7 +48,13 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
   - Experiment system for testing new strategies
   - Real-time thought stream showing agent reasoning
   - Leaderboard with rankings by credit score
+  - **Data Export**: Download buttons for exporting agent data and thought streams as JSON files
   - API endpoints: /api/village/agents, /api/village/thoughts, /api/village/signals, /api/village/debates, /api/village/knowledge
+  - **Data Storage**:
+    - **Agent State**: Persisted to PostgreSQL (`village_agents` table) - survives restarts
+    - **Birth Records**: Persisted to PostgreSQL (`agent_births` table) - historical record
+    - **Trading Signals**: Persisted to PostgreSQL (`village_signals` table)
+    - **Agent Thoughts**: In-memory only - use export button to download before restart
 - **On-Chain Agent Identity System**: Implemented NeuronBadge.sol soulbound NFT contract and BlockchainSyncService for proving agent evolution on-chain. Agents earn badges for successful mutations, with complete identity tracking including credit scores, generation lineage, and performance metrics. The Evolution page now has an "On-Chain" tab showing proof cards, agent resumes, and blockchain sync status.
 - **Real Data Integration**: All system components now use real market data sources (Binance, CoinGecko, DefiLlama) instead of simulated data
 - **Backtesting Enhancement**: QuickBacktestEngine now fetches actual historical OHLCV data with deterministic seeded fallback
