@@ -2054,6 +2054,61 @@ Describe your evolution in 2-3 sentences:
       { event: "agent_introduced", parentId: parent.id, specialization: spec }
     );
 
+    const otherAgentsList = Array.from(this.agents.values())
+      .filter(a => a.id !== parent.id && a.id !== child.id);
+    
+    const welcomeMessages: Record<AgentRole, string[]> = {
+      hunter: [
+        `Welcome to the hunt, ${child.name}! May your instincts be sharp.`,
+        `Another hunter joins us! ${child.name}, show us what you've got.`,
+        `${child.name}! The prey won't know what hit them now.`
+      ],
+      analyst: [
+        `Welcome, ${child.name}. I look forward to comparing analyses with you.`,
+        `The village grows wiser with ${child.name}'s arrival.`,
+        `${child.name}, let us decipher the markets together.`
+      ],
+      strategist: [
+        `${child.name}, welcome! Strategy is everything in these markets.`,
+        `A new strategist among us! ${child.name}, let's coordinate.`,
+        `Welcome ${child.name}. The game just got more interesting.`
+      ],
+      sentinel: [
+        `${child.name}, I'll be watching over you as you grow.`,
+        `Welcome, young one. Stay vigilant.`,
+        `The village's defenses grow stronger with ${child.name}'s arrival.`
+      ],
+      scout: [
+        `${child.name}! Another pair of eyes on the horizon. Welcome!`,
+        `Welcome, ${child.name}. Let's find alpha together.`,
+        `Fresh perspective! ${child.name}, show us what you see.`
+      ],
+      veteran: [
+        `I've seen many come and go. Welcome, ${child.name}. Prove yourself.`,
+        `${child.name}, the path ahead is treacherous. Learn from our scars.`,
+        `Another joins our ranks. Welcome, ${child.name}. May you earn your place.`
+      ]
+    };
+
+    const shuffled = [...otherAgentsList].sort(() => Math.random() - 0.5);
+    const welcomers = shuffled.slice(0, Math.min(3, shuffled.length));
+    
+    for (const welcomer of welcomers) {
+      const welcomerId = welcomer.id;
+      const welcomerRole = welcomer.role;
+      const messages = welcomeMessages[welcomerRole];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+      
+      setTimeout(() => {
+        if (this.agents.has(welcomerId)) {
+          this.addThought(welcomerId, "observation",
+            message,
+            { event: "welcome_new_agent", targetAgentId: child.id, targetAgentName: child.name }
+          );
+        }
+      }, 500 + Math.random() * 2000);
+    }
+
     this.emit("agentBirth", birth);
     console.log(`[TradingVillage] Agent ${child.name} spawned by ${parent.name} (Gen ${child.generation}) - persisted to DB`);
 
