@@ -10,7 +10,7 @@ const anthropic = new Anthropic({
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
 export type AgentPersonality = "aggressive" | "conservative" | "balanced" | "contrarian" | "momentum" | "experimental";
-export type ThoughtType = "observation" | "analysis" | "hypothesis" | "decision" | "learning" | "experiment" | "competition" | "debate" | "agreement" | "challenge" | "insight_share";
+export type ThoughtType = "observation" | "analysis" | "hypothesis" | "decision" | "learning" | "experiment" | "competition" | "debate" | "agreement" | "challenge" | "insight_share" | "disagreement";
 
 export interface VillageAgent {
   id: string;
@@ -142,7 +142,7 @@ export interface VillageTradeSignal {
   };
   riskReward: number;
   positionSize: string;
-  status: "active" | "closed" | "stopped" | "expired";
+  status: "pending" | "active" | "rejected" | "invalidated" | "closed" | "stopped" | "expired";
   validators: { agentId: string; agentName: string; agrees: boolean; comment: string }[];
   createdAt: number;
   closedAt?: number;
@@ -712,7 +712,11 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     confidence: number
   ): Promise<VillageTradeSignal | null> {
     const fallbackPrices: Record<string, number> = {
-      BTC: 93000, ETH: 3200, SOL: 143, AVAX: 25, LINK: 15, ARB: 0.50, OP: 1.20, SUI: 2.0
+      BTC: 96000, ETH: 3200, SOL: 143, AVAX: 25, LINK: 15, ARB: 0.50, OP: 1.20, SUI: 2.0,
+      DOGE: 0.32, PEPE: 0.000012, XRP: 0.62, ADA: 0.45, DOT: 7.5, MATIC: 0.85, ATOM: 9.5, UNI: 8.0,
+      AAVE: 180, LDO: 2.5, CRV: 0.55, MKR: 1800, SNX: 3.5, COMP: 85, INJ: 25, TIA: 8.5,
+      SEI: 0.45, APT: 9.5, NEAR: 5.5, FTM: 0.75, RUNE: 5.0, RENDER: 8.5, FET: 1.8, TAO: 450,
+      WIF: 2.5, BONK: 0.000025, JUP: 0.85, PYTH: 0.45, W: 0.35, STRK: 0.55, MANTA: 1.2, DYM: 2.5
     };
     
     let basePrice = fallbackPrices[symbol] || 100;
@@ -848,13 +852,13 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         },
         riskReward,
         positionSize: parsed.positionSize || "moderate",
-        status: "active",
+        status: "pending",
         validators: [],
         createdAt: Date.now()
       };
 
       this.addThought(agent.id, "decision",
-        `TRADE SIGNAL: ${direction.toUpperCase()} ${symbol}\n` +
+        `PROPOSED SIGNAL: ${direction.toUpperCase()} ${symbol} - Awaiting validation from other agents\n` +
         `Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP1: $${signal.takeProfit1.toFixed(2)}\n` +
         `Pattern: ${signal.technicalAnalysis.pattern}\n` +
         `Reasoning: ${signal.reasoning}`,
@@ -898,19 +902,41 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         },
         riskReward: 2.0,
         positionSize: "moderate",
-        status: "active",
+        status: "pending",
         validators: [],
         createdAt: Date.now()
       };
 
       this.addThought(agent.id, "decision",
-        `TRADE SIGNAL: ${direction.toUpperCase()} ${symbol}\n` +
+        `PROPOSED SIGNAL: ${direction.toUpperCase()} ${symbol} - Awaiting validation\n` +
         `Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP1: $${signal.takeProfit1.toFixed(2)}\n` +
         `R:R = ${signal.riskReward.toFixed(1)} | Confidence: ${(confidence * 100).toFixed(0)}%`,
         { signalId: signal.id }
       );
 
       return signal;
+    }
+  }
+
+  private checkAndActivateSignal(signal: VillageTradeSignal) {
+    const agrees = signal.validators.filter(v => v.agrees).length;
+    const disagrees = signal.validators.filter(v => !v.agrees).length;
+    
+    if (signal.validators.length >= 2) {
+      if (agrees > disagrees) {
+        signal.status = "active";
+        const creator = this.agents.get(signal.agentId);
+        if (creator) {
+          this.addThought(signal.agentId, "decision",
+            `SIGNAL CONFIRMED: ${signal.direction.toUpperCase()} ${signal.symbol} validated by ${agrees} agents! Signal is now ACTIVE.`,
+            { signalId: signal.id, agrees, disagrees }
+          );
+        }
+        console.log(`[TradingVillage] Signal ${signal.id} ACTIVATED: ${agrees} agrees vs ${disagrees} disagrees`);
+      } else if (disagrees > agrees) {
+        signal.status = "rejected";
+        console.log(`[TradingVillage] Signal ${signal.id} REJECTED: ${disagrees} disagrees vs ${agrees} agrees`);
+      }
     }
   }
 
@@ -1000,6 +1026,8 @@ Keep it under 20 words. Be direct.`
           [signal.agentId]
         );
       }
+      
+      this.checkAndActivateSignal(storedSignal);
     }
 
     const validationRate = storedSignal.validators.filter(v => v.agrees).length / Math.max(1, storedSignal.validators.length);
@@ -1277,9 +1305,14 @@ Describe your evolution in 2-3 sentences:
       a.role === "hunter" || a.role === "scout" || a.role === "analyst"
     );
 
-    const symbols = ["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"];
+    const symbols = [
+      "BTC", "ETH", "SOL", "AVAX", "LINK", "ARB", "OP", "SUI", 
+      "DOGE", "PEPE", "XRP", "ADA", "DOT", "MATIC", "ATOM", "UNI",
+      "AAVE", "LDO", "CRV", "MKR", "SNX", "COMP", "INJ", "TIA",
+      "SEI", "APT", "NEAR", "FTM", "RUNE", "RENDER"
+    ];
     
-    for (let i = 0; i < Math.min(3, hunters.length); i++) {
+    for (let i = 0; i < Math.min(5, hunters.length); i++) {
       const hunter = hunters[i];
       const symbol = symbols[i % symbols.length];
       const direction = Math.random() > 0.45 ? "long" : "short";
@@ -1367,7 +1400,13 @@ Describe your evolution in 2-3 sentences:
     for (const hunter of hunters) {
       if (Math.random() > 0.8 || hunter.status === "debating") continue;
 
-      const symbols = ["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB", "OP", "SUI", "DOGE", "PEPE"];
+      const symbols = [
+        "BTC", "ETH", "SOL", "AVAX", "LINK", "ARB", "OP", "SUI", 
+        "DOGE", "PEPE", "XRP", "ADA", "DOT", "MATIC", "ATOM", "UNI",
+        "AAVE", "LDO", "CRV", "MKR", "SNX", "COMP", "INJ", "TIA",
+        "SEI", "APT", "NEAR", "FTM", "RUNE", "RENDER", "FET", "TAO",
+        "WIF", "BONK", "JUP", "PYTH", "W", "STRK", "MANTA", "DYM"
+      ];
       const symbol = symbols[Math.floor(Math.random() * symbols.length)];
       const rsi = 30 + Math.random() * 40;
       const volumeAbove = Math.random() > 0.5;
