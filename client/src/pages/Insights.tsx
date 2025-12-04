@@ -646,7 +646,7 @@ export default function Insights() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">DeFi Opportunities</p>
-                <p className="text-2xl font-bold">{opportunities.filter(o => o.executionReady).length}</p>
+                <p className="text-2xl font-bold">{isLoadingOpportunities ? "--" : opportunities.filter(o => o.executionReady).length}</p>
               </div>
               <Coins className="h-8 w-8 text-muted-foreground/50" />
             </div>
@@ -658,7 +658,7 @@ export default function Insights() {
               <div>
                 <p className="text-sm text-muted-foreground">Avg APY</p>
                 <p className="text-2xl font-bold text-green-500">
-                  {opportunities.length > 0 ? (opportunities.reduce((sum, o) => sum + o.apy, 0) / opportunities.length).toFixed(1) : 0}%
+                  {isLoadingOpportunities || opportunities.length === 0 ? "N/A" : `${(opportunities.reduce((sum, o) => sum + o.apy, 0) / opportunities.length).toFixed(1)}%`}
                 </p>
               </div>
               <Yield className="h-8 w-8 text-green-500/50" />
@@ -707,6 +707,16 @@ export default function Insights() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
             <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
               <div className="flex items-center gap-4 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchOpportunities()}
+                  disabled={isLoadingOpportunities}
+                  data-testid="button-refresh-opportunities"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingOpportunities ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
                 <Badge variant="secondary" className="ml-auto">
                   {opportunities.length} opportunities
                 </Badge>

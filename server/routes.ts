@@ -2814,7 +2814,7 @@ export async function registerRoutes(
   // Get DeFi opportunities with agent flow analysis
   app.get("/api/defi/opportunities", async (req, res) => {
     try {
-      const agents = orchestrator.getAgents();
+      const agents = orchestrator.getAllAgents();
       const creditScores = await storage.getCreditScores();
       const logs = await storage.getLogs();
       
