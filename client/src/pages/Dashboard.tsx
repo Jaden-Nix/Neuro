@@ -64,11 +64,15 @@ export default function Dashboard() {
   // Use WebSocket metrics if available, otherwise fetch
   const { data: fetchedMetrics } = useQuery<LiveMetrics>({
     queryKey: ["/api/metrics"],
-    refetchInterval: wsState.connected ? 10000 : 1000,
+    refetchInterval: 5000, // Fetch every 5 seconds for live prices
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't cache stale data
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
-  // Merge metrics from WebSocket or API
-  const metrics = wsState.metrics || fetchedMetrics;
+  // Merge metrics: prefer API data (fetchedMetrics) as it has real CCXT prices
+  // WebSocket metrics may contain fallback values from initial server startup
+  const metrics = fetchedMetrics || wsState.metrics;
 
   // Track previous metrics for change calculations
   useEffect(() => {

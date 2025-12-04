@@ -1,6 +1,7 @@
 import { coinGeckoClient, type OHLCCandle } from './providers/CoinGeckoClient';
 import { binanceClient, type Kline } from './providers/BinanceClient';
 import { defiLlamaClient, type YieldPool, type Protocol } from './providers/DefiLlamaClient';
+import { ccxtAdapter } from './providers/CCXTAdapter';
 
 export interface BacktestCandle {
   timestamp: number;
@@ -122,6 +123,18 @@ export class MarketDataService {
   async getCurrentPrice(symbol: string): Promise<number> {
     const upperSymbol = symbol.toUpperCase();
     
+    // Try CCXT first (9 exchanges with live data)
+    try {
+      const ccxtPrice = await ccxtAdapter.fetchPrice(upperSymbol);
+      if (ccxtPrice && ccxtPrice.price > 0) {
+        this.fallbackPrices[upperSymbol] = ccxtPrice.price;
+        return ccxtPrice.price;
+      }
+    } catch (ccxtError) {
+      // CCXT failed, try CoinGecko
+    }
+    
+    // Try CoinGecko as fallback
     try {
       const prices = await coinGeckoClient.getCurrentPrice([symbol]);
       const price = prices[symbol];
@@ -130,8 +143,10 @@ export class MarketDataService {
         return price;
       }
     } catch (geckoError) {
+      // CoinGecko also failed
     }
     
+    // Use static fallback
     const fallback = this.fallbackPrices[upperSymbol] || this.fallbackPrices[upperSymbol.replace('-USD', '')];
     if (fallback) {
       return fallback;
