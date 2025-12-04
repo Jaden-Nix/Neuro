@@ -5105,6 +5105,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/ultron/prices", async (req, res) => {
+    try {
+      const prices = livePriceService.getAllPrices();
+      res.json(prices);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get live prices" });
+    }
+  });
+
   app.get("/api/prices/:symbol", async (req, res) => {
     try {
       const price = livePriceService.getPrice(req.params.symbol.toUpperCase());

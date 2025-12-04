@@ -1106,141 +1106,182 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
   }
 
   private seedInitialAirdrops(): void {
+    const DAY_MS = 86400000;
+    const now = Date.now();
+    
     const airdrops: AirdropOpportunity[] = [
       {
         id: "airdrop-1",
-        protocolName: "LayerZero",
-        protocolUrl: "https://layerzero.network",
+        protocolName: "Movement Labs",
+        protocolUrl: "https://movementlabs.xyz",
         chain: "ethereum",
+        category: "testnet",
+        isRetro: false,
+        status: "active",
+        estimatedValue: "$2000-$15000",
+        confidence: 88,
+        riskLevel: "low",
+        eligibilityCriteria: [
+          "Run Movement testnet node",
+          "Deploy Move smart contracts",
+          "Bridge assets via Movement Bridge",
+          "Participate in community campaigns"
+        ],
+        requiredActions: [
+          { action: "Set up testnet validator node", completed: false, priority: "high", estimatedCost: "$0 (testnet)" },
+          { action: "Deploy 3+ Move contracts", completed: false, priority: "high" },
+          { action: "Complete bridge transactions", completed: false, priority: "medium" },
+          { action: "Earn Discord community roles", completed: false, priority: "medium" }
+        ],
+        fundingRound: "Series B - $200M",
+        investors: ["Polychain Capital", "Binance Labs", "OKX Ventures"],
+        discoveredAt: now - DAY_MS * 3,
+        updatedAt: now
+      },
+      {
+        id: "airdrop-2",
+        protocolName: "Initia",
+        protocolUrl: "https://initia.xyz",
+        chain: "ethereum",
+        category: "testnet",
+        isRetro: false,
+        status: "active",
+        estimatedValue: "$1500-$8000",
+        confidence: 82,
+        riskLevel: "low",
+        eligibilityCriteria: [
+          "Use Initia testnet",
+          "Interact with Minitia appchains",
+          "Provide liquidity on InitiaSwap",
+          "Stake INIT tokens"
+        ],
+        requiredActions: [
+          { action: "Claim testnet faucet tokens", completed: false, priority: "high" },
+          { action: "Swap on InitiaSwap DEX", completed: false, priority: "high" },
+          { action: "Bridge to 3+ Minitia chains", completed: false, priority: "high" },
+          { action: "Stake and earn rewards", completed: false, priority: "medium" }
+        ],
+        fundingRound: "Series A - $14M",
+        investors: ["Delphi Digital", "Hack VC", "Nascent"],
+        discoveredAt: now - DAY_MS * 5,
+        updatedAt: now
+      },
+      {
+        id: "airdrop-3",
+        protocolName: "Eclipse",
+        protocolUrl: "https://eclipse.xyz",
+        chain: "solana",
+        category: "non_retro",
+        isRetro: false,
+        status: "active",
+        estimatedValue: "$3000-$20000",
+        confidence: 85,
+        riskLevel: "medium",
+        eligibilityCriteria: [
+          "Bridge SOL/ETH to Eclipse mainnet",
+          "Use native dApps on Eclipse",
+          "Provide liquidity on DEXs",
+          "Early mainnet adopter bonus"
+        ],
+        requiredActions: [
+          { action: "Bridge $100+ to Eclipse mainnet", completed: false, priority: "high", estimatedCost: "$5-15 bridge fees" },
+          { action: "Trade on Orca/Raydium Eclipse", completed: false, priority: "high" },
+          { action: "Provide LP for 7+ days", completed: false, priority: "high", estimatedCost: "$200+ LP capital" },
+          { action: "Mint NFTs on Eclipse", completed: false, priority: "medium" }
+        ],
+        fundingRound: "Series A - $65M",
+        investors: ["Placeholder", "Polychain", "Tribe Capital"],
+        discoveredAt: now - DAY_MS * 2,
+        updatedAt: now
+      },
+      {
+        id: "airdrop-4",
+        protocolName: "Fuel Network",
+        protocolUrl: "https://fuel.network",
+        chain: "ethereum",
+        category: "non_retro",
+        isRetro: false,
+        status: "active",
+        estimatedValue: "$1000-$7000",
+        confidence: 78,
+        riskLevel: "low",
+        eligibilityCriteria: [
+          "Use Fuel mainnet apps",
+          "Bridge ETH to Fuel",
+          "Interact with Sway dApps",
+          "Points program participation"
+        ],
+        requiredActions: [
+          { action: "Bridge ETH via official Fuel bridge", completed: false, priority: "high", estimatedCost: "$15-25" },
+          { action: "Swap on Thunder DEX", completed: false, priority: "high" },
+          { action: "Lend/borrow on Swaylend", completed: false, priority: "medium" },
+          { action: "Accumulate Fuel Points", completed: false, priority: "high" }
+        ],
+        fundingRound: "Series B - $80M",
+        investors: ["Blockchain Capital", "Stratos", "Maven 11"],
+        discoveredAt: now - DAY_MS * 7,
+        updatedAt: now
+      },
+      {
+        id: "airdrop-5",
+        protocolName: "Sonic SVM",
+        protocolUrl: "https://sonic.game",
+        chain: "solana",
         category: "retro",
         isRetro: true,
         status: "active",
         estimatedValue: "$500-$5000",
-        confidence: 85,
+        confidence: 90,
         riskLevel: "low",
         eligibilityCriteria: [
-          "Bridge assets using Stargate",
-          "Use at least 3 different chains",
-          "Minimum $100 volume",
-          "Active for 6+ months"
+          "Play Sonic gaming applications",
+          "Bridge SOL to Sonic",
+          "Complete gaming quests",
+          "Hold Sonic NFTs"
         ],
         requiredActions: [
-          { action: "Bridge ETH via Stargate to 3+ chains", completed: false, priority: "high", estimatedCost: "$50-100 in gas" },
-          { action: "Use messaging protocol on testnet", completed: false, priority: "medium" },
-          { action: "Maintain consistent activity", completed: false, priority: "high" }
+          { action: "Connect wallet and play games", completed: false, priority: "high" },
+          { action: "Complete daily/weekly quests", completed: false, priority: "high" },
+          { action: "Invite friends (referral bonus)", completed: false, priority: "medium" },
+          { action: "Trade on Sonic DEX", completed: false, priority: "medium" }
         ],
-        fundingRound: "Series B - $135M",
-        investors: ["a16z", "Sequoia", "FTX Ventures"],
-        discoveredAt: Date.now() - 86400000 * 30,
-        updatedAt: Date.now()
+        fundingRound: "Series A - $12M",
+        investors: ["Bitkraft", "Galaxy Digital", "Big Brain Holdings"],
+        discoveredAt: now - DAY_MS * 1,
+        updatedAt: now
       },
       {
-        id: "airdrop-2",
-        protocolName: "Scroll",
-        protocolUrl: "https://scroll.io",
-        chain: "scroll",
-        category: "non_retro",
+        id: "airdrop-6",
+        protocolName: "Morph",
+        protocolUrl: "https://morphl2.io",
+        chain: "ethereum",
+        category: "testnet",
         isRetro: false,
         status: "active",
-        estimatedValue: "$200-$2000",
+        estimatedValue: "$800-$4000",
         confidence: 75,
         riskLevel: "low",
         eligibilityCriteria: [
-          "Bridge to Scroll mainnet",
-          "Deploy or interact with contracts",
-          "Provide liquidity on DEXs"
+          "Use Morph Holesky testnet",
+          "Deploy consumer dApps",
+          "Participate in hackathons",
+          "Community engagement"
         ],
         requiredActions: [
-          { action: "Bridge ETH to Scroll", completed: false, priority: "high", estimatedCost: "$10-20" },
-          { action: "Swap on SyncSwap or Ambient", completed: false, priority: "high" },
-          { action: "Provide LP on major DEX", completed: false, priority: "medium", estimatedCost: "$100+" }
+          { action: "Claim Holesky testnet ETH", completed: false, priority: "high" },
+          { action: "Deploy smart contract on Morph", completed: false, priority: "high" },
+          { action: "Use native testnet dApps", completed: false, priority: "medium" },
+          { action: "Join Morphism community", completed: false, priority: "medium" }
         ],
-        fundingRound: "Series B - $50M",
-        investors: ["Polychain", "Bain Capital Crypto"],
-        discoveredAt: Date.now() - 86400000 * 15,
-        updatedAt: Date.now()
-      },
-      {
-        id: "airdrop-3",
-        protocolName: "Hyperliquid",
-        protocolUrl: "https://hyperliquid.xyz",
-        chain: "arbitrum",
-        category: "non_retro",
-        isRetro: false,
-        status: "active",
-        estimatedValue: "$1000-$10000",
-        confidence: 90,
-        riskLevel: "medium",
-        eligibilityCriteria: [
-          "Trade perpetuals on platform",
-          "Maintain trading volume",
-          "Stake in vaults"
-        ],
-        requiredActions: [
-          { action: "Deposit USDC and trade perps", completed: false, priority: "high", estimatedCost: "$500+ trading capital" },
-          { action: "Achieve $10k+ trading volume", completed: false, priority: "high" },
-          { action: "Stake in HLP vault", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Self-funded",
-        discoveredAt: Date.now() - 86400000 * 7,
-        updatedAt: Date.now()
-      },
-      {
-        id: "airdrop-4",
-        protocolName: "Monad",
-        protocolUrl: "https://monad.xyz",
-        chain: "ethereum",
-        category: "testnet",
-        isRetro: false,
-        status: "upcoming",
-        estimatedValue: "$500-$3000",
-        confidence: 70,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Testnet participation",
-          "Discord community activity",
-          "Early builder program"
-        ],
-        requiredActions: [
-          { action: "Join Discord and get roles", completed: false, priority: "high" },
-          { action: "Participate in testnet when live", completed: false, priority: "high" },
-          { action: "Engage with community events", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Series A - $225M",
-        investors: ["Paradigm", "Electric Capital"],
-        discoveredAt: Date.now() - 86400000 * 5,
-        updatedAt: Date.now()
-      },
-      {
-        id: "airdrop-5",
-        protocolName: "Berachain",
-        protocolUrl: "https://berachain.com",
-        chain: "ethereum",
-        category: "testnet",
-        isRetro: false,
-        status: "active",
-        estimatedValue: "$500-$5000",
-        confidence: 80,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Use bArtio testnet",
-          "Stake BGT tokens",
-          "Interact with native dApps"
-        ],
-        requiredActions: [
-          { action: "Get testnet tokens from faucet", completed: false, priority: "high" },
-          { action: "Stake in Proof of Liquidity", completed: false, priority: "high" },
-          { action: "Use BEX, Berps, and Bend", completed: false, priority: "high" }
-        ],
-        fundingRound: "Series B - $100M",
-        investors: ["Framework Ventures", "Polychain"],
-        discoveredAt: Date.now() - 86400000 * 10,
-        updatedAt: Date.now()
+        fundingRound: "Seed - $20M",
+        investors: ["Dragonfly", "Pantera Capital", "Foresight Ventures"],
+        discoveredAt: now - DAY_MS * 4,
+        updatedAt: now
       }
     ];
 
     airdrops.forEach(a => this.airdrops.set(a.id, a));
-    console.log(`[TradingIntelligence] Seeded ${airdrops.length} airdrop opportunities`);
+    console.log(`[TradingIntelligence] Seeded ${airdrops.length} fresh airdrop opportunities`);
   }
 
   getActiveSignals(): TradingSignal[] {

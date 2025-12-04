@@ -744,7 +744,7 @@ export default function TradingAdvisor() {
   });
 
   const { data: livePrices = [], isLoading: pricesLoading } = useQuery<LivePrice[]>({
-    queryKey: ["/api/ultron/prices"],
+    queryKey: ["/api/prices/live"],
     refetchInterval: 5000,
   });
 
