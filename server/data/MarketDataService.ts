@@ -183,28 +183,55 @@ export class MarketDataService {
   }
 
   async getMarketSnapshot(symbol: string): Promise<MarketSnapshot> {
+    const cleanSymbol = symbol.replace('USDT', '').replace('-USD', '').replace('/USDT', '').toUpperCase();
+    
+    // Try CCXT first - this is the most reliable with 9 exchanges
     try {
-      const prices = await coinGeckoClient.getCurrentPrice([symbol]);
-      const price = prices[symbol] || this.fallbackPrices[symbol.toUpperCase()] || 0;
-      return {
-        symbol,
-        price,
-        change24h: 0,
-        volume24h: 0,
-        volatility: 0,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      const price = this.fallbackPrices[symbol.toUpperCase()] || 0;
-      return {
-        symbol,
-        price,
-        change24h: 0,
-        volume24h: 0,
-        volatility: 0,
-        timestamp: Date.now(),
-      };
+      const ccxtPrice = await ccxtAdapter.fetchPrice(cleanSymbol);
+      if (ccxtPrice && ccxtPrice.price > 0) {
+        this.fallbackPrices[cleanSymbol] = ccxtPrice.price;
+        return {
+          symbol: cleanSymbol,
+          price: ccxtPrice.price,
+          change24h: ccxtPrice.change24h || 0,
+          volume24h: ccxtPrice.volume24h || 0,
+          volatility: ccxtPrice.changePercent24h ? Math.abs(ccxtPrice.changePercent24h) : 0,
+          timestamp: Date.now(),
+        };
+      }
+    } catch (ccxtError) {
+      // CCXT failed, try CoinGecko
     }
+    
+    // Try CoinGecko as backup
+    try {
+      const prices = await coinGeckoClient.getCurrentPrice([cleanSymbol]);
+      const price = prices[cleanSymbol] || 0;
+      if (price > 0) {
+        this.fallbackPrices[cleanSymbol] = price;
+        return {
+          symbol: cleanSymbol,
+          price,
+          change24h: 0,
+          volume24h: 0,
+          volatility: 0,
+          timestamp: Date.now(),
+        };
+      }
+    } catch (geckoError) {
+      // CoinGecko also failed
+    }
+    
+    // Use fallback
+    const fallbackPrice = this.fallbackPrices[cleanSymbol] || 0;
+    return {
+      symbol: cleanSymbol,
+      price: fallbackPrice,
+      change24h: 0,
+      volume24h: 0,
+      volatility: 0,
+      timestamp: Date.now(),
+    };
   }
 
   async getDeFiSnapshot(): Promise<DeFiSnapshot> {
