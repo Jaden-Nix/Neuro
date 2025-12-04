@@ -376,11 +376,14 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
         [originalThought.agentId]
       );
 
-      if (isAgreement) {
-        relationship.trust = Math.min(100, relationship.trust + 2);
-        relationship.agreements++;
-      } else {
-        relationship.disagreements++;
+      // Update relationship if it exists
+      if (relationship) {
+        if (isAgreement) {
+          relationship.trust = Math.min(100, relationship.trust + 2);
+          relationship.agreements++;
+        } else {
+          relationship.disagreements++;
+        }
       }
 
     } catch (error) {

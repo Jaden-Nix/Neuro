@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Header } from "@/components/Header";
 import { NeuroNetCore } from "@/components/NeuroNetCore";
@@ -11,10 +11,14 @@ import { LiveSystemStatus } from "@/components/LiveSystemStatus";
 import { ControlPanel } from "@/components/ControlPanel";
 import { TimeWarpSlider } from "@/components/TimeWarpSlider";
 import { DeveloperPanel } from "@/components/DeveloperPanel";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, cacheMetrics, cachedMetrics } from "@/lib/queryClient";
+import { TrendingUp, TrendingDown, Zap, Target, AlertTriangle, RefreshCw, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -38,7 +42,19 @@ import type {
   MemoryEntry,
   SimulationBranch,
   ReplayEvent,
+  TradingSignal,
 } from "@shared/schema";
+
+interface VillageSignal extends TradingSignal {
+  agentName?: string;
+  validators?: Array<{
+    agentId: string;
+    agentName: string;
+    vote: "agree" | "disagree";
+    comment: string;
+    timestamp: number;
+  }>;
+}
 
 export default function Dashboard() {
   const { toast } = useToast();
@@ -52,27 +68,39 @@ export default function Dashboard() {
   // Fetch system state
   const { data: systemState } = useQuery<SystemState>({
     queryKey: ["/api/system/state"],
-    refetchInterval: 5000, // Reduced polling since we have WS
+    refetchInterval: 5000,
   });
 
   // Fetch agents
   const { data: agents = [] } = useQuery<Agent[]>({
     queryKey: ["/api/agents"],
-    refetchInterval: 5000, // Reduced polling
+    refetchInterval: 5000,
   });
 
-  // Use WebSocket metrics if available, otherwise fetch
+  // Fetch metrics with caching
   const { data: fetchedMetrics } = useQuery<LiveMetrics>({
     queryKey: ["/api/metrics"],
-    refetchInterval: 5000, // Fetch every 5 seconds for live prices
-    staleTime: 0, // Always consider data stale
-    gcTime: 0, // Don't cache stale data
-    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 5000,
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnWindowFocus: true,
   });
 
-  // Merge metrics: prefer API data (fetchedMetrics) as it has real CCXT prices
-  // WebSocket metrics may contain fallback values from initial server startup
-  const metrics = fetchedMetrics || wsState.metrics;
+  // Fetch Trading Village signals for display on dashboard
+  const { data: villageSignals = [], refetch: refetchSignals } = useQuery<VillageSignal[]>({
+    queryKey: ["/api/village/signals"],
+    refetchInterval: 10000,
+  });
+
+  // Use cached metrics initially, then switch to fetched data
+  const metrics = fetchedMetrics || wsState.metrics || cachedMetrics;
+
+  // Cache metrics when they change
+  useEffect(() => {
+    if (fetchedMetrics) {
+      cacheMetrics(fetchedMetrics);
+    }
+  }, [fetchedMetrics]);
 
   // Track previous metrics for change calculations
   useEffect(() => {
@@ -84,7 +112,7 @@ export default function Dashboard() {
   // Use WebSocket logs if available, otherwise fetch
   const { data: fetchedLogs = [] } = useQuery<LogEntry[]>({
     queryKey: ["/api/logs"],
-    refetchInterval: wsState.connected ? 10000 : 1000, // Less frequent if WS connected
+    refetchInterval: wsState.connected ? 10000 : 1000,
   });
 
   // Use WebSocket credits if available, otherwise fetch
@@ -122,6 +150,9 @@ export default function Dashboard() {
   const logs = wsState.logs.length > 0 ? wsState.logs : fetchedLogs;
   const simulationTree = wsState.simulations.length > 0 ? wsState.simulations : fetchedSimulations;
 
+  // Active and pending signals for display (show both so users can see what's being evaluated)
+  const activeSignals = villageSignals.filter(s => s.status === "active" || s.status === "pending").slice(0, 4);
+
   // Mutations for control actions
   const simulationMutation = useMutation({
     mutationFn: async () => {
@@ -136,7 +167,6 @@ export default function Dashboard() {
         title: "Simulation Complete",
         description: `Generated ${data.branches?.length || 5} prediction branches`,
       });
-      // Invalidate related queries
       queryClient.invalidateQueries({ queryKey: ["/api/simulations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
@@ -178,7 +208,6 @@ export default function Dashboard() {
         title: data.autonomousMode ? "Autonomous Mode Activated" : "Autonomous Mode Deactivated",
         description: data.message,
       });
-      // Invalidate system state
       queryClient.invalidateQueries({ queryKey: ["/api/system/state"] });
       queryClient.invalidateQueries({ queryKey: ["/api/logs"] });
     },
@@ -188,7 +217,6 @@ export default function Dashboard() {
     setIsSimulating(true);
     simulationMutation.mutate();
     
-    // Save simulation to memory after it completes
     setTimeout(() => {
       if (simulationTree.length > 0) {
         const latestSim = simulationTree[0];
@@ -226,12 +254,12 @@ export default function Dashboard() {
   };
 
   const defaultMetrics: LiveMetrics = {
-    ethPriceUsd: metrics?.ethPriceUsd ?? 3600,
-    btcPriceUsd: metrics?.btcPriceUsd ?? 96000,
-    totalTvlUsd: metrics?.totalTvlUsd ?? 0,
+    ethPriceUsd: metrics?.ethPriceUsd ?? cachedMetrics?.ethPriceUsd ?? 3600,
+    btcPriceUsd: metrics?.btcPriceUsd ?? cachedMetrics?.btcPriceUsd ?? 96000,
+    totalTvlUsd: metrics?.totalTvlUsd ?? cachedMetrics?.totalTvlUsd ?? 0,
     gasPriceGwei: metrics?.gasPriceGwei ?? 25,
     activeAgents: metrics?.activeAgents ?? 10,
-    totalSignals: metrics?.totalSignals ?? 0,
+    totalSignals: metrics?.totalSignals ?? activeSignals.length,
     avgWinRate: metrics?.avgWinRate ?? 0,
     totalTrades: metrics?.totalTrades ?? 0,
     riskLevel: metrics?.riskLevel ?? 50,
@@ -264,6 +292,105 @@ export default function Dashboard() {
           <motion.div variants={itemVariants}>
             <MetricsDashboard metrics={defaultMetrics} previousMetrics={previousMetrics} />
           </motion.div>
+
+          {/* Active Trading Signals Section */}
+          {activeSignals.length > 0 && (
+            <motion.div variants={itemVariants}>
+              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-yellow-500" />
+                      <CardTitle className="text-base">Active Trading Signals</CardTitle>
+                      <Badge variant="secondary">{activeSignals.length}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => refetchSignals()} data-testid="button-refresh-dashboard-signals">
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                      <Link href="/trading">
+                        <Button variant="outline" size="sm" data-testid="button-view-all-signals">
+                          View All
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <AnimatePresence mode="popLayout">
+                      {activeSignals.map((signal, idx) => (
+                        <motion.div
+                          key={signal.id}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
+                          transition={{ delay: idx * 0.05 }}
+                          className={`border rounded-lg p-3 transition-colors ${
+                            signal.direction === "long"
+                              ? "border-green-500/30 bg-green-500/5 dark:bg-green-500/10"
+                              : "border-red-500/30 bg-red-500/5 dark:bg-red-500/10"
+                          }`}
+                          data-testid={`signal-card-${signal.id}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-2">
+                              {signal.direction === "long" ? (
+                                <TrendingUp className="h-4 w-4 text-green-500" />
+                              ) : (
+                                <TrendingDown className="h-4 w-4 text-red-500" />
+                              )}
+                              <span className="font-semibold text-sm">{signal.symbol}</span>
+                            </div>
+                            <Badge 
+                              variant={signal.direction === "long" ? "default" : "destructive"}
+                              className="text-xs"
+                            >
+                              {signal.direction.toUpperCase()}
+                            </Badge>
+                          </div>
+                          
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Entry:</span>
+                              <span className="text-foreground font-mono">${signal.entryPrice?.toLocaleString() || "Market"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Confidence:</span>
+                              <span className={`font-medium ${
+                                signal.confidence >= 0.7 ? "text-green-500" : 
+                                signal.confidence >= 0.5 ? "text-yellow-500" : "text-red-500"
+                              }`}>
+                                {(signal.confidence * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            {signal.agentName && (
+                              <div className="flex justify-between">
+                                <span>By:</span>
+                                <span className="text-foreground">{signal.agentName}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {signal.validators && signal.validators.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-border/50">
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Target className="h-3 w-3" />
+                                <span>
+                                  {signal.validators.filter(v => v.vote === "agree").length} agree / {signal.validators.filter(v => v.vote === "disagree").length} disagree
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Main Grid Layout - Clean 4 Columns */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

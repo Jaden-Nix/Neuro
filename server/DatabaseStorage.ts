@@ -78,12 +78,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(systemState.id, "singleton"));
 
     if (!state) {
-      // Initialize default state if not exists
+      // Initialize default state if not exists - autonomous mode enabled by default
       const [newState] = await db
         .insert(systemState)
         .values({
           id: "singleton",
-          autonomousMode: false,
+          autonomousMode: true, // Enabled by default for continuous operation
           activeAgents: [],
           totalSimulationsRun: 0,
           totalTransactionsExecuted: 0,

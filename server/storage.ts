@@ -196,7 +196,7 @@ export class MemStorage implements IStorage {
 
   constructor() {
     this.systemState = {
-      autonomousMode: false,
+      autonomousMode: true, // Enabled by default for continuous autonomous operation
       activeAgents: [],
       totalSimulationsRun: 0,
       totalTransactionsExecuted: 0,
