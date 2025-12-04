@@ -183,7 +183,7 @@ export class ClaudeService {
   }
 
   async scoutAnalysis(context: MarketContext): Promise<AgentDecision> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackScoutDecision(context);
     }
 
@@ -237,7 +237,7 @@ Provide your analysis as JARVIS would - precise, intelligent, and actionable.`;
   }
 
   async riskAssessment(context: MarketContext, opportunity?: any): Promise<AgentDecision> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackRiskDecision(context);
     }
 
@@ -293,7 +293,7 @@ Provide risk assessment as JARVIS would - thorough, protective, and decisive.`;
   }
 
   async executionPlanning(context: MarketContext, decision: any): Promise<AgentDecision> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackExecutionDecision(context);
     }
 
@@ -358,7 +358,7 @@ Design the execution plan as JARVIS would - optimal, safe, and precise.`;
     riskDecision: AgentDecision,
     executionDecision: AgentDecision
   ): Promise<AgentDecision> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackMetaDecision(scoutDecision, riskDecision, executionDecision);
     }
 
@@ -425,7 +425,7 @@ Synthesize all inputs and make the final call as JARVIS would - wise, strategic,
     context: MarketContext,
     agents: { name: string; personality: string }[]
   ): Promise<{ speeches: { agent: string; speech: string; vote: string; confidence: number }[] }> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackParliamentDebate(topic, agents);
     }
 
@@ -473,7 +473,7 @@ Generate debate speeches for each agent. Make them sound intelligent and distinc
     type: string,
     data: any
   ): Promise<{ insight: string; confidence: number; action: string; impact: string }> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return this.fallbackInsight(type, data);
     }
 
@@ -515,7 +515,7 @@ ${JSON.stringify(data, null, 2)}`;
     trades: any[],
     metrics: any
   ): Promise<{ analysis: string; improvements: string[]; grade: string }> {
-    if (!this.isConfigured) {
+    if (!this.isConfigured && !this.isGeminiAvailable) {
       return {
         analysis: "Backtest analysis requires AI configuration",
         improvements: ["Configure AI integration for detailed analysis"],
@@ -565,29 +565,12 @@ ${JSON.stringify(trades.slice(-10), null, 2)}`;
     }
   }
 
-  getStatus(): { configured: boolean; model: string } {
+  getStatus(): { configured: boolean; model: string; geminiAvailable: boolean } {
     return {
       configured: this.isConfigured,
-      model: "claude-sonnet-4-5",
+      model: this.isConfigured ? "claude-sonnet-4-5" : (this.isGeminiAvailable ? "gemini-2.5-flash" : "none"),
+      geminiAvailable: this.isGeminiAvailable,
     };
-  }
-
-  async generateResponse(
-    prompt: string,
-    systemPrompt: string = "You are a helpful DeFi AI assistant. Provide concise, accurate responses."
-  ): Promise<string> {
-    if (!this.isConfigured) {
-      console.warn("[Claude] generateResponse called but service not configured");
-      return "";
-    }
-
-    try {
-      const response = await queryClaudeWithRetry(systemPrompt, prompt, 1024);
-      return response || "";
-    } catch (error) {
-      console.error("[Claude] generateResponse failed:", error);
-      return "";
-    }
   }
 
   private fallbackScoutDecision(context: MarketContext): AgentDecision {

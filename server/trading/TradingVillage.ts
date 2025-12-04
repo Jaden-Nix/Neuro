@@ -1,12 +1,59 @@
 import Anthropic from "@anthropic-ai/sdk";
+import pLimit from "p-limit";
+import pRetry from "p-retry";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
 
+// Using Replit's AI Integrations for Anthropic access (no API key needed, billed to credits)
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
   baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
 });
+
+const rateLimiter = pLimit(2);
+
+function isRateLimitError(error: any): boolean {
+  const errorMsg = error?.message || String(error);
+  return (
+    errorMsg.includes("429") ||
+    errorMsg.includes("RATELIMIT_EXCEEDED") ||
+    errorMsg.toLowerCase().includes("quota") ||
+    errorMsg.toLowerCase().includes("rate limit")
+  );
+}
+
+async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
+  return rateLimiter(() =>
+    pRetry(
+      async () => {
+        try {
+          const message = await anthropic.messages.create({
+            model: "claude-sonnet-4-5",
+            max_tokens: maxTokens,
+            messages: [{ role: "user", content: prompt }],
+          });
+          const content = message.content[0];
+          return content.type === "text" ? content.text : "";
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            throw error; // Rethrow to trigger retry
+          }
+          // For non-rate-limit errors, create an abort error to stop retrying
+          const abortError = new Error(error?.message || "Request failed");
+          (abortError as any).isAbortError = true;
+          throw abortError;
+        }
+      },
+      {
+        retries: 5,
+        minTimeout: 2000,
+        maxTimeout: 64000,
+        factor: 2,
+      }
+    )
+  );
+}
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
 export type AgentPersonality = "aggressive" | "conservative" | "balanced" | "contrarian" | "momentum" | "experimental";
@@ -340,12 +387,7 @@ export class TradingVillage extends EventEmitter {
     const trustLevel = relationship ? relationship.trust : 50;
 
     try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 200,
-        messages: [{
-          role: "user",
-          content: `You are ${responder.name}, a ${responder.role} AI trader with ${responder.personality} personality.
+      const prompt = `You are ${responder.name}, a ${responder.role} AI trader with ${responder.personality} personality.
 Your specialty: ${responder.specialties.join(", ")}
 Your trust level with ${originalAgent.name}: ${trustLevel}/100
 
@@ -358,11 +400,9 @@ Respond naturally as ${responder.name}. You can:
 - Ask a probing question
 - Share a related insight from your experience
 
-Keep response under 2 sentences. Be conversational, not formal. Reference your specialty if relevant.`
-        }]
-      });
+Keep response under 2 sentences. Be conversational, not formal. Reference your specialty if relevant.`;
 
-      const responseText = response.content[0].type === "text" ? response.content[0].text : "";
+      const responseText = await generateWithRetry(prompt, 200);
       
       const isAgreement = responseText.toLowerCase().includes("agree") || 
                           responseText.toLowerCase().includes("right") ||
@@ -443,22 +483,15 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
             `${m.agentName}: "${m.content}"`
           ).join("\n");
 
-          const response = await anthropic.messages.create({
-            model: "claude-sonnet-4-5",
-            max_tokens: 150,
-            messages: [{
-              role: "user",
-              content: `You are ${agent.name}, a ${agent.role} trader (${agent.personality} personality).
+          const debatePrompt = `You are ${agent.name}, a ${agent.role} trader (${agent.personality} personality).
 Topic: "${debate.topic}"${debate.symbol ? ` regarding ${debate.symbol}` : ""}
 
 Previous discussion:
 ${previousMessages || "No messages yet - you're starting."}
 
-Share your perspective in 1-2 sentences. Be direct and confident. You can agree, disagree, or add new insight.`
-            }]
-          });
+Share your perspective in 1-2 sentences. Be direct and confident. You can agree, disagree, or add new insight.`;
 
-          const messageText = response.content[0].type === "text" ? response.content[0].text : "";
+          const messageText = await generateWithRetry(debatePrompt, 150);
           const isBullish = messageText.toLowerCase().includes("bull") || messageText.toLowerCase().includes("long") || messageText.toLowerCase().includes("buy");
           const isBearish = messageText.toLowerCase().includes("bear") || messageText.toLowerCase().includes("short") || messageText.toLowerCase().includes("sell");
           const isAgreeing = messageText.toLowerCase().includes("agree") || messageText.toLowerCase().includes("right");
