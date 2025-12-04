@@ -556,8 +556,8 @@ export class TradingVillage extends EventEmitter {
     };
 
     this.thoughts.push(thought);
-    if (this.thoughts.length > 500) {
-      this.thoughts = this.thoughts.slice(-400);
+    if (this.thoughts.length > 2000) {
+      this.thoughts = this.thoughts.slice(-1800);
     }
 
     this.emit("thought", thought);
@@ -1781,7 +1781,7 @@ Describe your evolution in 2-3 sentences:
     return this.agents.get(id);
   }
 
-  getThoughts(limit = 50, agentId?: string): AgentThought[] {
+  getThoughts(limit = 200, agentId?: string): AgentThought[] {
     let thoughts = [...this.thoughts].reverse();
     if (agentId) {
       thoughts = thoughts.filter(t => t.agentId === agentId);

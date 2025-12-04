@@ -542,8 +542,22 @@ export default function UltronSignals() {
     }));
   }, [tokens, livePrices]);
 
+  const hasLivePrice = (token: TokenWithPrice): boolean => {
+    const price = token.livePrice;
+    if (!price) return false;
+    return price.changePercent24h !== 0 || price.volumeUsd24h > 0;
+  };
+
+  const liveTokens = useMemo(() => {
+    return tokensWithPrices.filter(t => t.isActive && hasLivePrice(t));
+  }, [tokensWithPrices]);
+
+  const pendingTokensCount = useMemo(() => {
+    return tokensWithPrices.filter(t => t.isActive && !hasLivePrice(t)).length;
+  }, [tokensWithPrices]);
+
   const filteredTokens = useMemo(() => {
-    let result = tokensWithPrices.filter(t => t.isActive);
+    let result = liveTokens;
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -571,7 +585,7 @@ export default function UltronSignals() {
     });
 
     return result;
-  }, [tokensWithPrices, searchQuery, categoryFilter, sortBy]);
+  }, [liveTokens, searchQuery, categoryFilter, sortBy]);
 
   const activeSignals = signals.filter(s => s.status === "active");
 
@@ -588,9 +602,14 @@ export default function UltronSignals() {
               <Radio className={`w-3 h-3 mr-1 ${isConnected ? "animate-pulse" : ""}`} />
               {isConnected ? "LIVE" : "OFFLINE"}
             </Badge>
-            <Badge variant="outline">
-              {tokensWithPrices.filter(t => t.livePrice).length}/{tokens.length} tokens
+            <Badge variant="outline" className="text-green-400 border-green-400/30">
+              {liveTokens.length} live tokens
             </Badge>
+            {pendingTokensCount > 0 && (
+              <Badge variant="outline" className="text-muted-foreground">
+                +{pendingTokensCount} more coming soon
+              </Badge>
+            )}
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
