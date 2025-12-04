@@ -487,23 +487,18 @@ export async function registerRoutes(
   // Metrics - Real market data + AI agent stats (no wallet required)
   app.get("/api/metrics", async (_req, res) => {
     try {
-      // Default fallback prices
+      // Default fallback prices (current market estimates)
       let ethPrice = 3500;
       let btcPrice = 95000;
       let totalTVL = 0;
       let gasPrice = 25;
       
-      // Try to get live prices from CCXT via TradingVillage (which we know works)
+      // Use LivePriceService which is proven to work (same as /api/prices/live)
       try {
-        const liveData = ccxtAdapter.getActiveTokens();
-        if (liveData.length > 0) {
-          // Use fetchMultiplePrices which is more reliable
-          const prices = await ccxtAdapter.fetchMultiplePrices(['BTC', 'ETH']);
-          const btcData = prices.get('BTC');
-          const ethData = prices.get('ETH');
-          if (btcData && btcData.price > 0) btcPrice = btcData.price;
-          if (ethData && ethData.price > 0) ethPrice = ethData.price;
-        }
+        const btcData = livePriceService.getPrice('BTC');
+        const ethData = livePriceService.getPrice('ETH');
+        if (btcData && btcData.price > 0) btcPrice = btcData.price;
+        if (ethData && ethData.price > 0) ethPrice = ethData.price;
       } catch (e) {
         // Use fallbacks
       }
