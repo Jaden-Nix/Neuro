@@ -3,18 +3,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, AlertCircle, Zap, Shield } from "lucide-react";
 
-interface SystemStatus {
-  fraxtalConnected: boolean;
-  atpRpc: boolean;
-  iqTokenRpc: boolean;
-  adkQueries: boolean;
-  rpcStatus: string;
-  blockNumber: number;
-  chainId: number;
+interface HackathonStatus {
+  compliance?: {
+    atp?: {
+      fraxtalConnected?: boolean;
+      rpcStatus?: string;
+      lastBlockNumber?: number;
+      chainId?: number;
+    };
+    adkTs?: {
+      apiKeyConfigured?: boolean;
+    };
+    iqToken?: {
+      rpcStatus?: string;
+    };
+  };
 }
 
 export function LiveSystemStatus() {
-  const { data: status } = useQuery({
+  const { data: status } = useQuery<HackathonStatus>({
     queryKey: ["/api/hackathon/status"],
     refetchInterval: 5000,
   });
