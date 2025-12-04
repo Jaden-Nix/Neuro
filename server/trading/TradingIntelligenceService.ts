@@ -71,8 +71,117 @@ export class TradingIntelligenceService {
   constructor() {
     this.marketDataService = new MarketDataService();
     this.performance = this.initPerformance();
-    this.seedInitialAirdrops();
-    console.log("[TradingIntelligence] Service initialized with Claude AI");
+    this.startLiveAirdropDiscovery();
+    console.log("[TradingIntelligence] Service initialized with Live AI Airdrop Discovery");
+  }
+
+  private startLiveAirdropDiscovery(): void {
+    console.log("[AirdropScout] Starting LIVE airdrop discovery - no static data");
+    
+    setTimeout(() => this.discoverCurrentAirdrops(), 5000);
+    
+    setInterval(() => this.discoverCurrentAirdrops(), 3 * 60 * 1000);
+  }
+
+  private async discoverCurrentAirdrops(): Promise<void> {
+    console.log("[AirdropScout] Discovering live December 2025 airdrops via AI...");
+    
+    const discoveryPrompt = `You are an elite DeFi airdrop researcher with real-time market knowledge. It is December 2025.
+
+CRITICAL: Only list airdrops that are ACTIVELY running RIGHT NOW in December 2025. NO old, ended, or historical airdrops.
+
+Find the TOP 5 highest-value airdrop opportunities that users can farm TODAY. Focus on:
+1. L2s launching tokens soon (Monad, Berachain, MegaETH, etc.)
+2. DEXs with active points programs (Jupiter, Hyperliquid, etc.)
+3. Lending protocols with ongoing campaigns
+4. New chains with testnet/mainnet incentives
+5. Projects with major VC backing but no token yet
+
+For each, provide:
+- Exact actions users should take NOW
+- Estimated value based on similar recent airdrops
+- Urgency level (some snapshots may be imminent)
+
+Return ONLY valid JSON array (no markdown):
+[
+  {
+    "protocolName": "string",
+    "protocolUrl": "string",
+    "chain": "ethereum"|"solana"|"base"|"arbitrum"|"optimism"|"other",
+    "category": "retro"|"non_retro"|"testnet",
+    "isRetro": boolean,
+    "estimatedValue": "$X-$Y",
+    "confidence": 50-100,
+    "riskLevel": "low"|"medium"|"high",
+    "eligibilityCriteria": ["criteria1", "criteria2"],
+    "requiredActions": [{"action": "string", "priority": "high"|"medium"|"low", "estimatedCost": "string"}],
+    "fundingRound": "string",
+    "investors": ["investor1"],
+    "urgency": "urgent"|"high"|"medium"|"low",
+    "snapshotDate": "if known, or 'TBA'",
+    "whyNow": "why this is hot in Dec 2025"
+  }
+]`;
+
+    try {
+      const response = await this.callClaude(discoveryPrompt);
+      
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.log("[AirdropScout] No valid JSON in discovery response");
+        return;
+      }
+      
+      const discovered = JSON.parse(jsonMatch[0]);
+      const now = Date.now();
+      
+      for (const item of discovered) {
+        const existingNames = Array.from(this.airdrops.values()).map(a => a.protocolName.toLowerCase());
+        if (existingNames.includes(item.protocolName.toLowerCase())) {
+          const existing = Array.from(this.airdrops.values()).find(
+            a => a.protocolName.toLowerCase() === item.protocolName.toLowerCase()
+          );
+          if (existing) {
+            existing.updatedAt = now;
+            existing.confidence = item.confidence || existing.confidence;
+          }
+          continue;
+        }
+        
+        const airdrop: AirdropOpportunity = {
+          id: `airdrop-live-${nanoid(6)}`,
+          protocolName: item.protocolName,
+          protocolUrl: item.protocolUrl || `https://${item.protocolName.toLowerCase().replace(/\s+/g, '')}.xyz`,
+          chain: item.chain || "ethereum",
+          category: item.category || "non_retro",
+          isRetro: item.isRetro || false,
+          status: "active",
+          estimatedValue: item.estimatedValue || "$500-$5000",
+          confidence: Math.min(95, Math.max(50, item.confidence || 70)),
+          riskLevel: item.riskLevel || "medium",
+          eligibilityCriteria: item.eligibilityCriteria || ["Use the protocol actively"],
+          requiredActions: (item.requiredActions || []).map((a: any) => ({
+            action: a.action,
+            completed: false,
+            priority: a.priority || "medium",
+            estimatedCost: a.estimatedCost
+          })),
+          fundingRound: item.fundingRound || "Unknown",
+          investors: item.investors || [],
+          discoveredAt: now,
+          updatedAt: now,
+          aiDiscovered: true,
+          discoveryReason: item.whyNow || `Live December 2025 opportunity - ${item.urgency || 'active'}`
+        };
+        
+        this.airdrops.set(airdrop.id, airdrop);
+        console.log(`[AirdropScout] LIVE: ${airdrop.protocolName} (${airdrop.chain}) - ${airdrop.estimatedValue} - Confidence: ${airdrop.confidence}%`);
+      }
+      
+      console.log(`[AirdropScout] Total active airdrops: ${this.airdrops.size}`);
+    } catch (error) {
+      console.error("[AirdropScout] Live discovery failed:", error);
+    }
   }
 
   private initPerformance(): TradingPerformance {
@@ -1106,352 +1215,10 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
     );
   }
 
-  private seedInitialAirdrops(): void {
-    const DAY_MS = 86400000;
-    const now = Date.now();
-    
-    const airdrops: AirdropOpportunity[] = [
-      {
-        id: "airdrop-1",
-        protocolName: "Hyperliquid Season 2",
-        protocolUrl: "https://hyperliquid.xyz",
-        chain: "arbitrum",
-        category: "retro",
-        isRetro: true,
-        status: "active",
-        estimatedValue: "$5000-$100000",
-        confidence: 95,
-        riskLevel: "medium",
-        eligibilityCriteria: [
-          "Trade perpetuals on Hyperliquid",
-          "High trading volume prioritized",
-          "Use HLP vault for passive rewards",
-          "Active since Season 1 bonus"
-        ],
-        requiredActions: [
-          { action: "Deposit USDC and trade perps actively", completed: false, priority: "high", estimatedCost: "$500+ trading capital" },
-          { action: "Achieve $50k+ cumulative volume", completed: false, priority: "high" },
-          { action: "Stake in HLP vault", completed: false, priority: "high" },
-          { action: "Maintain consistent weekly activity", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Self-funded (profitable)",
-        investors: [],
-        discoveredAt: now - DAY_MS * 2,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-2",
-        protocolName: "MetaMask (MASK)",
-        protocolUrl: "https://metamask.io",
-        chain: "ethereum",
-        category: "retro",
-        isRetro: true,
-        status: "active",
-        estimatedValue: "$2000-$50000",
-        confidence: 88,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Use MetaMask Swaps feature",
-          "Bridge assets via MetaMask",
-          "Stake ETH through MetaMask",
-          "Use Linea network actively"
-        ],
-        requiredActions: [
-          { action: "Make 10+ swaps via MetaMask Swaps", completed: false, priority: "high", estimatedCost: "Gas fees only" },
-          { action: "Bridge to Linea L2", completed: false, priority: "high", estimatedCost: "$10-20" },
-          { action: "Earn MetaMask Rewards Points", completed: false, priority: "high" },
-          { action: "Use mUSD stablecoin", completed: false, priority: "medium" }
-        ],
-        fundingRound: "ConsenSys backed",
-        investors: ["ConsenSys", "Paradigm"],
-        discoveredAt: now - DAY_MS * 1,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-3",
-        protocolName: "Jupiter Season 2",
-        protocolUrl: "https://jup.ag",
-        chain: "solana",
-        category: "retro",
-        isRetro: true,
-        status: "active",
-        estimatedValue: "$1000-$20000",
-        confidence: 90,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Trade on Jupiter DEX aggregator",
-          "Use Jupiter Perps",
-          "Stake JUP tokens",
-          "Use limit orders feature"
-        ],
-        requiredActions: [
-          { action: "Max volume on Jupiter swaps", completed: false, priority: "high", estimatedCost: "SOL gas fees" },
-          { action: "Trade perpetuals on Jupiter Perps", completed: false, priority: "high" },
-          { action: "Stake JUP for governance", completed: false, priority: "medium" },
-          { action: "Use DCA and limit orders", completed: false, priority: "medium" }
-        ],
-        fundingRound: "DAO Treasury",
-        investors: [],
-        discoveredAt: now - DAY_MS * 3,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-4",
-        protocolName: "Base Network Token",
-        protocolUrl: "https://base.org",
-        chain: "base",
-        category: "non_retro",
-        isRetro: false,
-        status: "active",
-        estimatedValue: "$500-$10000",
-        confidence: 75,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Use native Base dApps",
-          "Provide liquidity on Aerodrome",
-          "Use DeFi protocols (Aave, Uniswap)",
-          "Sustained organic usage"
-        ],
-        requiredActions: [
-          { action: "Bridge ETH to Base", completed: false, priority: "high", estimatedCost: "$5-10" },
-          { action: "Swap on Aerodrome DEX", completed: false, priority: "high" },
-          { action: "Use Clanker token launcher", completed: false, priority: "medium" },
-          { action: "Lend/borrow on Aave Base", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Coinbase backed",
-        investors: ["Coinbase"],
-        discoveredAt: now - DAY_MS * 5,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-5",
-        protocolName: "Meteora Season 2",
-        protocolUrl: "https://meteora.ag",
-        chain: "solana",
-        category: "retro",
-        isRetro: true,
-        status: "active",
-        estimatedValue: "$1500-$15000",
-        confidence: 92,
-        riskLevel: "medium",
-        eligibilityCriteria: [
-          "Provide liquidity on Meteora",
-          "Generate trading fees",
-          "Use volatile pairs for higher rewards",
-          "Season 1 ended Oct 2025"
-        ],
-        requiredActions: [
-          { action: "Add LP to DLMM pools", completed: false, priority: "high", estimatedCost: "$100+ LP capital" },
-          { action: "Focus on high-volume pairs", completed: false, priority: "high" },
-          { action: "Earn MET points from fees", completed: false, priority: "high" },
-          { action: "Maintain LP positions for 7+ days", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Seed - $4M",
-        investors: ["Jump Crypto", "Solana Ventures"],
-        discoveredAt: now - DAY_MS * 4,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-6",
-        protocolName: "Abstract Chain",
-        protocolUrl: "https://abs.xyz",
-        chain: "ethereum",
-        category: "non_retro",
-        isRetro: false,
-        status: "active",
-        estimatedValue: "$800-$8000",
-        confidence: 80,
-        riskLevel: "low",
-        eligibilityCriteria: [
-          "Earn XP points and badges",
-          "Use dApps on Abstract chain",
-          "Hold PENGU tokens (bonus)",
-          "Complete Abstract quests"
-        ],
-        requiredActions: [
-          { action: "Bridge to Abstract chain", completed: false, priority: "high", estimatedCost: "$10-15" },
-          { action: "Earn XP from on-chain activity", completed: false, priority: "high" },
-          { action: "Collect achievement badges", completed: false, priority: "medium" },
-          { action: "Hold PENGU for multiplier", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Pudgy Penguins backed",
-        investors: ["1kx", "Founders Fund"],
-        discoveredAt: now - DAY_MS * 2,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-7",
-        protocolName: "Axiom (Solana)",
-        protocolUrl: "https://axiom.trade",
-        chain: "solana",
-        category: "retro",
-        isRetro: true,
-        status: "active",
-        estimatedValue: "$500-$5000",
-        confidence: 85,
-        riskLevel: "medium",
-        eligibilityCriteria: [
-          "Trade perpetuals on Axiom",
-          "Complete trading quests",
-          "Refer users for bonus",
-          "Earn SOL cashback rewards"
-        ],
-        requiredActions: [
-          { action: "Trade perps to earn points", completed: false, priority: "high" },
-          { action: "Complete weekly quests", completed: false, priority: "high" },
-          { action: "Invite 3+ active traders", completed: false, priority: "medium" },
-          { action: "Claim SOL cashback", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Seed - $8M",
-        investors: ["Multicoin Capital", "Solana Ventures"],
-        discoveredAt: now - DAY_MS * 1,
-        updatedAt: now
-      },
-      {
-        id: "airdrop-8",
-        protocolName: "Hylo Finance",
-        protocolUrl: "https://hylo.finance",
-        chain: "solana",
-        category: "non_retro",
-        isRetro: false,
-        status: "active",
-        estimatedValue: "$1000-$8000",
-        confidence: 78,
-        riskLevel: "medium",
-        eligibilityCriteria: [
-          "Use liquidation-free leverage via hyUSD",
-          "Loop strategies on Solana",
-          "Provide liquidity",
-          "Early adopter bonus"
-        ],
-        requiredActions: [
-          { action: "Mint hyUSD with SOL collateral", completed: false, priority: "high" },
-          { action: "Use leverage looping strategy", completed: false, priority: "high" },
-          { action: "Provide LP for hyUSD pairs", completed: false, priority: "medium" },
-          { action: "Maintain position for 14+ days", completed: false, priority: "medium" }
-        ],
-        fundingRound: "Seed - $3M",
-        investors: ["Framework Ventures", "Mechanism Capital"],
-        discoveredAt: now - DAY_MS * 3,
-        updatedAt: now
-      }
-    ];
-
-    airdrops.forEach(a => this.airdrops.set(a.id, a));
-    console.log(`[TradingIntelligence] Seeded ${airdrops.length} active airdrop opportunities for Dec 2025`);
-    
-    this.startAirdropDiscovery();
-  }
-
-  private startAirdropDiscovery(): void {
-    setInterval(() => this.discoverNewAirdrops(), 5 * 60 * 1000);
-    
-    setTimeout(() => this.discoverNewAirdrops(), 30000);
-  }
 
   async discoverNewAirdrops(): Promise<AirdropOpportunity[]> {
-    console.log("[AirdropScout] Starting AI-powered airdrop discovery...");
-    
-    const discoveryPrompt = `You are an elite DeFi airdrop researcher. Analyze the current crypto ecosystem and identify HIGH-PROBABILITY airdrop opportunities that users should farm NOW.
-
-Focus on:
-1. L2s and new chains that haven't launched tokens yet
-2. DEXes with points programs
-3. Lending/borrowing protocols with active campaigns
-4. Infrastructure projects with testnet incentives
-5. Projects with major VC backing but no token
-
-For each opportunity, assess:
-- Likelihood of airdrop (based on VC backing, team history, points programs)
-- Estimated value based on comparable airdrops
-- Required actions to qualify
-- Risk level (rug potential, time investment)
-
-Current date: December 2025
-
-Return EXACTLY 3 new opportunities in this JSON format (no markdown, just JSON array):
-[
-  {
-    "protocolName": "string",
-    "protocolUrl": "string",
-    "chain": "ethereum" | "solana" | "base" | "arbitrum" | "optimism",
-    "category": "retro" | "non_retro" | "testnet",
-    "isRetro": boolean,
-    "estimatedValue": "$X-$Y",
-    "confidence": 50-100,
-    "riskLevel": "low" | "medium" | "high",
-    "eligibilityCriteria": ["criteria1", "criteria2", "criteria3"],
-    "requiredActions": [
-      {"action": "string", "priority": "high" | "medium" | "low", "estimatedCost": "string"}
-    ],
-    "fundingRound": "string",
-    "investors": ["investor1", "investor2"],
-    "whyNow": "string explaining urgency"
-  }
-]
-
-Be specific with current protocols. No generic suggestions. Focus on opportunities most likely to reward users in 2025.`;
-
-    try {
-      const response = await this.callClaude(discoveryPrompt);
-      
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        console.log("[AirdropScout] No valid JSON in discovery response");
-        return [];
-      }
-      
-      const discovered = JSON.parse(jsonMatch[0]);
-      const newAirdrops: AirdropOpportunity[] = [];
-      const now = Date.now();
-      
-      for (const item of discovered) {
-        const existingNames = Array.from(this.airdrops.values()).map(a => a.protocolName.toLowerCase());
-        if (existingNames.includes(item.protocolName.toLowerCase())) {
-          continue;
-        }
-        
-        const airdrop: AirdropOpportunity = {
-          id: `airdrop-ai-${nanoid(6)}`,
-          protocolName: item.protocolName,
-          protocolUrl: item.protocolUrl || `https://${item.protocolName.toLowerCase().replace(/\s+/g, '')}.xyz`,
-          chain: item.chain || "ethereum",
-          category: item.category || "non_retro",
-          isRetro: item.isRetro || false,
-          status: "active",
-          estimatedValue: item.estimatedValue || "$500-$5000",
-          confidence: Math.min(95, Math.max(50, item.confidence || 70)),
-          riskLevel: item.riskLevel || "medium",
-          eligibilityCriteria: item.eligibilityCriteria || ["Use the protocol actively"],
-          requiredActions: (item.requiredActions || []).map((a: any) => ({
-            action: a.action,
-            completed: false,
-            priority: a.priority || "medium",
-            estimatedCost: a.estimatedCost
-          })),
-          fundingRound: item.fundingRound || "Unknown",
-          investors: item.investors || [],
-          discoveredAt: now,
-          updatedAt: now,
-          aiDiscovered: true,
-          discoveryReason: item.whyNow || "AI-detected opportunity"
-        };
-        
-        this.airdrops.set(airdrop.id, airdrop);
-        newAirdrops.push(airdrop);
-        
-        console.log(`[AirdropScout] DISCOVERED: ${airdrop.protocolName} (${airdrop.chain}) - ${airdrop.estimatedValue} - Confidence: ${airdrop.confidence}%`);
-      }
-      
-      if (newAirdrops.length > 0) {
-        console.log(`[AirdropScout] Found ${newAirdrops.length} new airdrop opportunities via AI`);
-      }
-      
-      return newAirdrops;
-    } catch (error) {
-      console.error("[AirdropScout] Discovery failed:", error);
-      return [];
-    }
+    await this.discoverCurrentAirdrops();
+    return Array.from(this.airdrops.values()).filter(a => a.aiDiscovered);
   }
 
   async refreshAirdropIntel(airdropId: string): Promise<AirdropOpportunity | null> {

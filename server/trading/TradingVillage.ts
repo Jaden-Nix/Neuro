@@ -803,7 +803,7 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         takeProfit3: tp3,
         confidence,
         timeframe: "4H",
-        reasoning: `${agent.specialty || agent.specialties[0]} analysis indicates ${direction} opportunity based on current price action and volume patterns.`,
+        reasoning: `${agent.specialties[0]} analysis indicates ${direction} opportunity based on current price action and volume patterns.`,
         technicalAnalysis: {
           pattern: direction === "long" ? "Higher low formation" : "Lower high formation",
           indicators: ["RSI oversold" , "MACD bullish crossover", "Volume spike"],
@@ -1176,48 +1176,152 @@ Describe your evolution in 2-3 sentences:
   }
 
   private startBackgroundProcesses() {
-    setInterval(() => this.runHuntingCycle(), 60000);
-    setInterval(() => this.runDebateCycle(), 90000);
-    setInterval(() => this.runKnowledgeSharingCycle(), 120000);
-    setInterval(() => this.generateMarketInsights(), 45000);
+    console.log("[TradingVillage] Starting active signal generation and evolution...");
+    
+    setTimeout(() => this.runInitialSignalGeneration(), 3000);
+    
+    setInterval(() => this.runHuntingCycle(), 30000);
+    setInterval(() => this.runDebateCycle(), 60000);
+    setInterval(() => this.runKnowledgeSharingCycle(), 90000);
+    setInterval(() => this.generateMarketInsights(), 20000);
+    setInterval(() => this.runEvolutionCycle(), 120000);
+  }
+
+  private async runInitialSignalGeneration() {
+    console.log("[TradingVillage] Generating initial trading signals...");
+    const hunters = Array.from(this.agents.values()).filter(a => 
+      a.role === "hunter" || a.role === "scout" || a.role === "analyst"
+    );
+
+    const symbols = ["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB"];
+    
+    for (let i = 0; i < Math.min(3, hunters.length); i++) {
+      const hunter = hunters[i];
+      const symbol = symbols[i % symbols.length];
+      const direction = Math.random() > 0.45 ? "long" : "short";
+      const confidence = 0.65 + Math.random() * 0.3;
+
+      hunter.status = "analyzing";
+      this.addThought(hunter.id, "analysis",
+        `Completed comprehensive ${symbol} analysis. Multiple confluence signals detected.`,
+        { symbol, direction, confidence }
+      );
+
+      await this.claimSignal(hunter.id, symbol, direction, confidence);
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    
+    console.log("[TradingVillage] Initial signals generated:", this.tradeSignals.length);
+  }
+
+  private async runEvolutionCycle() {
+    const agents = Array.from(this.agents.values())
+      .sort((a, b) => {
+        const aScore = a.wins * 2 - a.losses + a.currentStreak.count * (a.currentStreak.type === "win" ? 1 : -1);
+        const bScore = b.wins * 2 - b.losses + b.currentStreak.count * (b.currentStreak.type === "win" ? 1 : -1);
+        return bScore - aScore;
+      });
+
+    for (const agent of agents.slice(0, 3)) {
+      if (agent.currentStreak.count >= 2 || agent.wins >= 3) {
+        const evolutionType = agent.currentStreak.type === "win" ? "adaptation" : "mutation";
+        const newGen = agent.generation + 1;
+        const oldCreditScore = agent.creditScore;
+        
+        agent.generation = newGen;
+        agent.creditScore += 50;
+        agent.experience += 25;
+        
+        const newStrategy = this.generateEvolutionStrategy(agent);
+        if (newStrategy && !agent.strategies.includes(newStrategy)) {
+          agent.strategies.push(newStrategy);
+          agent.memory.successfulStrategies.push(newStrategy);
+        }
+        
+        this.addThought(agent.id, "learning",
+          `EVOLUTION: Generation ${newGen}! ${evolutionType === "adaptation" ? "Win streak" : "Adaptation"} triggered upgrade. ` +
+          `New strategy: ${newStrategy}. Credits: ${oldCreditScore} -> ${agent.creditScore}`,
+          { evolutionType, newGen, creditGain: 50, newStrategy }
+        );
+
+        const competition: CompetitionEvent = {
+          id: `comp-${nanoid(8)}`,
+          type: "evolution",
+          agents: [agent.id],
+          description: `${agent.name} evolved to Generation ${newGen}!`,
+          creditChange: { [agent.id]: 50 },
+          timestamp: Date.now()
+        };
+        this.competitions.push(competition);
+        this.emit("evolution", { agent, competition });
+        
+        console.log(`[TradingVillage] EVOLUTION: ${agent.name} -> Gen ${newGen}`);
+        break;
+      }
+    }
+  }
+
+  private generateEvolutionStrategy(agent: VillageAgent): string {
+    const strategies: Record<AgentRole, string[]> = {
+      hunter: ["Momentum scalping", "Volume breakout", "Trend reversal detection", "Gap filling strategy"],
+      analyst: ["Multi-TF confluence", "Pattern recognition v2", "Indicator divergence", "Support/resistance mapping"],
+      strategist: ["Dynamic position sizing", "Volatility-adjusted stops", "Portfolio rebalancing", "Correlation hedging"],
+      sentinel: ["Whale tracking", "Exchange flow analysis", "Liquidation cascade prediction", "Smart money following"],
+      scout: ["Narrative alpha", "Social sentiment analysis", "On-chain metrics", "Early project detection"],
+      veteran: ["Cycle timing", "Macro correlation", "Historical pattern matching", "Crisis management v2"]
+    };
+    
+    const roleStrategies = strategies[agent.role] || strategies.hunter;
+    return roleStrategies[Math.floor(Math.random() * roleStrategies.length)];
   }
 
   private async runHuntingCycle() {
     const hunters = Array.from(this.agents.values()).filter(a => 
-      a.role === "hunter" || a.role === "scout"
+      a.role === "hunter" || a.role === "scout" || a.role === "analyst"
     );
 
     for (const hunter of hunters) {
-      if (Math.random() > 0.6 || hunter.status !== "hunting") continue;
+      if (Math.random() > 0.8 || hunter.status === "debating") continue;
 
-      const symbols = ["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB", "OP", "SUI"];
+      const symbols = ["BTC", "ETH", "SOL", "AVAX", "LINK", "ARB", "OP", "SUI", "DOGE", "PEPE"];
       const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+      const rsi = 30 + Math.random() * 40;
+      const volumeAbove = Math.random() > 0.5;
 
+      hunter.status = "analyzing";
       this.addThought(hunter.id, "observation",
-        `Scanning ${symbol}... RSI: ${(30 + Math.random() * 40).toFixed(1)}, Volume: ${Math.random() > 0.5 ? "above" : "below"} average`,
-        { symbol, scanning: true }
+        `Scanning ${symbol}... RSI: ${rsi.toFixed(1)}, Volume: ${volumeAbove ? "ABOVE" : "below"} average, Trend: ${rsi < 40 ? "oversold" : rsi > 60 ? "overbought" : "neutral"}`,
+        { symbol, scanning: true, rsi, volumeAbove }
       );
 
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1500));
 
-      if (Math.random() > 0.7) {
-        const direction = Math.random() > 0.5 ? "long" : "short";
-        const confidence = 0.6 + Math.random() * 0.35;
+      if (Math.random() > 0.4) {
+        const direction = (rsi < 45 || volumeAbove) ? "long" : "short";
+        const confidence = 0.65 + Math.random() * 0.3;
 
-        const analysts = Array.from(this.agents.values()).filter(a => a.role === "analyst");
+        const analysts = Array.from(this.agents.values()).filter(a => a.role === "analyst" || a.role === "strategist");
         const analyst = analysts[Math.floor(Math.random() * analysts.length)];
 
-        if (analyst) {
+        if (analyst && analyst.id !== hunter.id) {
           this.addThought(hunter.id, "analysis",
-            `@${analyst.name}, seeing ${direction} setup on ${symbol}. Confidence: ${(confidence * 100).toFixed(0)}%. Your take?`,
-            { symbol, direction, confidence },
+            `@${analyst.name}, spotted ${direction.toUpperCase()} setup on ${symbol}. RSI ${rsi.toFixed(0)}, Volume ${volumeAbove ? "spiking" : "declining"}. Confidence: ${(confidence * 100).toFixed(0)}%. Validate?`,
+            { symbol, direction, confidence, rsi },
             undefined,
             [analyst.id]
           );
         }
 
         await this.claimSignal(hunter.id, symbol, direction, confidence);
+        
+        hunter.wins += Math.random() > 0.4 ? 1 : 0;
+        if (hunter.wins > 0) {
+          hunter.currentStreak = { type: "win", count: hunter.currentStreak.count + 1 };
+          hunter.creditScore += 10;
+        }
       }
+      
+      hunter.status = "hunting";
     }
   }
 
