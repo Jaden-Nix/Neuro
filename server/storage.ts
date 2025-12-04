@@ -219,8 +219,8 @@ export class MemStorage implements IStorage {
     this.previousMetrics = null;
 
     this.metrics = {
-      ethPriceUsd: 3600,
-      btcPriceUsd: 96000,
+      ethPriceUsd: 0,
+      btcPriceUsd: 0,
       totalTvlUsd: 0,
       gasPriceGwei: 25,
       activeAgents: 10,
