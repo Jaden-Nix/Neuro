@@ -570,8 +570,7 @@ export class TradingIntelligenceService {
       const isDataReal = ohlcvResult.source === 'real';
       
       if (!isDataReal) {
-        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Using synthetic OHLCV data, skipping signal generation`);
-        return null;
+        console.log(`[TradingIntelligence] ${symbol} Using synthetic OHLCV data - signal will be flagged`);
       }
       
       const candles: CandleData[] = realCandles.map(c => ({
@@ -614,24 +613,30 @@ export class TradingIntelligenceService {
       
       console.log(`[TradingIntelligence] ${symbol} ENHANCED: Technical ${bestConfluence.score.toFixed(1)}%, Overall ${intelligenceScore.overallScore.toFixed(1)}%, Volatility: ${volatilityRegime.regime}, Patterns: ${patterns.length}, HTF: ${mtfAnalysis.htfTrend}, DataQuality: ${intelligenceScore.dataQuality.overallQuality}`);
       
-      if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
-        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Insufficient confluence (${bestConfluence.score.toFixed(1)}% < 60%)`);
-        return null;
+      let riskWarnings: string[] = [];
+      
+      if (bestConfluence.recommendation === "avoid") {
+        riskWarnings.push(`Low confluence (${bestConfluence.score.toFixed(1)}%)`);
+        console.log(`[TradingIntelligence] ${symbol} WARNING - Low confluence (${bestConfluence.score.toFixed(1)}%)`);
       }
       
       if (intelligenceScore.overallScore < 50 && intelligenceScore.signals.some(s => s.includes('Unfavorable') || s.includes('Weak') || s.includes('Counter'))) {
-        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Intelligence warnings present with low score (${intelligenceScore.overallScore.toFixed(1)}%)`);
-        return null;
+        riskWarnings.push(`Intelligence score low (${intelligenceScore.overallScore.toFixed(1)}%)`);
+        console.log(`[TradingIntelligence] ${symbol} WARNING - Intelligence score low (${intelligenceScore.overallScore.toFixed(1)}%)`);
       }
       
       if (!htfAligned && mtfAnalysis.htfTrend !== 'neutral') {
-        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - HTF trend not aligned (Signal: ${bestDirection}, HTF: ${mtfAnalysis.htfTrend})`);
-        return null;
+        riskWarnings.push(`HTF trend not aligned (${mtfAnalysis.htfTrend})`);
+        console.log(`[TradingIntelligence] ${symbol} WARNING - HTF trend not aligned (Signal: ${bestDirection}, HTF: ${mtfAnalysis.htfTrend})`);
       }
       
-      if (intelligenceScore.dataQuality.overallQuality === 'low' && intelligenceScore.overallScore < 65) {
-        console.log(`[TradingIntelligence] ${symbol} FILTERED OUT - Low data quality with insufficient score`);
-        return null;
+      if (intelligenceScore.dataQuality.overallQuality === 'low') {
+        riskWarnings.push('Low data quality');
+        console.log(`[TradingIntelligence] ${symbol} WARNING - Low data quality`);
+      }
+      
+      if (!isDataReal) {
+        riskWarnings.push('Using synthetic data');
       }
       
       const stochRSIStr = indicators.stochRSI ? `StochRSI K: ${indicators.stochRSI.k.toFixed(1)}, D: ${indicators.stochRSI.d.toFixed(1)}` : "N/A";
@@ -784,9 +789,9 @@ ULTRON DECISION RULES:
         
         const analysis = JSON.parse(jsonMatch[0]);
         
-        if (!analysis.hasSignal || analysis.confidence < 70) {
-          console.log(`[TradingIntelligence] AI rejected signal for ${symbol} despite confluence`);
-          return null;
+        if (!analysis.hasSignal) {
+          console.log(`[TradingIntelligence] AI rejected signal for ${symbol} - using fallback`);
+          return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators, { direction: bestDirection, confluence: bestConfluence }, riskWarnings);
         }
 
         const signal: TradingSignal = {
@@ -803,7 +808,7 @@ ULTRON DECISION RULES:
           confidence: Math.min(analysis.confidence, bestConfluence.score + 10),
           riskRewardRatio: analysis.riskRewardRatio || 2,
           leverage: analysis.leverage || 1,
-          reasoning: `${analysis.reasoning} [Confluence: ${bestConfluence.score.toFixed(0)}% with ${bestConfluence.signals.length} aligned indicators]`,
+          reasoning: `${analysis.reasoning} [Confluence: ${bestConfluence.score.toFixed(0)}% with ${bestConfluence.signals.length} aligned indicators]${riskWarnings.length > 0 ? ` [Warnings: ${riskWarnings.join(', ')}]` : ''}`,
           technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}, Confluence: ${bestConfluence.signals.map(s => s.indicator).join('+')}`,
           indicators,
           patterns: analysis.patterns || [],
@@ -825,7 +830,7 @@ ULTRON DECISION RULES:
         return signal;
       } catch (parseError) {
         console.error("[TradingIntelligence] Failed to parse AI response:", parseError);
-        return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators, { direction: bestDirection, confluence: bestConfluence });
+        return this.generateFallbackSignal(symbol, exchange, timeframe, currentPrice, indicators, { direction: bestDirection, confluence: bestConfluence }, riskWarnings);
       }
     } catch (error) {
       console.error(`[TradingIntelligence] Failed to generate signal for ${symbol}:`, error);
@@ -842,7 +847,8 @@ ULTRON DECISION RULES:
     precomputedConfluence?: { 
       direction: "long" | "short";
       confluence: { score: number; signals: { indicator: string; signal: string; weight: number }[]; recommendation: "strong_entry" | "entry" | "wait" | "avoid" };
-    }
+    },
+    riskWarnings: string[] = []
   ): TradingSignal | null {
     let direction: SignalDirection;
     let bestConfluence: { score: number; signals: { indicator: string; signal: string; weight: number }[]; recommendation: "strong_entry" | "entry" | "wait" | "avoid" };
@@ -861,11 +867,6 @@ ULTRON DECISION RULES:
         direction = "short";
         bestConfluence = shortConfluence;
       }
-    }
-    
-    if (bestConfluence.recommendation === "avoid" || bestConfluence.recommendation === "wait") {
-      console.log(`[TradingIntelligence] Fallback signal blocked for ${symbol} - confluence ${bestConfluence.score.toFixed(0)}% too low (${bestConfluence.recommendation})`);
-      return null;
     }
     
     const slPercent = direction === "long" ? 0.97 : 1.03;
@@ -889,7 +890,7 @@ ULTRON DECISION RULES:
       confidence: baseConfidence,
       riskRewardRatio: 2.5,
       leverage: 1,
-      reasoning: `Multi-indicator confluence signal (${bestConfluence.score.toFixed(0)}%) with ${bestConfluence.signals.length} aligned indicators: ${bestConfluence.signals.map(s => s.indicator).join(', ')}`,
+      reasoning: `Multi-indicator confluence signal (${bestConfluence.score.toFixed(0)}%) with ${bestConfluence.signals.length} aligned indicators: ${bestConfluence.signals.map(s => s.indicator).join(', ')}${riskWarnings.length > 0 ? ` [Warnings: ${riskWarnings.join(', ')}]` : ''}`,
       technicalAnalysis: `RSI: ${indicators.rsiSignal}, MACD: ${indicators.macdSignal}, EMA: ${indicators.emaTrend}, Confluence: ${bestConfluence.signals.map(s => s.indicator).join('+')}`,
       indicators,
       patterns: bestConfluence.signals.map(s => s.indicator.toLowerCase()),
@@ -1338,6 +1339,179 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
 
     airdrops.forEach(a => this.airdrops.set(a.id, a));
     console.log(`[TradingIntelligence] Seeded ${airdrops.length} active airdrop opportunities for Dec 2025`);
+    
+    this.startAirdropDiscovery();
+  }
+
+  private startAirdropDiscovery(): void {
+    setInterval(() => this.discoverNewAirdrops(), 5 * 60 * 1000);
+    
+    setTimeout(() => this.discoverNewAirdrops(), 30000);
+  }
+
+  async discoverNewAirdrops(): Promise<AirdropOpportunity[]> {
+    console.log("[AirdropScout] Starting AI-powered airdrop discovery...");
+    
+    const discoveryPrompt = `You are an elite DeFi airdrop researcher. Analyze the current crypto ecosystem and identify HIGH-PROBABILITY airdrop opportunities that users should farm NOW.
+
+Focus on:
+1. L2s and new chains that haven't launched tokens yet
+2. DEXes with points programs
+3. Lending/borrowing protocols with active campaigns
+4. Infrastructure projects with testnet incentives
+5. Projects with major VC backing but no token
+
+For each opportunity, assess:
+- Likelihood of airdrop (based on VC backing, team history, points programs)
+- Estimated value based on comparable airdrops
+- Required actions to qualify
+- Risk level (rug potential, time investment)
+
+Current date: December 2025
+
+Return EXACTLY 3 new opportunities in this JSON format (no markdown, just JSON array):
+[
+  {
+    "protocolName": "string",
+    "protocolUrl": "string",
+    "chain": "ethereum" | "solana" | "base" | "arbitrum" | "optimism",
+    "category": "retro" | "non_retro" | "testnet",
+    "isRetro": boolean,
+    "estimatedValue": "$X-$Y",
+    "confidence": 50-100,
+    "riskLevel": "low" | "medium" | "high",
+    "eligibilityCriteria": ["criteria1", "criteria2", "criteria3"],
+    "requiredActions": [
+      {"action": "string", "priority": "high" | "medium" | "low", "estimatedCost": "string"}
+    ],
+    "fundingRound": "string",
+    "investors": ["investor1", "investor2"],
+    "whyNow": "string explaining urgency"
+  }
+]
+
+Be specific with current protocols. No generic suggestions. Focus on opportunities most likely to reward users in 2025.`;
+
+    try {
+      const response = await this.callClaude(discoveryPrompt);
+      
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        console.log("[AirdropScout] No valid JSON in discovery response");
+        return [];
+      }
+      
+      const discovered = JSON.parse(jsonMatch[0]);
+      const newAirdrops: AirdropOpportunity[] = [];
+      const now = Date.now();
+      
+      for (const item of discovered) {
+        const existingNames = Array.from(this.airdrops.values()).map(a => a.protocolName.toLowerCase());
+        if (existingNames.includes(item.protocolName.toLowerCase())) {
+          continue;
+        }
+        
+        const airdrop: AirdropOpportunity = {
+          id: `airdrop-ai-${nanoid(6)}`,
+          protocolName: item.protocolName,
+          protocolUrl: item.protocolUrl || `https://${item.protocolName.toLowerCase().replace(/\s+/g, '')}.xyz`,
+          chain: item.chain || "ethereum",
+          category: item.category || "non_retro",
+          isRetro: item.isRetro || false,
+          status: "active",
+          estimatedValue: item.estimatedValue || "$500-$5000",
+          confidence: Math.min(95, Math.max(50, item.confidence || 70)),
+          riskLevel: item.riskLevel || "medium",
+          eligibilityCriteria: item.eligibilityCriteria || ["Use the protocol actively"],
+          requiredActions: (item.requiredActions || []).map((a: any) => ({
+            action: a.action,
+            completed: false,
+            priority: a.priority || "medium",
+            estimatedCost: a.estimatedCost
+          })),
+          fundingRound: item.fundingRound || "Unknown",
+          investors: item.investors || [],
+          discoveredAt: now,
+          updatedAt: now,
+          aiDiscovered: true,
+          discoveryReason: item.whyNow || "AI-detected opportunity"
+        };
+        
+        this.airdrops.set(airdrop.id, airdrop);
+        newAirdrops.push(airdrop);
+        
+        console.log(`[AirdropScout] DISCOVERED: ${airdrop.protocolName} (${airdrop.chain}) - ${airdrop.estimatedValue} - Confidence: ${airdrop.confidence}%`);
+      }
+      
+      if (newAirdrops.length > 0) {
+        console.log(`[AirdropScout] Found ${newAirdrops.length} new airdrop opportunities via AI`);
+      }
+      
+      return newAirdrops;
+    } catch (error) {
+      console.error("[AirdropScout] Discovery failed:", error);
+      return [];
+    }
+  }
+
+  async refreshAirdropIntel(airdropId: string): Promise<AirdropOpportunity | null> {
+    const airdrop = this.airdrops.get(airdropId);
+    if (!airdrop) return null;
+
+    const refreshPrompt = `Analyze the current status of ${airdrop.protocolName} airdrop opportunity.
+
+Current info:
+- Chain: ${airdrop.chain}
+- Estimated Value: ${airdrop.estimatedValue}
+- Confidence: ${airdrop.confidence}%
+
+Questions to answer:
+1. Has the airdrop been announced/confirmed?
+2. Has the snapshot occurred?
+3. Have eligibility criteria changed?
+4. Is the estimated value still accurate?
+5. Any new required actions?
+
+Respond in JSON:
+{
+  "status": "active" | "confirmed" | "ended" | "snapshot_taken",
+  "confidenceChange": -20 to +20,
+  "valueUpdate": "$X-$Y" or null,
+  "newCriteria": ["string"] or null,
+  "urgentUpdate": "string" or null
+}`;
+
+    try {
+      const response = await this.callClaude(refreshPrompt);
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const update = JSON.parse(jsonMatch[0]);
+        
+        if (update.status) {
+          airdrop.status = update.status;
+        }
+        if (update.confidenceChange) {
+          airdrop.confidence = Math.min(100, Math.max(0, airdrop.confidence + update.confidenceChange));
+        }
+        if (update.valueUpdate) {
+          airdrop.estimatedValue = update.valueUpdate;
+        }
+        if (update.newCriteria) {
+          airdrop.eligibilityCriteria = [...new Set([...airdrop.eligibilityCriteria, ...update.newCriteria])];
+        }
+        
+        airdrop.updatedAt = Date.now();
+        this.airdrops.set(airdropId, airdrop);
+        
+        console.log(`[AirdropScout] Updated intel for ${airdrop.protocolName}`);
+        return airdrop;
+      }
+    } catch (error) {
+      console.error(`[AirdropScout] Failed to refresh ${airdrop.protocolName}:`, error);
+    }
+    
+    return airdrop;
   }
 
   getActiveSignals(): TradingSignal[] {

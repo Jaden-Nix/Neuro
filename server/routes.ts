@@ -4949,6 +4949,32 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/airdrops/discover", writeLimiter, async (req, res) => {
+    try {
+      console.log("[Routes] AI airdrop discovery triggered by user");
+      const newAirdrops = await tradingIntelligenceService.discoverNewAirdrops();
+      res.json({ 
+        success: true, 
+        discovered: newAirdrops.length,
+        airdrops: newAirdrops
+      });
+    } catch (error) {
+      console.error("Failed to discover airdrops:", error);
+      res.status(500).json({ error: "Failed to discover airdrops" });
+    }
+  });
+
+  app.post("/api/airdrops/:id/refresh", writeLimiter, async (req, res) => {
+    try {
+      const airdrop = await tradingIntelligenceService.refreshAirdropIntel(req.params.id);
+      if (!airdrop) return res.status(404).json({ error: "Airdrop not found" });
+      res.json(airdrop);
+    } catch (error) {
+      console.error("Failed to refresh airdrop intel:", error);
+      res.status(500).json({ error: "Failed to refresh airdrop intel" });
+    }
+  });
+
   // ==========================================
   // Trading Village Routes (AI Agent Ecosystem)
   // ==========================================

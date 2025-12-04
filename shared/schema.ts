@@ -235,7 +235,7 @@ export interface LiveMetrics {
 
 // WebSocket Message Types
 export interface WSMessage {
-  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits" | "autonomousCycle" | "transactionMonitor" | "selfHealing" | "onchain" | "agentEvent" | "creditUpdate" | "evolution";
+  type: "log" | "metrics" | "alert" | "simulation" | "agent_update" | "transaction" | "credits" | "autonomousCycle" | "transactionMonitor" | "selfHealing" | "onchain" | "agentEvent" | "creditUpdate" | "evolution" | "priceUpdate" | "airdropDiscovered";
   data: any;
   timestamp: number;
 }
@@ -1896,7 +1896,7 @@ export interface TradingPerformance {
 // ==========================================
 
 export type AirdropCategory = "retro" | "non_retro" | "testnet" | "mainnet" | "social" | "liquidity" | "governance";
-export type AirdropStatus = "active" | "upcoming" | "ended" | "claimed";
+export type AirdropStatus = "active" | "upcoming" | "ended" | "claimed" | "confirmed" | "snapshot_taken";
 export type AirdropRisk = "low" | "medium" | "high";
 
 export interface AirdropOpportunity {
@@ -1927,6 +1927,8 @@ export interface AirdropOpportunity {
   discoveredAt: number;
   updatedAt: number;
   notes?: string;
+  aiDiscovered?: boolean;
+  discoveryReason?: string;
 }
 
 // ==========================================
