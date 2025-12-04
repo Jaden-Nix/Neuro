@@ -1561,21 +1561,24 @@ Describe your evolution in 2-3 sentences:
   getTradeSignals(limit = 20, status?: "active" | "closed" | "all"): VillageTradeSignal[] {
     this.cleanupConflictingSignals();
     
-    let signals = [...this.tradeSignals].reverse();
+    let signals = [...this.tradeSignals];
+    
     if (status && status !== "all") {
       signals = signals.filter(s => s.status === status);
+    } else {
+      signals = signals.filter(s => s.status === "active" || s.status === "pending");
     }
     
-    if (status === "active" || !status) {
-      const seenSymbols = new Set<string>();
-      signals = signals.filter(s => {
-        if (s.status === "active") {
-          if (seenSymbols.has(s.symbol)) return false;
-          seenSymbols.add(s.symbol);
-        }
-        return true;
-      });
-    }
+    const seenSymbols = new Set<string>();
+    signals = signals.filter(s => {
+      if (s.status === "active" || s.status === "pending") {
+        if (seenSymbols.has(s.symbol)) return false;
+        seenSymbols.add(s.symbol);
+      }
+      return true;
+    });
+    
+    signals.sort((a, b) => b.confidence - a.confidence);
     
     return signals.slice(0, limit);
   }
