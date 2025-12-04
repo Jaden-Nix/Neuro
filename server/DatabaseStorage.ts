@@ -223,41 +223,24 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // Metrics - with blockchain RPC integration
+  // Metrics - market data + AI agent stats (no wallet required)
   async getMetrics(): Promise<LiveMetrics> {
-    // Check cache first
     const now = Date.now();
-    if (this.metricsCache && now < this.metricsCacheExpiry) {
-      return {
-        ...this.metricsCache,
-        timestamp: now,
-      };
-    }
-
-    try {
-      // Fetch real blockchain metrics
-      const onChainMetrics = await rpcClient.getOnChainMetrics();
-      
-      this.metricsCache = onChainMetrics;
-      this.metricsCacheExpiry = now + this.METRICS_CACHE_TTL;
-      
-      return onChainMetrics;
-    } catch (error) {
-      console.error("Failed to fetch on-chain metrics:", error);
-      
-      // Fallback to safe defaults if RPC fails
-      return {
-        walletBalanceEth: 0,
-        tvlUsd: 0,
-        currentAPY: 0,
-        riskLevel: 50,
-        activeOpportunities: 0,
-        pendingTransactions: 0,
-        gasPriceGwei: 20,
-        ethPriceUsd: 2000,
-        timestamp: now,
-      };
-    }
+    
+    // Return sensible defaults - the main metrics endpoint in routes.ts handles real data
+    return {
+      ethPriceUsd: 3600,
+      btcPriceUsd: 96000,
+      totalTvlUsd: 0,
+      gasPriceGwei: 25,
+      activeAgents: 10,
+      totalSignals: 0,
+      avgWinRate: 0,
+      totalTrades: 0,
+      riskLevel: 50,
+      activeDebates: 0,
+      timestamp: now,
+    };
   }
 
   async updateMetrics(updates: Partial<LiveMetrics>): Promise<LiveMetrics> {

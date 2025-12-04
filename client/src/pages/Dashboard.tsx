@@ -222,14 +222,16 @@ export default function Dashboard() {
   };
 
   const defaultMetrics: LiveMetrics = {
-    walletBalanceEth: metrics?.walletBalanceEth ?? 0,
-    tvlUsd: metrics?.tvlUsd ?? 0,
-    currentAPY: metrics?.currentAPY ?? 0,
-    riskLevel: metrics?.riskLevel ?? 0,
-    activeOpportunities: metrics?.activeOpportunities ?? 0,
-    pendingTransactions: metrics?.pendingTransactions ?? 0,
-    gasPriceGwei: metrics?.gasPriceGwei ?? 0,
-    ethPriceUsd: metrics?.ethPriceUsd ?? 0,
+    ethPriceUsd: metrics?.ethPriceUsd ?? 3600,
+    btcPriceUsd: metrics?.btcPriceUsd ?? 96000,
+    totalTvlUsd: metrics?.totalTvlUsd ?? 0,
+    gasPriceGwei: metrics?.gasPriceGwei ?? 25,
+    activeAgents: metrics?.activeAgents ?? 10,
+    totalSignals: metrics?.totalSignals ?? 0,
+    avgWinRate: metrics?.avgWinRate ?? 0,
+    totalTrades: metrics?.totalTrades ?? 0,
+    riskLevel: metrics?.riskLevel ?? 50,
+    activeDebates: metrics?.activeDebates ?? 0,
     timestamp: Date.now(),
   };
 

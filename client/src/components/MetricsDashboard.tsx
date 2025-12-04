@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Activity, Wallet, DollarSign, Gauge } from "lucide-react";
+import { TrendingUp, TrendingDown, Activity, Bot, DollarSign, Gauge, Zap, Users, BarChart3 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LiveMetrics } from "@shared/schema";
 
@@ -9,6 +9,7 @@ interface MetricsDashboardProps {
 
 export function MetricsDashboard({ metrics, previousMetrics }: MetricsDashboardProps) {
   const formatCurrency = (value: number) => {
+    if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
     if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
     if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
     if (value >= 1e3) return `$${(value / 1e3).toFixed(2)}K`;
@@ -21,6 +22,12 @@ export function MetricsDashboard({ metrics, previousMetrics }: MetricsDashboardP
     return "text-red-500";
   };
 
+  const getWinRateColor = (rate: number) => {
+    if (rate >= 60) return "text-green-500";
+    if (rate >= 40) return "text-yellow-500";
+    return "text-red-500";
+  };
+
   const calculateChange = (current: number, previous: number | undefined): { change: string; positive: boolean } | null => {
     if (!previous || previous === 0) return null;
     const delta = ((current - previous) / previous) * 100;
@@ -30,53 +37,53 @@ export function MetricsDashboard({ metrics, previousMetrics }: MetricsDashboardP
     };
   };
 
-  const walletChange = calculateChange(metrics.walletBalanceEth, previousMetrics?.walletBalanceEth);
-  const tvlChange = calculateChange(metrics.tvlUsd, previousMetrics?.tvlUsd);
-  const apyChange = calculateChange(metrics.currentAPY, previousMetrics?.currentAPY);
+  const ethPriceChange = calculateChange(metrics.ethPriceUsd, previousMetrics?.ethPriceUsd);
+  const btcPriceChange = calculateChange(metrics.btcPriceUsd, previousMetrics?.btcPriceUsd);
+  const tvlChange = calculateChange(metrics.totalTvlUsd, previousMetrics?.totalTvlUsd);
 
   const metricCards = [
     {
-      icon: Wallet,
-      label: "Wallet Balance",
-      value: formatCurrency(metrics.walletBalanceEth),
-      change: walletChange?.change,
-      positive: walletChange?.positive ?? true,
-      testId: "metric-wallet-balance"
+      icon: DollarSign,
+      label: "ETH Price",
+      value: formatCurrency(metrics.ethPriceUsd),
+      change: ethPriceChange?.change,
+      positive: ethPriceChange?.positive ?? true,
+      testId: "metric-eth-price"
     },
     {
       icon: DollarSign,
-      label: "Total TVL",
-      value: formatCurrency(metrics.tvlUsd),
+      label: "BTC Price",
+      value: formatCurrency(metrics.btcPriceUsd),
+      change: btcPriceChange?.change,
+      positive: btcPriceChange?.positive ?? true,
+      testId: "metric-btc-price"
+    },
+    {
+      icon: BarChart3,
+      label: "DeFi TVL",
+      value: formatCurrency(metrics.totalTvlUsd),
       change: tvlChange?.change,
       positive: tvlChange?.positive ?? true,
       testId: "metric-total-tvl"
     },
     {
+      icon: Bot,
+      label: "AI Agents",
+      value: metrics.activeAgents.toString(),
+      testId: "metric-active-agents"
+    },
+    {
+      icon: Zap,
+      label: "Active Signals",
+      value: metrics.totalSignals.toString(),
+      testId: "metric-total-signals"
+    },
+    {
       icon: TrendingUp,
-      label: "Current APY",
-      value: `${metrics.currentAPY.toFixed(2)}%`,
-      change: apyChange?.change,
-      positive: apyChange?.positive ?? true,
-      testId: "metric-current-apy"
-    },
-    {
-      icon: Gauge,
-      label: "Risk Level",
-      value: `${metrics.riskLevel}%`,
-      valueColor: getRiskColor(metrics.riskLevel),
-      testId: "metric-risk-level"
-    },
-    {
-      icon: Activity,
-      label: "Active Opportunities",
-      value: metrics.activeOpportunities.toString(),
-      testId: "metric-active-opportunities"
-    },
-    {
-      icon: Activity,
-      label: "Pending Txs",
-      value: metrics.pendingTransactions.toString(),
-      testId: "metric-pending-transactions"
+      label: "Win Rate",
+      value: `${metrics.avgWinRate.toFixed(1)}%`,
+      valueColor: getWinRateColor(metrics.avgWinRate),
+      testId: "metric-win-rate"
     },
   ];
 

@@ -219,12 +219,16 @@ export class MemStorage implements IStorage {
     this.previousMetrics = null;
 
     this.metrics = {
-      walletBalance: "1250000",
-      totalTVL: "8500000",
-      currentAPY: 12.5,
-      riskLevel: 35,
-      activeOpportunities: 7,
-      pendingTransactions: 2,
+      ethPriceUsd: 3600,
+      btcPriceUsd: 96000,
+      totalTvlUsd: 0,
+      gasPriceGwei: 25,
+      activeAgents: 10,
+      totalSignals: 0,
+      avgWinRate: 0,
+      totalTrades: 0,
+      riskLevel: 50,
+      activeDebates: 0,
       timestamp: Date.now(),
     };
   }

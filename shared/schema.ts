@@ -220,16 +220,24 @@ export interface SystemState {
   lastUpdated: number;
 }
 
-// Live Metrics (aligned with OnChainMetrics from RPCClient)
+// Live Metrics - Market data + AI agent statistics (no wallet required)
 export interface LiveMetrics {
-  walletBalanceEth: number;
-  tvlUsd: number;
-  currentAPY: number;
-  riskLevel: number;
-  activeOpportunities: number;
-  pendingTransactions: number;
-  gasPriceGwei: number;
+  // Market Data (from public APIs - no wallet needed)
   ethPriceUsd: number;
+  btcPriceUsd: number;
+  totalTvlUsd: number;
+  gasPriceGwei: number;
+  
+  // AI Agent Statistics
+  activeAgents: number;
+  totalSignals: number;
+  avgWinRate: number;
+  totalTrades: number;
+  
+  // System Health
+  riskLevel: number;
+  activeDebates: number;
+  
   timestamp: number;
 }
 
