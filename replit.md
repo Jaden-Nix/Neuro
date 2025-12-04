@@ -4,7 +4,19 @@
 
 NeuroNet Governor is an advanced multi-agent AI system designed for autonomous DeFi protocol governance. It orchestrates specialized AI agents (Meta, Scout, Risk, Execution) through an internal economy based on distinct personalities, credit scores, and responsibilities. The system features real-time market simulation, on-chain memory for continuous learning, 24/7 monitoring via a Sentinel system, and full decision replay capabilities. The project aims to provide an autonomous DeFi governance solution with a cinematic command center interface, supporting multiple chains including Ethereum, Base, and Fraxtal.
 
-## Recent Changes (December 2024)
+## Recent Changes (December 2025)
+
+- **Hybrid AI System**: Full integration of both Gemini and Claude AI for different agent roles:
+  - **Gemini AI** (via Replit AI Integrations): Scout and Execution agents for fast, real-time analysis
+  - **Claude AI** (via Replit AI Integrations): Risk and Meta agents for complex reasoning and strategic decisions
+  - **HybridAIService**: Intelligent routing between providers with automatic fallback, rate limiting (p-limit), and retry logic (p-retry)
+  - **AI-Powered Airdrop Discovery**: AirdropScout uses Claude to discover current December 2025 airdrop opportunities (Berachain, Hyperliquid, Monad, etc.)
+  - **Real Trading Signals**: Agents generate actionable signals with entry, stop-loss, and take-profit levels
+
+- **December 2025 Airdrop Database**: Updated with current active opportunities:
+  - LayerZero V2 (multi-chain), Starknet Ecosystem, Scroll Mainnet, Linea Network
+  - Meteora Season 2 (Solana), Abstract Chain, Axiom (Solana), Hylo Finance
+  - AI discovery pipeline adds new opportunities: Berachain, Hyperliquid, Monad
 
 - **Ultron Signals - Live Price Streaming**: Real-time price streaming for 103 tokens across 9 exchanges (KuCoin, MEXC, Gate, Bitget, Kraken, Bybit, OKX, Coinbase, Huobi). Features:
   - **CCXT Multi-Exchange Adapter**: Unified interface for fetching live prices with intelligent fallback chain
@@ -72,7 +84,10 @@ Frontend state is managed using React Query for server state and caching, with a
 ## External Dependencies
 
 ### AI Services
-- **Anthropic Claude API**: Core AI engine for agent decision-making (`claude-sonnet-4-5`).
+- **Hybrid AI System**: Dual-provider architecture for optimal performance
+  - **Anthropic Claude API**: Complex reasoning for Risk and Meta agents (`claude-sonnet-4-5` via Replit AI Integrations)
+  - **Google Gemini API**: Fast analysis for Scout and Execution agents (`gemini-2.5-flash` via Replit AI Integrations)
+  - **HybridAIService**: Intelligent routing with automatic fallback between providers
 - **ADK-TS (IQ AI Agent Development Kit)**: Hackathon-compliant multi-agent framework.
 
 ### Blockchain Integration
