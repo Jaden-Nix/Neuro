@@ -380,32 +380,34 @@ export default function Dashboard() {
                               </span>
                             </div>
                             <div className="flex justify-between">
-                              <span>Confidence:</span>
-                              <span className={`font-medium ${
-                                signal.confidence >= 0.7 ? "text-green-500" : 
-                                signal.confidence >= 0.5 ? "text-yellow-500" : "text-red-500"
-                              }`}>
-                                {(signal.confidence * 100).toFixed(0)}%
+                              <span>SL:</span>
+                              <span className="text-red-500 font-mono">
+                                ${signal.stopLoss != null ? (signal.stopLoss < 0.01 ? signal.stopLoss.toExponential(2) : signal.stopLoss.toLocaleString(undefined, {maximumFractionDigits: 2})) : "-"}
                               </span>
                             </div>
-                            {signal.agentName && (
-                              <div className="flex justify-between">
-                                <span>By:</span>
-                                <span className="text-foreground">{signal.agentName}</span>
-                              </div>
-                            )}
+                            <div className="flex justify-between">
+                              <span>TP:</span>
+                              <span className="text-green-500 font-mono">
+                                ${signal.takeProfit1 != null ? (signal.takeProfit1 < 0.01 ? signal.takeProfit1.toExponential(2) : signal.takeProfit1.toLocaleString(undefined, {maximumFractionDigits: 2})) : "-"}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>R:R:</span>
+                              <span className="text-foreground font-medium">
+                                1:{signal.riskReward?.toFixed(1) || "2.0"}
+                              </span>
+                            </div>
                           </div>
 
-                          {signal.validators && (
-                            <div className="mt-2 pt-2 border-t border-border/50">
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Target className="h-3 w-3" />
-                                <span>
-                                  {signal.validators.filter(v => v.agrees === true).length} agree / {signal.validators.filter(v => v.agrees === false).length} disagree
-                                </span>
-                              </div>
-                            </div>
-                          )}
+                          <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">By {signal.agentName || "Agent"}</span>
+                            <span className={`font-medium ${
+                              signal.confidence >= 0.7 ? "text-green-500" : 
+                              signal.confidence >= 0.5 ? "text-yellow-500" : "text-red-500"
+                            }`}>
+                              {(signal.confidence * 100).toFixed(0)}% conf
+                            </span>
+                          </div>
                         </motion.div>
                       ))}
                     </AnimatePresence>
