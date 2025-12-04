@@ -22,9 +22,20 @@ import {
   Trophy,
   Activity,
   Dna,
-  Link2
+  Link2,
+  ExternalLink
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+const getExplorerUrl = (network: string, txHash: string): string | null => {
+  if (network === 'base-sepolia' && txHash.length === 66) {
+    return `https://sepolia.basescan.org/tx/${txHash}`;
+  }
+  if (network === 'base' && txHash.length === 66) {
+    return `https://basescan.org/tx/${txHash}`;
+  }
+  return null;
+};
 
 interface OnChainProof {
   badgeId: string;
@@ -55,6 +66,9 @@ interface BlockchainStatus {
   pendingMints: number;
   totalMinted: number;
   totalAgents: number;
+  isLive?: boolean;
+  contractAddress?: string;
+  walletAddress?: string | null;
 }
 
 function ProofCard({ proof, index }: { proof: OnChainProof; index: number }) {
@@ -143,6 +157,23 @@ function ProofCard({ proof, index }: { proof: OnChainProof; index: number }) {
             >
               {copied ? <CheckCircle className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
             </Button>
+            {getExplorerUrl(proof.network, proof.transactionHash) && (
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="h-6 w-6" 
+                asChild
+                data-testid={`button-explorer-${proof.badgeId}`}
+              >
+                <a 
+                  href={getExplorerUrl(proof.network, proof.transactionHash) || '#'} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </Button>
+            )}
           </div>
         </div>
       </div>

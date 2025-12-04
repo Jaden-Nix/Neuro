@@ -158,7 +158,15 @@ export class BlockchainSyncService extends EventEmitter {
     
     if (this.config.enabled && this.config.privateKey && this.config.contractAddresses.neuronBadge) {
       try {
-        this.account = privateKeyToAccount(this.config.privateKey as `0x${string}`);
+        let privateKey = this.config.privateKey;
+        if (!privateKey.startsWith('0x')) {
+          privateKey = `0x${privateKey}`;
+        }
+        if (privateKey.length !== 66) {
+          throw new Error(`Invalid private key length: expected 66 chars (with 0x prefix), got ${privateKey.length}`);
+        }
+        
+        this.account = privateKeyToAccount(privateKey as `0x${string}`);
         
         this.publicClient = createPublicClient({
           chain: baseSepolia,
@@ -181,10 +189,22 @@ export class BlockchainSyncService extends EventEmitter {
         this.config.enabled = false;
       }
     } else {
+      const missingVars: string[] = [];
+      if (!this.config.enabled && process.env.BLOCKCHAIN_ENABLED !== 'true') {
+        missingVars.push('BLOCKCHAIN_ENABLED=true');
+      }
+      if (!this.config.privateKey) {
+        missingVars.push('DEPLOYER_PRIVATE_KEY');
+      }
+      if (!this.config.contractAddresses.neuronBadge) {
+        missingVars.push('NEURON_BADGE_ADDRESS');
+      }
+      
       console.log('[BlockchainSync] Demo mode (simulated minting)', {
         enabled: this.config.enabled,
         hasPrivateKey: !!this.config.privateKey,
         hasContract: !!this.config.contractAddresses.neuronBadge,
+        missingEnvVars: missingVars.length > 0 ? missingVars : 'none',
       });
     }
   }
