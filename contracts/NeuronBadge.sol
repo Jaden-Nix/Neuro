@@ -271,7 +271,7 @@ contract NeuronBadge is ERC721, ERC721URIStorage, ERC721Enumerable, Ownable, Ree
             BadgeType.STRESS_TEST,
             agentGenerations[agentId],
             MutationType.RISK_REBALANCING,
-            passed ? 10 : -5,
+            passed ? int256(10) : int256(-5),
             block.timestamp
         );
         
