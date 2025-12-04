@@ -3941,11 +3941,39 @@ export async function registerRoutes(
 
       const actionType = session.proposalData?.actionType || "governance";
       
-      const debateResult = await parliamentEngine.runDebate(
-        session.topic,
-        session.description,
-        actionType
-      );
+      const DEBATE_TIMEOUT = 60000;
+      let timeoutId: NodeJS.Timeout | null = null;
+      let timedOut = false;
+      
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          timedOut = true;
+          reject(new Error("Debate generation timed out after 60 seconds"));
+        }, DEBATE_TIMEOUT);
+      });
+      
+      let debateResult;
+      try {
+        debateResult = await Promise.race([
+          parliamentEngine.runDebate(session.topic, session.description, actionType),
+          timeoutPromise
+        ]);
+        if (timeoutId) clearTimeout(timeoutId);
+      } catch (error) {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (timedOut) {
+          console.error("[Parliament] Debate timed out");
+          const currentSession = await storage.getParliamentSession(req.params.id);
+          if (currentSession && currentSession.status === "deliberating") {
+            await storage.updateParliamentSession(req.params.id, { status: "voting" });
+          }
+          return res.status(408).json({ 
+            error: "Debate generation timed out. The session is now ready for manual voting.",
+            timeout: true 
+          });
+        }
+        throw error;
+      }
       
       for (const entry of debateResult.debates) {
         await storage.addDebateEntry(req.params.id, entry);
@@ -3971,9 +3999,13 @@ export async function registerRoutes(
         await new Promise(resolve => setTimeout(resolve, 200));
       }
 
-      const updated = await storage.updateParliamentSession(req.params.id, {
-        metaSummary: debateResult.metaSummary,
-      });
+      const currentSession = await storage.getParliamentSession(req.params.id);
+      const updateData: Record<string, any> = { metaSummary: debateResult.metaSummary };
+      if (currentSession && currentSession.status === "deliberating") {
+        updateData.status = "voting";
+      }
+      
+      const updated = await storage.updateParliamentSession(req.params.id, updateData);
       res.json(updated);
     } catch (error) {
       console.error("Live debate error:", error);
@@ -4008,6 +4040,47 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to conclude session" });
+    }
+  });
+
+  app.post("/api/parliament/:id/manual-decision", writeLimiter, async (req, res) => {
+    try {
+      const session = await storage.getParliamentSession(req.params.id);
+      if (!session) return res.status(404).json({ error: "Session not found" });
+      
+      const { decision, reason } = req.body;
+      if (!decision || !["approved", "rejected"].includes(decision)) {
+        return res.status(400).json({ error: "Invalid decision. Must be 'approved' or 'rejected'" });
+      }
+      
+      const originalMetaSummary = parliamentEngine.synthesizeMetaSummary(session.votes, session.debates || [], session.quorum);
+      const metaSummary = JSON.parse(JSON.stringify(originalMetaSummary)) as typeof originalMetaSummary;
+      
+      metaSummary.recommendation = decision === "approved" ? "approve" : "reject";
+      metaSummary.synthesis = `[MANUAL OVERRIDE by user: ${decision.toUpperCase()}] Reason: ${reason || "No reason provided"}. | Original analysis: ${originalMetaSummary.synthesis} (Original recommendation: ${originalMetaSummary.recommendation})`;
+      
+      const updated = await storage.updateParliamentSession(req.params.id, {
+        status: "concluded",
+        outcome: decision as "approved" | "rejected",
+        metaSummary,
+        concludedAt: Date.now(),
+      });
+      
+      broadcastToClients({
+        type: "log",
+        data: { 
+          event: "parliament_manual_decision", 
+          sessionId: req.params.id, 
+          outcome: decision,
+          reason: reason || "No reason provided",
+        },
+        timestamp: Date.now(),
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Manual decision error:", error);
+      res.status(500).json({ error: "Failed to apply manual decision" });
     }
   });
 

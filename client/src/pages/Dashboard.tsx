@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -136,7 +136,16 @@ export default function Dashboard() {
     refetchInterval: wsState.connected ? 10000 : 3000,
   });
 
-  const logs = wsState.logs.length > 0 ? wsState.logs : fetchedLogs;
+  const logs = useMemo(() => {
+    const allLogs = [...fetchedLogs, ...wsState.logs];
+    const seenIds = new Set<string>();
+    const uniqueLogs = allLogs.filter(log => {
+      if (seenIds.has(log.id)) return false;
+      seenIds.add(log.id);
+      return true;
+    });
+    return uniqueLogs.sort((a, b) => a.timestamp - b.timestamp).slice(-200);
+  }, [fetchedLogs, wsState.logs]);
   const simulationTree = wsState.simulations.length > 0 ? wsState.simulations : fetchedSimulations;
 
   const activeSignals = villageSignals.filter(s => s.status === "active").slice(0, 4);

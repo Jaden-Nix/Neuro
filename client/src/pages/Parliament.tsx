@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Gavel, 
   Users, 
@@ -592,6 +593,8 @@ function NewSessionDialog({ onCreated }: { onCreated: () => void }) {
 
 function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBack: () => void }) {
   const [metaSummary, setMetaSummary] = useState<MetaSummary | undefined>(session.metaSummary);
+  const [debateError, setDebateError] = useState<string | null>(null);
+  const { toast } = useToast();
   
   const concludeMutation = useMutation({
     mutationFn: async () => {
@@ -603,20 +606,61 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
         setMetaSummary(data.metaSummary);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
+      toast({ title: "Session concluded", description: `Outcome: ${data.outcome}` });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Error", description: "Failed to conclude session" });
+    },
+  });
+
+  const manualDecisionMutation = useMutation({
+    mutationFn: async ({ decision, reason }: { decision: "approved" | "rejected"; reason?: string }) => {
+      const response = await apiRequest("POST", `/api/parliament/${session.id}/manual-decision`, { decision, reason });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to apply decision");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.metaSummary) {
+        setMetaSummary(data.metaSummary);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
+      toast({ title: "Decision applied", description: `Session ${data.outcome}` });
+    },
+    onError: (error: Error) => {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to apply manual decision" });
     },
   });
 
   const simulateDebate = useMutation({
     mutationFn: async () => {
+      setDebateError(null);
       const response = await apiRequest("POST", `/api/parliament/${session.id}/debate-live`);
       const data = await response.json();
+      if (!response.ok) {
+        queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
+        if (data.timeout) {
+          setDebateError("Debate timed out. You can now manually approve or reject the proposal.");
+          return data;
+        } else {
+          setDebateError(data.error || "Failed to run debate");
+          throw new Error(data.error || "Failed to run debate");
+        }
+      }
       if (data.metaSummary) {
         setMetaSummary(data.metaSummary);
       }
       queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
       return data;
     },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parliament", session.id] });
+    }
   });
+
+  const showManualControls = session.status !== "concluded";
 
   return (
     <div className="space-y-6">
@@ -649,6 +693,52 @@ function LiveSessionView({ session, onBack }: { session: ParliamentSession; onBa
           )}
         </div>
       </div>
+
+      {debateError && (
+        <Card className="border-amber-500/50 bg-amber-500/10">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <p className="text-sm">{debateError}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {showManualControls && (
+        <Card className="border-2 border-dashed">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <Scale className="w-5 h-5 text-primary" />
+                <span className="font-medium">Manual Decision Override</span>
+                <span className="text-sm text-muted-foreground">(Use when agents are done or timed out)</span>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="default"
+                  onClick={() => manualDecisionMutation.mutate({ decision: "approved", reason: "Manual approval by user" })}
+                  disabled={manualDecisionMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700"
+                  data-testid="button-manual-approve"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Approve
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => manualDecisionMutation.mutate({ decision: "rejected", reason: "Manual rejection by user" })}
+                  disabled={manualDecisionMutation.isPending}
+                  data-testid="button-manual-reject"
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

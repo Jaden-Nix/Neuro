@@ -6,6 +6,13 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
 
 ## Recent Changes (December 2025)
 
+- **Parliament Debate System Fixes**:
+  - **Timeout Handling**: 60-second debate timeout with proper cleanup prevents indefinite hanging
+  - **Status Guard**: Both success and timeout paths reload session state before updating, preventing concluded sessions from being reverted to "voting" during concurrent manual overrides
+  - **Manual Override**: Users can manually approve/reject proposals after agent voting with toast notifications for success/error states
+  - **Log Persistence**: Thought stream uses compound keys (id+timestamp) for deduplication; historical logs reload on WebSocket reconnection
+  - **MetaSummary Cloning**: Deep clones synthesized summary before mutation to preserve original analysis
+
 - **LIVE AI Airdrop Discovery**: Pure AI-driven airdrop discovery with NO static/seeded data:
   - **Gemini + Claude Hybrid**: Gemini for fast discovery, Claude as fallback for reliability
   - **Robust JSON Parsing**: Multi-strategy extraction handles malformed AI responses

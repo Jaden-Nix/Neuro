@@ -10,7 +10,11 @@ interface WebSocketState {
   credits: import("@shared/schema").AgentCreditScore[];
 }
 
+const MAX_LOGS = 5000;
+
 export function useWebSocket() {
+  const logsRef = useRef<LogEntry[]>([]);
+  
   const [state, setState] = useState<WebSocketState>({
     connected: false,
     logs: [],
@@ -30,17 +34,30 @@ export function useWebSocket() {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
-      ws.onopen = () => {
+      ws.onopen = async () => {
         console.log("WebSocket connected");
         reconnectAttempts.current = 0;
-        setState((prev) => ({ ...prev, connected: true }));
+        
+        if (logsRef.current.length === 0) {
+          try {
+            const response = await fetch("/api/logs?limit=100");
+            if (response.ok) {
+              const historicalLogs: LogEntry[] = await response.json();
+              logsRef.current = historicalLogs;
+              console.log(`Loaded ${historicalLogs.length} historical logs`);
+            }
+          } catch (error) {
+            console.error("Failed to load historical logs:", error);
+          }
+        }
+        
+        setState((prev) => ({ ...prev, connected: true, logs: logsRef.current }));
 
-        // Setup heartbeat
         heartbeatIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "ping" }));
           }
-        }, 30000); // Ping every 30 seconds
+        }, 30000);
       };
 
       ws.onmessage = (event) => {
@@ -49,10 +66,16 @@ export function useWebSocket() {
 
           switch (message.type) {
             case "log":
-              setState((prev) => ({
-                ...prev,
-                logs: [...prev.logs.slice(-99), message.data as LogEntry],
-              }));
+              const newLog = message.data as LogEntry;
+              const logKey = `${newLog.id}-${newLog.timestamp}`;
+              const existingKeys = new Set(logsRef.current.map(l => `${l.id}-${l.timestamp}`));
+              if (!existingKeys.has(logKey)) {
+                logsRef.current = [...logsRef.current.slice(-(MAX_LOGS - 1)), newLog];
+                setState((prev) => ({
+                  ...prev,
+                  logs: logsRef.current,
+                }));
+              }
               break;
 
             case "metrics":

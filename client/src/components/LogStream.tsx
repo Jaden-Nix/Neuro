@@ -95,29 +95,42 @@ const LogEntryItem = forwardRef<HTMLDivElement, { log: LogEntry; isNew: boolean 
     const levelColorClass = levelColors[log.level] || "text-muted-foreground";
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || isNaN(timestamp) || timestamp <= 0) {
-        return new Date().toLocaleTimeString('en-US', { 
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
+      const now = Date.now();
+      let ts = timestamp;
+      if (!ts || isNaN(ts) || ts <= 0) {
+        ts = now;
       }
-      const date = new Date(timestamp);
+      const date = new Date(ts);
       if (isNaN(date.getTime())) {
-        return new Date().toLocaleTimeString('en-US', { 
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        });
+        ts = now;
       }
-      return date.toLocaleTimeString('en-US', { 
+      
+      const diffMs = now - ts;
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      
+      let relative: string;
+      if (diffSec < 5) {
+        relative = "now";
+      } else if (diffSec < 60) {
+        relative = `${diffSec}s ago`;
+      } else if (diffMin < 60) {
+        relative = `${diffMin}m ago`;
+      } else if (diffHour < 24) {
+        relative = `${diffHour}h ago`;
+      } else {
+        relative = `${Math.floor(diffHour / 24)}d ago`;
+      }
+      
+      const timeStr = new Date(ts).toLocaleTimeString('en-US', { 
         hour12: false,
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
       });
+      
+      return `${timeStr} (${relative})`;
     };
 
     return (
@@ -191,7 +204,7 @@ const LogEntryItem = forwardRef<HTMLDivElement, { log: LogEntry; isNew: boolean 
   }
 );
 
-export function LogStream({ logs, maxLogs = 100, onClearLogs, isClearing }: LogStreamProps) {
+export function LogStream({ logs, maxLogs = 5000, onClearLogs, isClearing }: LogStreamProps) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [seenLogIds, setSeenLogIds] = useState<Set<string>>(new Set());
   const scrollRef = useRef<HTMLDivElement>(null);
