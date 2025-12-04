@@ -29,6 +29,12 @@ import {
   GitBranch,
   Eye,
   Shield,
+  Search,
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  Coins,
+  TrendingUp as Yield,
 } from "lucide-react";
 
 type PatternType =
@@ -72,6 +78,25 @@ interface AIInsight {
     timeframe?: string;
     supportLevel?: number;
     resistanceLevel?: number;
+  };
+}
+
+interface DeFiOpportunity {
+  id: string;
+  protocol: string;
+  type: "yield_farming" | "staking" | "liquidity_provision" | "lending";
+  apy: number;
+  tvl: number;
+  risk: "low" | "medium" | "high";
+  chain: string;
+  token: string;
+  scoutScore: number;
+  riskScore: number;
+  executionReady: boolean;
+  agentFlow: {
+    scout: { analyzed: boolean; confidence: number; notes: string };
+    risk: { analyzed: boolean; approved: boolean; concerns: string[] };
+    execution: { ready: boolean; estimatedGas: number; slippage: number };
   };
 }
 
@@ -164,6 +189,8 @@ export default function Insights() {
   const [selectedSymbol, setSelectedSymbol] = useState<string>("all");
   const [minConfidence, setMinConfidence] = useState(0);
   const [selectedInsight, setSelectedInsight] = useState<AIInsight | null>(null);
+  const [selectedOpportunity, setSelectedOpportunity] = useState<DeFiOpportunity | null>(null);
+  const [activeTab, setActiveTab] = useState("opportunities");
 
   const { data: insights = [], isLoading, refetch } = useQuery<AIInsight[]>({
     queryKey: ["/api/insights"],
@@ -175,6 +202,11 @@ export default function Insights() {
 
   const { data: symbols = [] } = useQuery<string[]>({
     queryKey: ["/api/insights/symbols"],
+  });
+
+  const { data: opportunities = [], isLoading: isLoadingOpportunities, refetch: refetchOpportunities } = useQuery<DeFiOpportunity[]>({
+    queryKey: ["/api/defi/opportunities"],
+    refetchInterval: 30000,
   });
 
   const generateMutation = useMutation({
@@ -233,6 +265,201 @@ export default function Insights() {
     return date.toLocaleString();
   };
 
+  const formatTVL = (tvl: number) => {
+    if (tvl >= 1e9) return `$${(tvl / 1e9).toFixed(1)}B`;
+    if (tvl >= 1e6) return `$${(tvl / 1e6).toFixed(1)}M`;
+    return `$${tvl.toLocaleString()}`;
+  };
+
+  const renderOpportunityCard = (opp: DeFiOpportunity) => {
+    const riskColors = {
+      low: "text-green-500 bg-green-500/10",
+      medium: "text-yellow-500 bg-yellow-500/10",
+      high: "text-red-500 bg-red-500/10",
+    };
+
+    return (
+      <Card
+        key={opp.id}
+        data-testid={`card-opportunity-${opp.id}`}
+        className={`cursor-pointer transition-all hover-elevate ${
+          selectedOpportunity?.id === opp.id ? "ring-2 ring-primary" : ""
+        }`}
+        onClick={() => setSelectedOpportunity(opp)}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-md bg-primary/10 text-primary">
+                <Coins className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-medium">{opp.protocol}</CardTitle>
+                <CardDescription className="text-xs">{opp.chain} - {opp.token}</CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={riskColors[opp.risk]}>
+                {opp.risk.toUpperCase()}
+              </Badge>
+              <Badge variant="secondary" className="font-mono text-green-500">
+                {opp.apy.toFixed(1)}% APY
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-3">
+            <span>TVL: {formatTVL(opp.tvl)}</span>
+            <span className="capitalize">{opp.type.replace("_", " ")}</span>
+          </div>
+          
+          <div className="flex items-center gap-1 text-xs">
+            <div className={`flex items-center gap-1 px-2 py-1 rounded ${opp.agentFlow.scout.analyzed ? "bg-blue-500/10 text-blue-500" : "bg-muted text-muted-foreground"}`}>
+              <Search className="h-3 w-3" />
+              <span>Scout</span>
+              {opp.agentFlow.scout.analyzed && <CheckCircle className="h-3 w-3" />}
+            </div>
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            <div className={`flex items-center gap-1 px-2 py-1 rounded ${opp.agentFlow.risk.analyzed ? (opp.agentFlow.risk.approved ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500") : "bg-muted text-muted-foreground"}`}>
+              <Shield className="h-3 w-3" />
+              <span>Risk</span>
+              {opp.agentFlow.risk.analyzed && (opp.agentFlow.risk.approved ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />)}
+            </div>
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+            <div className={`flex items-center gap-1 px-2 py-1 rounded ${opp.executionReady ? "bg-purple-500/10 text-purple-500" : "bg-muted text-muted-foreground"}`}>
+              <Zap className="h-3 w-3" />
+              <span>Exec</span>
+              {opp.executionReady && <CheckCircle className="h-3 w-3" />}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderOpportunityDetails = () => {
+    if (!selectedOpportunity) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground">
+          <Coins className="h-12 w-12 mb-4 opacity-50" />
+          <p className="text-lg font-medium">Select an opportunity</p>
+          <p className="text-sm">Click on any DeFi opportunity to see the agent analysis</p>
+        </div>
+      );
+    }
+
+    const opp = selectedOpportunity;
+
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-lg bg-primary/10 text-primary">
+            <Coins className="h-6 w-6" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-semibold">{opp.protocol}</h3>
+            <p className="text-sm text-muted-foreground">{opp.chain} - {opp.type.replace("_", " ")}</p>
+          </div>
+          <Badge variant="secondary" className="text-lg font-mono text-green-500">
+            {opp.apy.toFixed(1)}% APY
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">Token</p>
+            <p className="text-lg font-semibold">{opp.token}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">TVL</p>
+            <p className="text-lg font-semibold">{formatTVL(opp.tvl)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Agent Analysis Flow</p>
+          
+          <div className="space-y-3">
+            <Card className="bg-blue-500/5 border-blue-500/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Search className="h-4 w-4 text-blue-500" />
+                  <span className="font-medium text-blue-500">Scout Agent</span>
+                  <Badge variant="secondary" className="ml-auto">
+                    {(opp.agentFlow.scout.confidence * 100).toFixed(0)}% confidence
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{opp.agentFlow.scout.notes}</p>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-center">
+              <ArrowDownRight className="h-5 w-5 text-muted-foreground rotate-45" />
+            </div>
+
+            <Card className={`${opp.agentFlow.risk.approved ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className={`h-4 w-4 ${opp.agentFlow.risk.approved ? "text-green-500" : "text-red-500"}`} />
+                  <span className={`font-medium ${opp.agentFlow.risk.approved ? "text-green-500" : "text-red-500"}`}>Risk Agent</span>
+                  <Badge variant={opp.agentFlow.risk.approved ? "default" : "destructive"} className="ml-auto">
+                    {opp.agentFlow.risk.approved ? "APPROVED" : "BLOCKED"}
+                  </Badge>
+                </div>
+                {opp.agentFlow.risk.concerns.length > 0 ? (
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    {opp.agentFlow.risk.concerns.map((concern, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <AlertTriangle className="h-3 w-3 mt-0.5 text-yellow-500 shrink-0" />
+                        {concern}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No significant concerns identified</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-center">
+              <ArrowDownRight className="h-5 w-5 text-muted-foreground rotate-45" />
+            </div>
+
+            <Card className={`${opp.executionReady ? "bg-purple-500/5 border-purple-500/20" : "bg-muted/50 border-border"}`}>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className={`h-4 w-4 ${opp.executionReady ? "text-purple-500" : "text-muted-foreground"}`} />
+                  <span className={`font-medium ${opp.executionReady ? "text-purple-500" : "text-muted-foreground"}`}>Execution Agent</span>
+                  <Badge variant={opp.executionReady ? "default" : "secondary"} className="ml-auto">
+                    {opp.executionReady ? "READY" : "BLOCKED"}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Est. Gas:</span>
+                    <span className="ml-2 font-mono">{opp.agentFlow.execution.estimatedGas} gwei</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Slippage:</span>
+                    <span className="ml-2 font-mono">{opp.agentFlow.execution.slippage}%</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {opp.executionReady && (
+          <Button className="w-full" data-testid="button-execute-opportunity">
+            <Zap className="h-4 w-4 mr-2" />
+            Execute Opportunity
+          </Button>
+        )}
+      </div>
+    );
+  };
+
   const renderInsightCard = (insight: AIInsight) => {
     const patternInfo = PATTERN_INFO[insight.pattern];
     const PatternIcon = patternInfo.icon;
@@ -283,7 +510,7 @@ export default function Insights() {
     );
   };
 
-  const renderDetailPanel = () => {
+  const renderInsightDetails = () => {
     if (!selectedInsight) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center p-6 text-muted-foreground">
@@ -327,16 +554,6 @@ export default function Insights() {
               <span className="text-lg font-semibold">{(selectedInsight.confidence * 100).toFixed(0)}%</span>
             </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Impact</p>
-            <Badge variant="outline" className={`${IMPACT_COLORS[selectedInsight.impact]} text-base`}>
-              {selectedInsight.impact}
-            </Badge>
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Detected At</p>
-            <p className="text-sm">{formatTimestamp(selectedInsight.timestamp)}</p>
-          </div>
         </div>
 
         <div className="space-y-2">
@@ -376,34 +593,6 @@ export default function Insights() {
                   </div>
                 </div>
               )}
-              {metadata.volatility !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Volatility Ratio</p>
-                  <p className="text-lg font-semibold">{metadata.volatility.toFixed(2)}x</p>
-                </div>
-              )}
-              {metadata.supportLevel !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Support Level</p>
-                  <p className="text-lg font-semibold">${metadata.supportLevel.toFixed(2)}</p>
-                </div>
-              )}
-              {metadata.resistanceLevel !== undefined && (
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Resistance Level</p>
-                  <p className="text-lg font-semibold">${metadata.resistanceLevel.toFixed(2)}</p>
-                </div>
-              )}
-              {metadata.correlatedAssets && metadata.correlatedAssets.length > 0 && (
-                <div className="p-3 bg-muted/50 rounded-lg col-span-2">
-                  <p className="text-xs text-muted-foreground mb-2">Correlated Assets</p>
-                  <div className="flex flex-wrap gap-2">
-                    {metadata.correlatedAssets.map((asset) => (
-                      <Badge key={asset} variant="secondary">{asset}</Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -411,7 +600,6 @@ export default function Insights() {
     );
   };
 
-  const patternCounts = stats?.byPattern || {};
   const impactCounts = stats?.byImpact || {};
 
   return (
@@ -423,7 +611,7 @@ export default function Insights() {
             AI Insights
           </h1>
           <p className="text-sm text-muted-foreground">
-            Advanced ML pattern recognition for market analysis
+            DeFi opportunities analyzed by Scout, Risk, and Execution agents
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -449,19 +637,6 @@ export default function Insights() {
             )}
             Analyze Market
           </Button>
-          <Button
-            variant="secondary"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending}
-            data-testid="button-generate-demo"
-          >
-            {generateMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4 mr-2" />
-            )}
-            Generate Demo
-          </Button>
         </div>
       </div>
 
@@ -470,10 +645,10 @@ export default function Insights() {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Insights</p>
-                <p className="text-2xl font-bold">{stats?.totalInsights || 0}</p>
+                <p className="text-sm text-muted-foreground">DeFi Opportunities</p>
+                <p className="text-2xl font-bold">{opportunities.filter(o => o.executionReady).length}</p>
               </div>
-              <Brain className="h-8 w-8 text-muted-foreground/50" />
+              <Coins className="h-8 w-8 text-muted-foreground/50" />
             </div>
           </CardContent>
         </Card>
@@ -481,10 +656,23 @@ export default function Insights() {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Confidence</p>
-                <p className="text-2xl font-bold">{((stats?.avgConfidence || 0) * 100).toFixed(0)}%</p>
+                <p className="text-sm text-muted-foreground">Avg APY</p>
+                <p className="text-2xl font-bold text-green-500">
+                  {opportunities.length > 0 ? (opportunities.reduce((sum, o) => sum + o.apy, 0) / opportunities.length).toFixed(1) : 0}%
+                </p>
               </div>
-              <Target className="h-8 w-8 text-muted-foreground/50" />
+              <Yield className="h-8 w-8 text-green-500/50" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Pattern Insights</p>
+                <p className="text-2xl font-bold">{stats?.totalInsights || 0}</p>
+              </div>
+              <Brain className="h-8 w-8 text-muted-foreground/50" />
             </div>
           </CardContent>
         </Card>
@@ -499,116 +687,137 @@ export default function Insights() {
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">High Priority</p>
-                <p className="text-2xl font-bold text-orange-500">{impactCounts.High || 0}</p>
-              </div>
-              <Activity className="h-8 w-8 text-orange-500/50" />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      <Tabs defaultValue="all" className="flex-1 flex flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="px-4">
           <TabsList>
-            <TabsTrigger value="all" data-testid="tab-all">All Patterns</TabsTrigger>
-            <TabsTrigger value="momentum" data-testid="tab-momentum">Momentum</TabsTrigger>
-            <TabsTrigger value="whale" data-testid="tab-whale">Whale Activity</TabsTrigger>
-            <TabsTrigger value="volatility" data-testid="tab-volatility">Volatility</TabsTrigger>
-            <TabsTrigger value="reversal" data-testid="tab-reversal">Reversals</TabsTrigger>
+            <TabsTrigger value="opportunities" data-testid="tab-opportunities">
+              <Coins className="h-4 w-4 mr-2" />
+              DeFi Opportunities
+            </TabsTrigger>
+            <TabsTrigger value="patterns" data-testid="tab-patterns">
+              <Brain className="h-4 w-4 mr-2" />
+              Pattern Insights
+            </TabsTrigger>
           </TabsList>
         </div>
 
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 overflow-hidden">
-          <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
-                  <SelectTrigger className="w-32" data-testid="select-symbol">
-                    <SelectValue placeholder="Symbol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Symbols</SelectItem>
-                    {symbols.map((sym) => (
-                      <SelectItem key={sym} value={sym}>{sym}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+        <TabsContent value="opportunities" className="flex-1 m-0 p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+            <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
+              <div className="flex items-center gap-4 flex-wrap">
+                <Badge variant="secondary" className="ml-auto">
+                  {opportunities.length} opportunities
+                </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Min Confidence:</span>
-                <Slider
-                  value={[minConfidence]}
-                  onValueChange={([v]) => setMinConfidence(v)}
-                  max={100}
-                  step={5}
-                  className="w-24"
-                  data-testid="slider-confidence"
-                />
-                <span className="text-sm font-mono w-10">{minConfidence}%</span>
-              </div>
-              <Badge variant="secondary" className="ml-auto">
-                {filteredInsights.length} results
-              </Badge>
+
+              <ScrollArea className="flex-1">
+                <div className="space-y-3">
+                  {isLoadingOpportunities ? (
+                    <div className="flex items-center justify-center h-40">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : opportunities.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                      <Coins className="h-12 w-12 mb-4 opacity-50" />
+                      <p>No opportunities available yet</p>
+                      <p className="text-sm">Agent pipeline is analyzing markets...</p>
+                    </div>
+                  ) : (
+                    opportunities.map(renderOpportunityCard)
+                  )}
+                </div>
+              </ScrollArea>
             </div>
 
-            <ScrollArea className="flex-1">
-              <TabsContent value="all" className="m-0 space-y-3">
-                {isLoading ? (
-                  <div className="flex items-center justify-center h-40">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : filteredInsights.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-                    <Brain className="h-12 w-12 mb-4 opacity-50" />
-                    <p>No insights detected yet</p>
-                    <p className="text-sm">Click "Generate Demo" to create sample insights</p>
-                  </div>
-                ) : (
-                  filteredInsights.map(renderInsightCard)
-                )}
-              </TabsContent>
-              <TabsContent value="momentum" className="m-0 space-y-3">
-                {insights
-                  .filter((i) => i.pattern === "momentum_shift")
-                  .filter((i) => i.confidence >= minConfidence / 100)
-                  .map(renderInsightCard)}
-              </TabsContent>
-              <TabsContent value="whale" className="m-0 space-y-3">
-                {insights
-                  .filter((i) => i.pattern === "whale_accumulation")
-                  .filter((i) => i.confidence >= minConfidence / 100)
-                  .map(renderInsightCard)}
-              </TabsContent>
-              <TabsContent value="volatility" className="m-0 space-y-3">
-                {insights
-                  .filter((i) => i.pattern === "volatility_cluster")
-                  .filter((i) => i.confidence >= minConfidence / 100)
-                  .map(renderInsightCard)}
-              </TabsContent>
-              <TabsContent value="reversal" className="m-0 space-y-3">
-                {insights
-                  .filter((i) => i.pattern === "trend_reversal")
-                  .filter((i) => i.confidence >= minConfidence / 100)
-                  .map(renderInsightCard)}
-              </TabsContent>
-            </ScrollArea>
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/30">
+                <CardTitle className="text-sm">Agent Analysis</CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-[calc(100vh-400px)]">
+                {renderOpportunityDetails()}
+              </ScrollArea>
+            </Card>
           </div>
+        </TabsContent>
 
-          <Card className="overflow-hidden">
-            <CardHeader className="border-b bg-muted/30">
-              <CardTitle className="text-sm">Insight Details</CardTitle>
-            </CardHeader>
-            <ScrollArea className="h-[calc(100vh-400px)]">
-              {renderDetailPanel()}
-            </ScrollArea>
-          </Card>
-        </div>
+        <TabsContent value="patterns" className="flex-1 m-0 p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-full">
+            <div className="lg:col-span-2 flex flex-col gap-4 overflow-hidden">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={selectedSymbol} onValueChange={setSelectedSymbol}>
+                    <SelectTrigger className="w-32" data-testid="select-symbol">
+                      <SelectValue placeholder="Symbol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Symbols</SelectItem>
+                      {symbols.map((sym) => (
+                        <SelectItem key={sym} value={sym}>{sym}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Min Confidence:</span>
+                  <Slider
+                    value={[minConfidence]}
+                    onValueChange={([v]) => setMinConfidence(v)}
+                    max={100}
+                    step={5}
+                    className="w-24"
+                    data-testid="slider-confidence"
+                  />
+                  <span className="text-sm font-mono w-10">{minConfidence}%</span>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => generateMutation.mutate()}
+                  disabled={generateMutation.isPending}
+                  data-testid="button-generate-demo"
+                  className="ml-auto"
+                >
+                  {generateMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4 mr-2" />
+                  )}
+                  Generate Demo
+                </Button>
+              </div>
+
+              <ScrollArea className="flex-1">
+                <div className="space-y-3">
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-40">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : filteredInsights.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+                      <Brain className="h-12 w-12 mb-4 opacity-50" />
+                      <p>No insights detected yet</p>
+                      <p className="text-sm">Click "Generate Demo" to create sample insights</p>
+                    </div>
+                  ) : (
+                    filteredInsights.map(renderInsightCard)
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+
+            <Card className="overflow-hidden">
+              <CardHeader className="border-b bg-muted/30">
+                <CardTitle className="text-sm">Insight Details</CardTitle>
+              </CardHeader>
+              <ScrollArea className="h-[calc(100vh-400px)]">
+                {renderInsightDetails()}
+              </ScrollArea>
+            </Card>
+          </div>
+        </TabsContent>
       </Tabs>
     </div>
   );

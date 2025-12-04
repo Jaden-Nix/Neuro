@@ -2808,6 +2808,209 @@ export async function registerRoutes(
   });
 
   // ==========================================
+  // DeFi Opportunities Routes
+  // ==========================================
+
+  // Get DeFi opportunities with agent flow analysis
+  app.get("/api/defi/opportunities", async (req, res) => {
+    try {
+      const agents = orchestrator.getAgents();
+      const creditScores = await storage.getCreditScores();
+      const logs = await storage.getLogs();
+      
+      const scoutAgent = agents.find(a => a.type === "scout");
+      const riskAgent = agents.find(a => a.type === "risk");
+      const executionAgent = agents.find(a => a.type === "execution");
+      
+      const scoutCredit = creditScores.find(c => c.agentId === "scout-core");
+      const riskCredit = creditScores.find(c => c.agentId === "risk-core");
+      const execCredit = creditScores.find(c => c.agentId === "execution-core");
+
+      const recentScoutLog = logs.find(l => l.agentType === "scout");
+      const recentRiskLog = logs.find(l => l.agentType === "risk");
+      const recentExecLog = logs.find(l => l.agentType === "execution");
+
+      const opportunities = [
+        {
+          id: "opp-aave-usdc",
+          protocol: "Aave V3",
+          type: "lending",
+          apy: 4.2,
+          tvl: 12500000000,
+          risk: "low",
+          chain: "Ethereum",
+          token: "USDC",
+          scoutScore: scoutCredit ? Math.min(100, (scoutCredit.totalCredits / 10) * 100) : 92,
+          riskScore: 15,
+          executionReady: true,
+          agentFlow: {
+            scout: { 
+              analyzed: !!scoutAgent, 
+              confidence: scoutCredit ? scoutCredit.accuracyRate : 0.92, 
+              notes: recentScoutLog?.message?.slice(0, 200) || "Strong TVL, established protocol, consistent yields"
+            },
+            risk: { 
+              analyzed: !!riskAgent, 
+              approved: true, 
+              concerns: [] 
+            },
+            execution: { 
+              ready: !!executionAgent, 
+              estimatedGas: 45, 
+              slippage: 0.1 
+            },
+          },
+        },
+        {
+          id: "opp-lido-eth",
+          protocol: "Lido",
+          type: "staking",
+          apy: 3.8,
+          tvl: 28000000000,
+          risk: "low",
+          chain: "Ethereum",
+          token: "ETH",
+          scoutScore: 95,
+          riskScore: 12,
+          executionReady: true,
+          agentFlow: {
+            scout: { 
+              analyzed: !!scoutAgent, 
+              confidence: 0.95, 
+              notes: "Largest liquid staking protocol, battle-tested" 
+            },
+            risk: { 
+              analyzed: !!riskAgent, 
+              approved: true, 
+              concerns: [] 
+            },
+            execution: { 
+              ready: !!executionAgent, 
+              estimatedGas: 65, 
+              slippage: 0.05 
+            },
+          },
+        },
+        {
+          id: "opp-curve-3crv",
+          protocol: "Curve Finance",
+          type: "liquidity_provision",
+          apy: 8.5,
+          tvl: 4200000000,
+          risk: "medium",
+          chain: "Ethereum",
+          token: "3CRV",
+          scoutScore: 78,
+          riskScore: 35,
+          executionReady: riskAgent?.status === "idle",
+          agentFlow: {
+            scout: { 
+              analyzed: !!scoutAgent, 
+              confidence: 0.78, 
+              notes: "Good APY, stable pool, moderate IL risk" 
+            },
+            risk: { 
+              analyzed: !!riskAgent, 
+              approved: true, 
+              concerns: ["Impermanent loss possible in volatile markets"] 
+            },
+            execution: { 
+              ready: riskAgent?.status === "idle", 
+              estimatedGas: 120, 
+              slippage: 0.3 
+            },
+          },
+        },
+        {
+          id: "opp-pendle-steth",
+          protocol: "Pendle",
+          type: "yield_farming",
+          apy: 15.2,
+          tvl: 890000000,
+          risk: "medium",
+          chain: "Arbitrum",
+          token: "PT-stETH",
+          scoutScore: 72,
+          riskScore: riskCredit ? Math.min(100, 100 - (riskCredit.totalCredits / 10) * 10) : 45,
+          executionReady: false,
+          agentFlow: {
+            scout: { 
+              analyzed: !!scoutAgent, 
+              confidence: 0.72, 
+              notes: "High yield opportunity, yield tokenization mechanism" 
+            },
+            risk: { 
+              analyzed: !!riskAgent, 
+              approved: false, 
+              concerns: recentRiskLog 
+                ? [recentRiskLog.message.slice(0, 100), "Complex yield structure", "Token expiry consideration"]
+                : ["Smart contract risk", "Complex yield structure", "Token expiry consideration"]
+            },
+            execution: { 
+              ready: false, 
+              estimatedGas: 85, 
+              slippage: 0.5 
+            },
+          },
+        },
+        {
+          id: "opp-gmx-glp",
+          protocol: "GMX",
+          type: "staking",
+          apy: 12.8,
+          tvl: 520000000,
+          risk: "medium",
+          chain: "Arbitrum",
+          token: "GLP",
+          scoutScore: 80,
+          riskScore: 40,
+          executionReady: execCredit ? execCredit.accuracyRate > 0.7 : true,
+          agentFlow: {
+            scout: { 
+              analyzed: !!scoutAgent, 
+              confidence: 0.80, 
+              notes: "Perpetual DEX revenue share, diversified asset exposure" 
+            },
+            risk: { 
+              analyzed: !!riskAgent, 
+              approved: true, 
+              concerns: ["Exposure to trader PnL", "Market volatility risk"] 
+            },
+            execution: { 
+              ready: execCredit ? execCredit.accuracyRate > 0.7 : true, 
+              estimatedGas: 75, 
+              slippage: 0.2 
+            },
+          },
+        },
+      ];
+
+      res.json(opportunities);
+    } catch (error) {
+      console.error("Failed to get DeFi opportunities:", error);
+      res.status(500).json({ error: "Failed to get DeFi opportunities" });
+    }
+  });
+
+  // Analyze a specific DeFi opportunity through the agent pipeline
+  app.post("/api/defi/opportunities/:id/analyze", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const result = await orchestrator.runAutonomousCycle(id);
+      
+      res.json({
+        opportunityId: id,
+        analysis: result,
+        timestamp: Date.now(),
+      });
+    } catch (error) {
+      console.error("Failed to analyze opportunity:", error);
+      res.status(500).json({ error: "Failed to analyze opportunity" });
+    }
+  });
+
+  // ==========================================
   // Multi-Wallet Management Routes
   // ==========================================
 
