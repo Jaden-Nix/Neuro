@@ -5478,6 +5478,30 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/village/spawn-cooldown", async (req, res) => {
+    try {
+      const status = tradingVillage.getSpawnCooldownStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get spawn cooldown status" });
+    }
+  });
+
+  app.post("/api/village/reset", writeLimiter, async (req, res) => {
+    try {
+      const result = await tradingVillage.resetSpawnedAgents();
+      broadcastToClients({
+        type: "log",
+        data: { event: "village_reset", ...result },
+        timestamp: Date.now(),
+      });
+      res.json({ success: true, ...result, message: `Removed ${result.removed} spawned agents. ${result.remaining} original agents remain.` });
+    } catch (error) {
+      console.error("[API] Reset village error:", error);
+      res.status(500).json({ error: "Failed to reset village" });
+    }
+  });
+
   tradingVillage.on("agentBirth", (birth) => {
     broadcastToClients({
       type: "log",

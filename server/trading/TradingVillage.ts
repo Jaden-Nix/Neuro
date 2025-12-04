@@ -242,6 +242,8 @@ export class TradingVillage extends EventEmitter {
   private competitions: CompetitionEvent[] = [];
   private experiments: Map<string, Experiment> = new Map();
   private tradeSignals: VillageTradeSignal[] = [];
+  private lastSpawnTime: number = 0;
+  private static readonly SPAWN_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours between spawns
 
   constructor() {
     super();
@@ -1862,6 +1864,12 @@ Describe your evolution in 2-3 sentences:
       return { canSpawn: false, reason: "Village at maximum capacity (25 agents)" };
     }
 
+    const timeSinceLastSpawn = Date.now() - this.lastSpawnTime;
+    if (this.lastSpawnTime > 0 && timeSinceLastSpawn < TradingVillage.SPAWN_COOLDOWN_MS) {
+      const hoursRemaining = Math.ceil((TradingVillage.SPAWN_COOLDOWN_MS - timeSinceLastSpawn) / (60 * 60 * 1000));
+      return { canSpawn: false, reason: `Global spawn cooldown active (${hoursRemaining}h remaining). Only 1 agent can spawn per 24 hours.` };
+    }
+
     if (agent.creditScore < 550) {
       return { canSpawn: false, reason: "Insufficient credit score (need 550+)" };
     }
@@ -2044,6 +2052,9 @@ Describe your evolution in 2-3 sentences:
     await this.saveSpawnedAgentToDB(child, parent.id);
     await this.saveBirthRecordToDB(birth);
 
+    this.lastSpawnTime = Date.now();
+    console.log(`[TradingVillage] Agent ${child.name} spawned. Next spawn allowed in 24 hours.`);
+
     this.addThought(parent.id, "learning",
       `I have trained ${child.name}, my ${child.generation}th generation student, specializing in ${spec}. May they surpass me.`,
       { event: "agent_birth", childId: child.id, specialization: spec }
@@ -2154,6 +2165,48 @@ Describe your evolution in 2-3 sentences:
       const { specialization } = this.checkBirthConditions(parent);
       await this.spawnAgent(parent.id, specialization);
     }
+  }
+
+  async resetSpawnedAgents(): Promise<{ removed: number; remaining: number }> {
+    const originalAgentNames = UNIQUE_AGENT_CONFIGS.map(c => c.name);
+    const spawnedAgentIds: string[] = [];
+    
+    for (const [id, agent] of this.agents) {
+      if (!originalAgentNames.includes(agent.name)) {
+        spawnedAgentIds.push(id);
+      }
+    }
+
+    for (const id of spawnedAgentIds) {
+      this.agents.delete(id);
+    }
+
+    try {
+      await db.delete(villageAgents);
+      await db.delete(agentBirths);
+      console.log(`[TradingVillage] Reset complete: removed ${spawnedAgentIds.length} spawned agents from memory and database`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to clear spawned agents from DB:", error);
+    }
+
+    this.lastSpawnTime = 0;
+    this.agentBirths = [];
+
+    this.addThought(
+      Array.from(this.agents.values())[0]?.id || "system",
+      "observation",
+      "Village reset complete. Spawned agents have been retired. The original 10 traders remain.",
+      { event: "village_reset", removedCount: spawnedAgentIds.length }
+    );
+
+    return { removed: spawnedAgentIds.length, remaining: this.agents.size };
+  }
+
+  getSpawnCooldownStatus(): { canSpawn: boolean; nextSpawnIn: number | null; lastSpawnTime: number } {
+    const timeSinceLastSpawn = Date.now() - this.lastSpawnTime;
+    const canSpawn = this.lastSpawnTime === 0 || timeSinceLastSpawn >= TradingVillage.SPAWN_COOLDOWN_MS;
+    const nextSpawnIn = canSpawn ? null : TradingVillage.SPAWN_COOLDOWN_MS - timeSinceLastSpawn;
+    return { canSpawn, nextSpawnIn, lastSpawnTime: this.lastSpawnTime };
   }
 }
 
