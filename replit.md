@@ -62,7 +62,13 @@ NeuroNet Governor is an advanced multi-agent AI system designed for autonomous D
     - **Birth Records**: Persisted to PostgreSQL (`agent_births` table) - historical record
     - **Trading Signals**: Persisted to PostgreSQL (`village_signals` table)
     - **Agent Thoughts**: In-memory only - use export button to download before restart
-- **On-Chain Agent Identity System**: Implemented NeuronBadge.sol soulbound NFT contract and BlockchainSyncService for proving agent evolution on-chain. Agents earn badges for successful mutations, with complete identity tracking including credit scores, generation lineage, and performance metrics. The Evolution page now has an "On-Chain" tab showing proof cards, agent resumes, and blockchain sync status.
+- **On-Chain Agent Identity System (LIVE on Base Sepolia)**: 
+  - **NeuronBadge Contract**: `0xc4f97d52334f0de35fec958f24fc5af9c450f8dc` - Soulbound NFT for proving agent evolution
+  - **Live Minting**: BlockchainSyncService uses viem to mint evolution badges on-chain in real-time
+  - **Badge Types**: Evolution (mutations), Stress Test (resilience), Healing (self-recovery)
+  - **BaseScan Verification**: All minted badges have clickable links to view transactions on BaseScan
+  - **Environment Variables**: `BLOCKCHAIN_ENABLED=true`, `NEURON_BADGE_ADDRESS`, `DEPLOYER_PRIVATE_KEY`
+  - **UI Integration**: Evolution page shows live/simulated status indicator and explorer links for verified proofs
 - **Real Data Integration**: All system components now use real market data sources (Binance, CoinGecko, DefiLlama) instead of simulated data
 - **Backtesting Enhancement**: QuickBacktestEngine now fetches actual historical OHLCV data with deterministic seeded fallback
 - **Claude AI Integration**: All agents now use Replit AI Integrations for Anthropic Claude access (AI_INTEGRATIONS_ANTHROPIC_API_KEY, AI_INTEGRATIONS_ANTHROPIC_BASE_URL)
