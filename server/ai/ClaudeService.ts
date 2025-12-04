@@ -1,13 +1,19 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import pLimit from "p-limit";
 import pRetry from "p-retry";
 import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 
-// Using Replit's AI Integrations service for Anthropic access (billed to Replit credits)
-const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+
+const anthropic = claudeApiKey ? new Anthropic({
+  apiKey: claudeApiKey,
+  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
+}) : null;
+
+const gemini = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
 const rateLimiter = pLimit(2);
 
@@ -42,11 +48,36 @@ export interface AgentDecision {
   timestamp: number;
 }
 
+async function queryWithGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number = 2048
+): Promise<string> {
+  if (!gemini) {
+    throw new Error("Gemini not configured");
+  }
+  
+  const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+  const response = await gemini.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: fullPrompt,
+    config: { maxOutputTokens: maxTokens },
+  });
+  return response.text || "";
+}
+
 async function queryClaudeWithRetry(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 2048
 ): Promise<string> {
+  if (!anthropic) {
+    if (gemini) {
+      return queryWithGemini(systemPrompt, userPrompt, maxTokens);
+    }
+    return "";
+  }
+  
   return anthropicCircuitBreaker.execute(
     () => rateLimiter(() =>
       pRetry(
@@ -81,7 +112,7 @@ async function queryClaudeWithRetry(
         }
       )
     ),
-    () => "" // Fallback returns empty string, methods handle this
+    () => "" // Fallback returns empty string, methods will try Gemini
   );
 }
 
@@ -103,18 +134,52 @@ function parseJsonFromResponse(response: string): Record<string, any> {
 
 export class ClaudeService {
   private isConfigured: boolean;
+  private isGeminiAvailable: boolean;
 
   constructor() {
-    this.isConfigured = !!(
-      process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY &&
-      process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL
-    );
+    this.isConfigured = !!claudeApiKey;
+    this.isGeminiAvailable = !!geminiApiKey;
     
     if (this.isConfigured) {
-      console.log("[Claude] Service initialized with Replit AI Integrations");
+      console.log("[Claude] Service initialized with Claude AI");
+    } else if (this.isGeminiAvailable) {
+      console.log("[Claude] Using Gemini AI as alternative (FREE tier)");
     } else {
-      console.warn("[Claude] API not configured - will use fallback responses");
+      console.warn("[Claude] No AI configured - will use fallback responses");
     }
+  }
+
+  async generateResponse(prompt: string): Promise<string> {
+    if (this.isGeminiAvailable && gemini) {
+      try {
+        const response = await gemini.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: { maxOutputTokens: 2048 },
+        });
+        return response.text || "";
+      } catch (error) {
+        console.error("[Claude] Gemini fallback failed:", error);
+      }
+    }
+    
+    if (this.isConfigured && anthropic) {
+      try {
+        const message = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 2048,
+          messages: [{ role: "user", content: prompt }],
+        });
+        const content = message.content[0];
+        if (content.type === "text") {
+          return content.text;
+        }
+      } catch (error) {
+        console.error("[Claude] Claude request failed:", error);
+      }
+    }
+    
+    return "";
   }
 
   async scoutAnalysis(context: MarketContext): Promise<AgentDecision> {

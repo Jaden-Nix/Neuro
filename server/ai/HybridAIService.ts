@@ -3,18 +3,21 @@ import { GoogleGenAI } from "@google/genai";
 import pLimit from "p-limit";
 import pRetry, { AbortError } from "p-retry";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 
-const gemini = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  httpOptions: {
-    apiVersion: "",
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
-});
+const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+
+const anthropic = claudeApiKey ? new Anthropic({
+  apiKey: claudeApiKey,
+  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
+}) : null;
+
+const gemini = geminiApiKey ? new GoogleGenAI({
+  apiKey: geminiApiKey,
+  ...(geminiBaseUrl && { httpOptions: { apiVersion: "", baseUrl: geminiBaseUrl } }),
+}) : null;
 
 const claudeLimit = pLimit(2);
 const geminiLimit = pLimit(2);
@@ -41,12 +44,12 @@ export interface HybridAIConfig {
 }
 
 const defaultConfig: HybridAIConfig = {
-  primaryProvider: "hybrid",
-  fallbackProvider: "claude",
+  primaryProvider: "gemini",
+  fallbackProvider: "gemini",
   scoutProvider: "gemini",
-  riskProvider: "claude",
+  riskProvider: "gemini",
   executionProvider: "gemini",
-  metaProvider: "claude",
+  metaProvider: "gemini",
 };
 
 export class HybridAIService {
@@ -57,21 +60,18 @@ export class HybridAIService {
   constructor(config: Partial<HybridAIConfig> = {}) {
     this.config = { ...defaultConfig, ...config };
     
-    this.isClaudeConfigured = !!(
-      process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY &&
-      process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL
-    );
-    
-    this.isGeminiConfigured = !!(
-      process.env.AI_INTEGRATIONS_GEMINI_API_KEY &&
-      process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
-    );
+    this.isClaudeConfigured = !!claudeApiKey;
+    this.isGeminiConfigured = !!geminiApiKey;
     
     console.log(`[HybridAI] Initialized - Claude: ${this.isClaudeConfigured ? 'ready' : 'not configured'}, Gemini: ${this.isGeminiConfigured ? 'ready' : 'not configured'}`);
+    
+    if (this.isGeminiConfigured) {
+      console.log(`[HybridAI] Using Gemini as primary AI provider (FREE tier)`);
+    }
   }
 
   async queryWithClaude(systemPrompt: string, userPrompt: string, maxTokens: number = 2048): Promise<string> {
-    if (!this.isClaudeConfigured) {
+    if (!this.isClaudeConfigured || !anthropic) {
       throw new Error("Claude not configured");
     }
 
@@ -109,7 +109,7 @@ export class HybridAIService {
   }
 
   async queryWithGemini(prompt: string, maxTokens: number = 2048): Promise<string> {
-    if (!this.isGeminiConfigured) {
+    if (!this.isGeminiConfigured || !gemini) {
       throw new Error("Gemini not configured");
     }
 
