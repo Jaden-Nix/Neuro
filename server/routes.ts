@@ -487,13 +487,38 @@ export async function registerRoutes(
   // Metrics - Real market data + AI agent stats (no wallet required)
   app.get("/api/metrics", async (_req, res) => {
     try {
-      // Get market data from public APIs (no wallet needed)
-      const [ethPrice, btcPrice, defiSnapshot, gasPrice] = await Promise.all([
-        marketDataService.getCurrentPrice("ETH").catch(() => 3600),
-        marketDataService.getCurrentPrice("BTC").catch(() => 96000),
-        marketDataService.getDeFiSnapshot().catch(() => ({ totalTVL: 0 })),
-        rpcClient.getGasPriceGwei().catch(() => 25),
-      ]);
+      // Default fallback prices
+      let ethPrice = 3500;
+      let btcPrice = 95000;
+      let totalTVL = 0;
+      let gasPrice = 25;
+      
+      // Try to get live prices from CCXT via TradingVillage (which we know works)
+      try {
+        const liveData = ccxtAdapter.getActiveTokens();
+        if (liveData.length > 0) {
+          // Use fetchMultiplePrices which is more reliable
+          const prices = await ccxtAdapter.fetchMultiplePrices(['BTC', 'ETH']);
+          const btcData = prices.get('BTC');
+          const ethData = prices.get('ETH');
+          if (btcData && btcData.price > 0) btcPrice = btcData.price;
+          if (ethData && ethData.price > 0) ethPrice = ethData.price;
+        }
+      } catch (e) {
+        // Use fallbacks
+      }
+      
+      // Get DeFi and gas data separately (non-blocking)
+      try {
+        const [defiSnapshot, gas] = await Promise.all([
+          marketDataService.getDeFiSnapshot().catch(() => ({ totalTVL: 0 })),
+          rpcClient.getGasPriceGwei().catch(() => 25),
+        ]);
+        totalTVL = defiSnapshot.totalTVL || 0;
+        gasPrice = gas;
+      } catch (e) {
+        // Use defaults
+      }
 
       // Get AI agent statistics from TradingVillage
       const villageStats = tradingVillage.getVillageStats();
@@ -503,7 +528,7 @@ export async function registerRoutes(
         // Market Data
         ethPriceUsd: ethPrice,
         btcPriceUsd: btcPrice,
-        totalTvlUsd: defiSnapshot.totalTVL || 0,
+        totalTvlUsd: totalTVL,
         gasPriceGwei: gasPrice,
         
         // AI Agent Statistics
