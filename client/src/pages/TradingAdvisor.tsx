@@ -261,6 +261,7 @@ function formatDuration(ms: number): string {
 }
 
 function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: string, price: number) => void }) {
+  const [leverage, setLeverage] = useState(10);
   const isLong = signal.direction === "long";
   const riskDiff = Math.abs(signal.entryPrice - signal.stopLoss);
   const rewardDiff = Math.abs(signal.takeProfit1 - signal.entryPrice);
@@ -269,6 +270,16 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
   const potentialLoss = signal.entryPrice > 0 ? (((signal.entryPrice - signal.stopLoss) / signal.entryPrice) * 100).toFixed(1) : "0";
   const timeRemaining = signal.expiresAt - Date.now();
   const isExpiring = timeRemaining < 3600000;
+
+  const liquidationPrice = isLong 
+    ? signal.entryPrice * (1 - 1 / leverage)
+    : signal.entryPrice * (1 + 1 / leverage);
+  const distanceToLiq = ((Math.abs(signal.entryPrice - liquidationPrice) / signal.entryPrice) * 100);
+  const leveragedGain = parseFloat(potentialGain) * leverage;
+  const leveragedLoss = parseFloat(potentialLoss) * leverage;
+  const isLiqBeforeStop = isLong 
+    ? liquidationPrice > signal.stopLoss 
+    : liquidationPrice < signal.stopLoss;
 
   return (
     <motion.div
@@ -349,6 +360,63 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
             </div>
           </div>
 
+          <div className="pt-2 border-t">
+            <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Your Leverage:</span>
+                <Select value={leverage.toString()} onValueChange={(v) => setLeverage(parseInt(v))}>
+                  <SelectTrigger className="w-20" data-testid="select-leverage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1x</SelectItem>
+                    <SelectItem value="2">2x</SelectItem>
+                    <SelectItem value="3">3x</SelectItem>
+                    <SelectItem value="5">5x</SelectItem>
+                    <SelectItem value="10">10x</SelectItem>
+                    <SelectItem value="20">20x</SelectItem>
+                    <SelectItem value="25">25x</SelectItem>
+                    <SelectItem value="50">50x</SelectItem>
+                    <SelectItem value="75">75x</SelectItem>
+                    <SelectItem value="100">100x</SelectItem>
+                    <SelectItem value="125">125x</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-green-500 font-semibold">+{leveragedGain.toFixed(1)}%</span>
+                <span className="text-muted-foreground">/</span>
+                <span className="text-red-500 font-semibold">-{leveragedLoss.toFixed(1)}%</span>
+                <span className="text-xs text-muted-foreground">(leveraged)</span>
+              </div>
+            </div>
+            
+            <div className={`rounded-md p-3 ${isLiqBeforeStop ? "bg-orange-500/10 border border-orange-500/30" : "bg-red-500/5"}`}>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" /> Liquidation Price ({leverage}x)
+                  </div>
+                  <div className="font-mono font-semibold text-orange-500">
+                    ${liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs text-muted-foreground mb-1">Distance to Liq</div>
+                  <div className={`font-semibold ${distanceToLiq < 5 ? "text-red-500" : distanceToLiq < 10 ? "text-orange-500" : "text-muted-foreground"}`}>
+                    {isLong ? "-" : "+"}{distanceToLiq.toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+              {isLiqBeforeStop && (
+                <div className="mt-2 text-xs text-orange-500 flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  Warning: Liquidation before stop-loss! Consider lower leverage.
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between gap-4 text-sm flex-wrap">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1">
@@ -356,6 +424,7 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
                 <span className="text-green-500">+{potentialGain}%</span>
                 <span className="text-muted-foreground">/</span>
                 <span className="text-red-500">-{potentialLoss}%</span>
+                <span className="text-xs text-muted-foreground">(1x)</span>
               </div>
               <div className="flex items-center gap-1">
                 <BarChart3 className="h-4 w-4 text-muted-foreground" />
