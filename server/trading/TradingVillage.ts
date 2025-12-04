@@ -4,6 +4,9 @@ import pRetry from "p-retry";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
+import { db } from "../db";
+import { villageSignals } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
 // Using Replit's AI Integrations for Anthropic access (no API key needed, billed to credits)
 const anthropic = new Anthropic({
@@ -231,8 +234,85 @@ export class TradingVillage extends EventEmitter {
   constructor() {
     super();
     this.initializeVillage();
+    this.loadSignalsFromDB();
     this.startBackgroundProcesses();
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
+  }
+
+  private async loadSignalsFromDB() {
+    try {
+      const savedSignals = await db.select().from(villageSignals).orderBy(desc(villageSignals.createdAt)).limit(100);
+      this.tradeSignals = savedSignals.map(s => ({
+        id: s.id,
+        agentId: s.agentId,
+        agentName: s.agentName,
+        agentRole: s.agentRole as AgentRole,
+        symbol: s.symbol,
+        direction: s.direction,
+        entry: s.entry,
+        stopLoss: s.stopLoss,
+        takeProfit1: s.takeProfit1,
+        takeProfit2: s.takeProfit2,
+        takeProfit3: s.takeProfit3,
+        confidence: s.confidence,
+        timeframe: s.timeframe,
+        reasoning: s.reasoning,
+        technicalAnalysis: s.technicalAnalysis,
+        riskReward: s.riskReward,
+        positionSize: s.positionSize,
+        status: s.status,
+        validators: s.validators,
+        createdAt: s.createdAt.getTime(),
+        closedAt: s.closedAt?.getTime(),
+        outcome: s.outcome ?? undefined,
+      }));
+      console.log(`[TradingVillage] Loaded ${this.tradeSignals.length} signals from database`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to load signals from DB:", error);
+    }
+  }
+
+  private async saveSignalToDB(signal: VillageTradeSignal) {
+    try {
+      await db.insert(villageSignals).values({
+        id: signal.id,
+        agentId: signal.agentId,
+        agentName: signal.agentName,
+        agentRole: signal.agentRole,
+        symbol: signal.symbol,
+        direction: signal.direction,
+        entry: signal.entry,
+        stopLoss: signal.stopLoss,
+        takeProfit1: signal.takeProfit1,
+        takeProfit2: signal.takeProfit2,
+        takeProfit3: signal.takeProfit3,
+        confidence: signal.confidence,
+        timeframe: signal.timeframe,
+        reasoning: signal.reasoning,
+        technicalAnalysis: signal.technicalAnalysis,
+        riskReward: signal.riskReward,
+        positionSize: signal.positionSize,
+        status: signal.status,
+        validators: signal.validators,
+      }).onConflictDoNothing();
+      console.log(`[TradingVillage] Saved signal ${signal.id} to database`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to save signal to DB:", error);
+    }
+  }
+
+  private async updateSignalInDB(signalId: string, updates: Partial<VillageTradeSignal>) {
+    try {
+      const dbUpdates: Record<string, any> = {};
+      if (updates.status) dbUpdates.status = updates.status;
+      if (updates.validators) dbUpdates.validators = updates.validators;
+      if (updates.outcome) dbUpdates.outcome = updates.outcome;
+      if (updates.closedAt) dbUpdates.closedAt = new Date(updates.closedAt);
+      
+      await db.update(villageSignals).set(dbUpdates).where(eq(villageSignals.id, signalId));
+    } catch (error) {
+      console.error("[TradingVillage] Failed to update signal in DB:", error);
+    }
   }
 
   private cleanupConflictingSignals() {
@@ -732,6 +812,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
       const tradeSignal = await this.generateDetailedSignal(agent, symbol, direction, confidence);
       if (tradeSignal) {
         this.tradeSignals.push(tradeSignal);
+        this.saveSignalToDB(tradeSignal);
         this.emit("signalClaimed", { agent, claim, tradeSignal });
         
         this.requestSignalValidation(tradeSignal);
@@ -961,6 +1042,7 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
     if (signal.validators.length >= 2) {
       if (agrees > disagrees) {
         signal.status = "active";
+        this.updateSignalInDB(signal.id, { status: "active", validators: signal.validators });
         const creator = this.agents.get(signal.agentId);
         if (creator) {
           this.addThought(signal.agentId, "decision",
@@ -971,6 +1053,7 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         console.log(`[TradingVillage] Signal ${signal.id} ACTIVATED: ${agrees} agrees vs ${disagrees} disagrees`);
       } else if (disagrees > agrees) {
         signal.status = "rejected";
+        this.updateSignalInDB(signal.id, { status: "rejected", validators: signal.validators });
         console.log(`[TradingVillage] Signal ${signal.id} REJECTED: ${disagrees} disagrees vs ${agrees} agrees`);
       }
     }

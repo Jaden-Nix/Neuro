@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, jsonb, boolean, doublePrecision } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -2429,6 +2429,36 @@ export const evolutionBattles = pgTable("evolution_battles", {
   mutationsApplied: jsonb("mutations_applied").$type<string[]>().notNull(),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
+
+// Village trade signals - persisted to survive refresh/restart
+export const villageSignals = pgTable("village_signals", {
+  id: varchar("id").primaryKey(),
+  agentId: varchar("agent_id").notNull(),
+  agentName: varchar("agent_name").notNull(),
+  agentRole: varchar("agent_role").notNull(),
+  symbol: varchar("symbol").notNull(),
+  direction: varchar("direction").$type<"long" | "short">().notNull(),
+  entry: doublePrecision("entry").notNull(),
+  stopLoss: doublePrecision("stop_loss").notNull(),
+  takeProfit1: doublePrecision("take_profit_1").notNull(),
+  takeProfit2: doublePrecision("take_profit_2").notNull(),
+  takeProfit3: doublePrecision("take_profit_3").notNull(),
+  confidence: doublePrecision("confidence").notNull(),
+  timeframe: varchar("timeframe").notNull(),
+  reasoning: text("reasoning").notNull(),
+  technicalAnalysis: jsonb("technical_analysis").$type<{ pattern: string; indicators: string[]; keyLevels: { support: number; resistance: number } }>().notNull(),
+  riskReward: doublePrecision("risk_reward").notNull(),
+  positionSize: varchar("position_size").notNull(),
+  status: varchar("status").$type<"pending" | "active" | "rejected" | "invalidated" | "closed" | "stopped" | "expired">().notNull().default("pending"),
+  validators: jsonb("validators").$type<{ agentId: string; agentName: string; agrees: boolean; comment: string }[]>().notNull().default(sql`'[]'::jsonb`),
+  outcome: jsonb("outcome").$type<{ pnl: number; exitPrice: number; exitReason: string }>(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  closedAt: timestamp("closed_at"),
+});
+
+export const insertVillageSignalSchema = createInsertSchema(villageSignals).omit({ createdAt: true, closedAt: true });
+export type InsertVillageSignal = z.infer<typeof insertVillageSignalSchema>;
+export type SelectVillageSignal = typeof villageSignals.$inferSelect;
 
 // Insert schemas for new tables
 export const insertTokenRegistrySchema = createInsertSchema(tokenRegistry).omit({ addedAt: true, updatedAt: true });

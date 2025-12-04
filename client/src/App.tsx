@@ -1,8 +1,9 @@
-import { Switch, Route } from "wouter";
+import { useLocation } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider } from "wagmi";
 import { RainbowKitProvider, darkTheme, lightTheme } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { queryClient } from "./lib/queryClient";
 import { config } from "./lib/wagmi";
@@ -29,24 +30,52 @@ import TradingAdvisor from "@/pages/TradingAdvisor";
 import UltronSignals from "@/pages/UltronSignals";
 import NotFound from "@/pages/not-found";
 
+const pageVariants = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 }
+};
+
+const pageTransition = {
+  duration: 0.15,
+  ease: "easeInOut"
+};
+
 function Router() {
+  const [location] = useLocation();
+  
+  const getPageComponent = () => {
+    switch (location) {
+      case "/": return <Dashboard />;
+      case "/trading": return <TradingAdvisor />;
+      case "/signals": return <UltronSignals />;
+      case "/ml": return <MLInsights />;
+      case "/alerts": return <Alerts />;
+      case "/backtesting": return <Backtesting />;
+      case "/wallets": return <Wallets />;
+      case "/parliament": return <Parliament />;
+      case "/evolution": return <Evolution />;
+      case "/stress-lab": return <StressLab />;
+      case "/dream-mode": return <DreamMode />;
+      case "/insights": return <Insights />;
+      default: return <NotFound />;
+    }
+  };
+
   return (
-    <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/trading" component={TradingAdvisor} />
-      <Route path="/signals" component={UltronSignals} />
-      <Route path="/ml" component={MLInsights} />
-      {/* <Route path="/marketplace" component={Marketplace} /> */}
-      <Route path="/alerts" component={Alerts} />
-      <Route path="/backtesting" component={Backtesting} />
-      <Route path="/wallets" component={Wallets} />
-      <Route path="/parliament" component={Parliament} />
-      <Route path="/evolution" component={Evolution} />
-      <Route path="/stress-lab" component={StressLab} />
-      <Route path="/dream-mode" component={DreamMode} />
-      <Route path="/insights" component={Insights} />
-      <Route component={NotFound} />
-    </Switch>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={pageVariants}
+        transition={pageTransition}
+        className="h-full w-full bg-background"
+      >
+        {getPageComponent()}
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
