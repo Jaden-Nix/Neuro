@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "wouter";
+import { formatCryptoPrice } from "@/lib/utils";
 
 interface TradeSignal {
   id: string;
@@ -36,11 +37,7 @@ export function TradingSignalsSummary() {
     .filter(s => s.status === "validated" && s.confidence >= 70)
     .slice(0, 5);
 
-  const formatPrice = (price: number) => {
-    if (price >= 1000) return price.toLocaleString(undefined, { maximumFractionDigits: 0 });
-    if (price >= 1) return price.toFixed(2);
-    return price.toFixed(6);
-  };
+  const formatPrice = (price: number) => formatCryptoPrice(price);
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 85) return "text-green-500";

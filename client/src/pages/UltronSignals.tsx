@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, forwardRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatCryptoPrice } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,10 +80,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 function formatPrice(price: number): string {
-  if (price >= 1000) return price.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  if (price >= 1) return price.toFixed(2);
-  if (price >= 0.01) return price.toFixed(4);
-  return price.toFixed(8);
+  return formatCryptoPrice(price);
 }
 
 function formatChange(change: number): string {

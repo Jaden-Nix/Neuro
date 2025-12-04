@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { formatCryptoPrice } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -351,26 +352,26 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-muted/50 rounded-md p-3">
               <div className="text-xs text-muted-foreground mb-1">Entry</div>
-              <div className="font-mono font-semibold">${signal.entryPrice.toLocaleString()}</div>
+              <div className="font-mono font-semibold">${formatCryptoPrice(signal.entryPrice)}</div>
             </div>
             <div className="bg-red-500/10 rounded-md p-3">
               <div className="text-xs text-red-500 mb-1 flex items-center gap-1">
                 <Shield className="h-3 w-3" /> Stop Loss
               </div>
-              <div className="font-mono font-semibold text-red-500">${signal.stopLoss.toLocaleString()}</div>
+              <div className="font-mono font-semibold text-red-500">${formatCryptoPrice(signal.stopLoss)}</div>
             </div>
             <div className="bg-green-500/10 rounded-md p-3">
               <div className="text-xs text-green-500 mb-1 flex items-center gap-1">
                 <Target className="h-3 w-3" /> TP1
               </div>
-              <div className="font-mono font-semibold text-green-500">${signal.takeProfit1.toLocaleString()}</div>
+              <div className="font-mono font-semibold text-green-500">${formatCryptoPrice(signal.takeProfit1)}</div>
             </div>
             <div className="bg-green-500/5 rounded-md p-3">
               <div className="text-xs text-green-500/70 mb-1 flex items-center gap-1">
                 <Target className="h-3 w-3" /> TP2/TP3
               </div>
               <div className="font-mono text-sm text-green-500/70">
-                ${signal.takeProfit2.toLocaleString()} / ${signal.takeProfit3.toLocaleString()}
+                ${formatCryptoPrice(signal.takeProfit2)} / ${formatCryptoPrice(signal.takeProfit3)}
               </div>
             </div>
           </div>
@@ -1364,7 +1365,7 @@ export default function TradingAdvisor() {
                           <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Entry:</span>
-                              <span className="font-mono">${signal.entryPrice?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                              <span className="font-mono">${signal.entryPrice ? formatCryptoPrice(signal.entryPrice) : "-"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Confidence:</span>
@@ -1374,11 +1375,11 @@ export default function TradingAdvisor() {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">SL:</span>
-                              <span className="text-red-500 font-mono">${signal.stopLoss?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                              <span className="text-red-500 font-mono">${signal.stopLoss ? formatCryptoPrice(signal.stopLoss) : "-"}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">TP:</span>
-                              <span className="text-green-500 font-mono">${signal.takeProfit1?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                              <span className="text-green-500 font-mono">${signal.takeProfit1 ? formatCryptoPrice(signal.takeProfit1) : "-"}</span>
                             </div>
                           </div>
 
