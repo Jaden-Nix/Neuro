@@ -650,28 +650,33 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     confidence: number
   ): Promise<VillageTradeSignal | null> {
     const fallbackPrices: Record<string, number> = {
-      BTC: 96500, ETH: 3580, SOL: 145, AVAX: 48, LINK: 24, ARB: 1.05, OP: 2.50, SUI: 4.65
+      BTC: 93000, ETH: 3200, SOL: 143, AVAX: 25, LINK: 15, ARB: 0.50, OP: 1.20, SUI: 2.0
     };
     
     let basePrice = fallbackPrices[symbol] || 100;
     let volatility = symbol === "BTC" ? 0.02 : symbol === "ETH" ? 0.03 : 0.05;
+    let priceSource = "fallback";
     
     try {
       const snapshot = await marketDataService.getMarketSnapshot(`${symbol}USDT`);
       if (snapshot.price > 0) {
         basePrice = snapshot.price;
         volatility = Math.max(0.02, Math.min(0.10, snapshot.volatility / 100 || volatility));
+        priceSource = "live";
       }
     } catch (snapshotError) {
       try {
         const price = await marketDataService.getCurrentPrice(symbol);
         if (price > 0) {
           basePrice = price;
+          priceSource = "live";
         }
       } catch (priceError) {
         console.log(`[TradingVillage] Using fallback price for ${symbol}: $${basePrice}`);
       }
     }
+    
+    console.log(`[TradingVillage] ${symbol} price: $${basePrice.toFixed(2)} (${priceSource})`);
 
     try {
       const response = await anthropic.messages.create({
@@ -682,11 +687,13 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
           content: `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
 Your specialty: ${agent.specialties.join(", ")}
 
-Generate a ${direction.toUpperCase()} trade signal for ${symbol} at ~$${basePrice.toFixed(2)}.
+CRITICAL: The CURRENT LIVE price of ${symbol} is EXACTLY $${basePrice.toFixed(2)}. Do NOT use any other price from your training data. All your entry, stop loss, and take profit levels MUST be based on this current price of $${basePrice.toFixed(2)}.
+
+Generate a ${direction.toUpperCase()} trade signal for ${symbol}.
 
 Respond in this exact JSON format (no markdown):
 {
-  "entry": <entry price as number>,
+  "entry": <entry price NEAR $${basePrice.toFixed(2)}>,
   "stopLoss": <stop loss price as number>,
   "tp1": <take profit 1 as number>,
   "tp2": <take profit 2 as number>,
@@ -695,13 +702,13 @@ Respond in this exact JSON format (no markdown):
   "indicators": ["<indicator 1>", "<indicator 2>", "<indicator 3>"],
   "support": <key support level>,
   "resistance": <key resistance level>,
-  "reasoning": "<2-3 sentence explanation of why this trade, what you see, and the risk>",
+  "reasoning": "<2-3 sentence explanation of why this trade at $${basePrice.toFixed(2)}>",
   "timeframe": "<4H or 1D or 1H>",
   "positionSize": "<conservative or moderate or aggressive>"
 }
 
-For ${direction}: Entry should be ${direction === "long" ? "near support" : "near resistance"}.
-SL should be ${direction === "long" ? "below support" : "above resistance"} (${(volatility * 100).toFixed(1)}% away).
+REMEMBER: Current price is $${basePrice.toFixed(2)}. Entry must be within 1% of this price.
+For ${direction}: SL should be ${(volatility * 100).toFixed(1)}% away from entry.
 TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         }]
       });
@@ -730,14 +737,29 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         return isNaN(num) || num <= 0 ? fallback : num;
       };
       
-      const entry = safeNum(parsed.entry, defaultEntry);
+      let entry = safeNum(parsed.entry, defaultEntry);
+      
+      const priceDiff = Math.abs(entry - basePrice) / basePrice;
+      if (priceDiff > 0.20) {
+        console.warn(`[TradingVillage] AI returned wrong price $${entry.toFixed(2)} vs actual $${basePrice.toFixed(2)}, using corrected price`);
+        entry = defaultEntry;
+      }
+      
       const stopLoss = safeNum(parsed.stopLoss, defaultSl);
       const tp1 = safeNum(parsed.tp1, defaultTp1);
       const tp2 = safeNum(parsed.tp2, defaultTp2);
       const tp3 = safeNum(parsed.tp3, defaultTp3);
       
-      const rrDenom = Math.abs(entry - stopLoss);
-      const riskReward = rrDenom > 0 ? Math.abs(tp2 - entry) / rrDenom : 2.0;
+      const entryToSLRatio = Math.abs(entry - stopLoss) / entry;
+      const entryToTP1Ratio = Math.abs(tp1 - entry) / entry;
+      
+      const correctedSL = (priceDiff > 0.20 || entryToSLRatio > 0.15) ? defaultSl : stopLoss;
+      const correctedTP1 = (priceDiff > 0.20 || entryToTP1Ratio > 0.30) ? defaultTp1 : tp1;
+      const correctedTP2 = (priceDiff > 0.20) ? defaultTp2 : tp2;
+      const correctedTP3 = (priceDiff > 0.20) ? defaultTp3 : tp3;
+      
+      const rrDenom = Math.abs(entry - correctedSL);
+      const riskReward = rrDenom > 0 ? Math.abs(correctedTP2 - entry) / rrDenom : 2.0;
 
       const signal: VillageTradeSignal = {
         id: `vsig-${nanoid(8)}`,
@@ -747,10 +769,10 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
         symbol,
         direction,
         entry,
-        stopLoss,
-        takeProfit1: tp1,
-        takeProfit2: tp2,
-        takeProfit3: tp3,
+        stopLoss: correctedSL,
+        takeProfit1: correctedTP1,
+        takeProfit2: correctedTP2,
+        takeProfit3: correctedTP3,
         confidence,
         timeframe: parsed.timeframe || "4H",
         reasoning: parsed.reasoning || `${agent.specialties[0]} analysis indicates ${direction} opportunity`,
