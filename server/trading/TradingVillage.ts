@@ -188,6 +188,35 @@ export class TradingVillage extends EventEmitter {
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
   }
 
+  private cleanupConflictingSignals() {
+    const signalsBySymbol = new Map<string, VillageTradeSignal[]>();
+    
+    this.tradeSignals.forEach(signal => {
+      if (signal.status === "active") {
+        const existing = signalsBySymbol.get(signal.symbol) || [];
+        existing.push(signal);
+        signalsBySymbol.set(signal.symbol, existing);
+      }
+    });
+
+    signalsBySymbol.forEach((signals, symbol) => {
+      if (signals.length > 1) {
+        const sorted = signals.sort((a, b) => b.confidence - a.confidence);
+        const winner = sorted[0];
+        
+        sorted.slice(1).forEach(loser => {
+          loser.status = "invalidated";
+          const claimKey = `${loser.symbol}-${loser.direction}`;
+          this.signalClaims.delete(claimKey);
+        });
+        
+        console.log(`[TradingVillage] Cleanup: Kept ${winner.direction} ${symbol} by ${winner.agentName}, invalidated ${signals.length - 1} conflicting signals`);
+      }
+    });
+
+    this.tradeSignals = this.tradeSignals.filter(s => s.status !== "invalidated");
+  }
+
   private initializeVillage() {
     UNIQUE_AGENT_CONFIGS.forEach((config) => {
       const agent = this.createAgent(config);
@@ -598,6 +627,8 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
 
   async claimSignal(agentId: string, symbol: string, direction: "long" | "short", confidence: number): Promise<boolean> {
     const claimKey = `${symbol}-${direction}`;
+    const oppositeDirection = direction === "long" ? "short" : "long";
+    const oppositeKey = `${symbol}-${oppositeDirection}`;
 
     if (this.signalClaims.has(claimKey)) {
       const existingClaim = this.signalClaims.get(claimKey)!;
@@ -613,6 +644,37 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
           );
         }
         return false;
+      }
+    }
+
+    if (this.signalClaims.has(oppositeKey)) {
+      const opposingClaim = this.signalClaims.get(oppositeKey)!;
+      if (Date.now() - opposingClaim.claimedAt < 3600000) {
+        const agent = this.agents.get(agentId);
+        const opposer = this.agents.get(opposingClaim.claimedBy);
+        if (agent && opposer) {
+          if (confidence > opposingClaim.confidence + 0.1) {
+            console.log(`[TradingVillage] ${agent.name}'s ${direction} signal (${(confidence*100).toFixed(0)}%) overrides ${opposer.name}'s ${oppositeDirection} (${(opposingClaim.confidence*100).toFixed(0)}%)`);
+            this.signalClaims.delete(oppositeKey);
+            this.tradeSignals = this.tradeSignals.filter(s => 
+              !(s.symbol === symbol && s.direction === oppositeDirection && s.status === "active")
+            );
+            this.addThought(agentId, "challenge",
+              `Overriding @${opposer.name}'s ${oppositeDirection} ${symbol} call. My ${direction} analysis has stronger conviction at ${(confidence*100).toFixed(0)}%.`,
+              { symbol, direction, overriding: opposer.name },
+              undefined,
+              [opposingClaim.claimedBy]
+            );
+          } else {
+            this.addThought(agentId, "disagreement",
+              `I see ${symbol} ${direction}, but @${opposer.name} already called ${oppositeDirection}. Their conviction is similar - deferring.`,
+              { symbol, direction, existingDirection: oppositeDirection },
+              undefined,
+              [opposingClaim.claimedBy]
+            );
+            return false;
+          }
+        }
       }
     }
 
@@ -1458,10 +1520,24 @@ Describe your evolution in 2-3 sentences:
   }
 
   getTradeSignals(limit = 20, status?: "active" | "closed" | "all"): VillageTradeSignal[] {
+    this.cleanupConflictingSignals();
+    
     let signals = [...this.tradeSignals].reverse();
     if (status && status !== "all") {
       signals = signals.filter(s => s.status === status);
     }
+    
+    if (status === "active" || !status) {
+      const seenSymbols = new Set<string>();
+      signals = signals.filter(s => {
+        if (s.status === "active") {
+          if (seenSymbols.has(s.symbol)) return false;
+          seenSymbols.add(s.symbol);
+        }
+        return true;
+      });
+    }
+    
     return signals.slice(0, limit);
   }
 
