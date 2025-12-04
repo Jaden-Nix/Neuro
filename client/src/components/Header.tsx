@@ -1,26 +1,9 @@
-import { Activity, Code } from "lucide-react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Activity, Code, Wallet, Rocket } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { SolanaWalletButton } from "./SolanaWalletButton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-
-// Add Phantom/Solflare type declarations
-declare global {
-  interface Window {
-    phantom?: {
-      solana?: {
-        isPhantom?: boolean;
-        connect: () => Promise<{ publicKey: { toString: () => string } }>;
-        disconnect: () => Promise<void>;
-      };
-    };
-    solflare?: {
-      connect: () => Promise<{ publicKey: { toString: () => string } }>;
-      disconnect: () => Promise<void>;
-    };
-  }
-}
+import { useToast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   systemHealth: number;
@@ -30,6 +13,15 @@ interface HeaderProps {
 }
 
 export function Header({ systemHealth, activeAgents, chainStatus, onOpenDevPanel }: HeaderProps) {
+  const { toast } = useToast();
+
+  const handleWalletClick = () => {
+    toast({
+      title: "Auto-Trade Coming Soon",
+      description: "Wallet connection for automated trading is currently in development. Stay tuned!",
+    });
+  };
+
   const getChainStatusColor = () => {
     switch (chainStatus) {
       case "connected":
@@ -104,14 +96,16 @@ export function Header({ systemHealth, activeAgents, chainStatus, onOpenDevPanel
 
             <SolanaWalletButton />
 
-            <ConnectButton
-              showBalance={false}
-              chainStatus="icon"
-              accountStatus={{
-                smallScreen: "avatar",
-                largeScreen: "full",
-              }}
-            />
+            <Button
+              variant="default"
+              onClick={handleWalletClick}
+              data-testid="button-connect-wallet"
+              className="gap-2"
+            >
+              <Wallet className="w-4 h-4" />
+              Connect Wallet
+              <Rocket className="w-3 h-3 opacity-60" />
+            </Button>
           </div>
         </div>
       </div>
