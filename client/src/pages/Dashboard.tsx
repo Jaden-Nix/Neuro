@@ -45,15 +45,36 @@ import type {
   TradingSignal,
 } from "@shared/schema";
 
-interface VillageSignal extends TradingSignal {
+interface VillageSignal {
+  id: string;
+  agentId: string;
   agentName?: string;
+  agentRole?: string;
+  symbol: string;
+  direction: "long" | "short";
+  entry: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2?: number;
+  takeProfit3?: number;
+  confidence: number;
+  timeframe: string;
+  reasoning: string;
+  technicalAnalysis?: {
+    pattern: string;
+    indicators: string[];
+    keyLevels: { support: number; resistance: number };
+  };
+  riskReward: number;
+  positionSize: string;
+  status: "pending" | "active" | "hit_tp" | "hit_sl" | "expired" | "cancelled";
   validators?: Array<{
     agentId: string;
     agentName: string;
-    vote: "agree" | "disagree";
+    agrees: boolean;
     comment: string;
-    timestamp: number;
   }>;
+  createdAt: number;
 }
 
 export default function Dashboard() {
@@ -354,7 +375,9 @@ export default function Dashboard() {
                           <div className="space-y-1 text-xs text-muted-foreground">
                             <div className="flex justify-between">
                               <span>Entry:</span>
-                              <span className="text-foreground font-mono">${signal.entryPrice?.toLocaleString() || "Market"}</span>
+                              <span className="text-foreground font-mono">
+                                ${signal.entry != null ? (signal.entry < 0.01 ? signal.entry.toExponential(2) : signal.entry.toLocaleString(undefined, {maximumFractionDigits: 2})) : "Market"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Confidence:</span>
@@ -373,12 +396,12 @@ export default function Dashboard() {
                             )}
                           </div>
 
-                          {signal.validators && signal.validators.length > 0 && (
+                          {signal.validators && (
                             <div className="mt-2 pt-2 border-t border-border/50">
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <Target className="h-3 w-3" />
                                 <span>
-                                  {signal.validators.filter(v => v.vote === "agree").length} agree / {signal.validators.filter(v => v.vote === "disagree").length} disagree
+                                  {signal.validators.filter(v => v.agrees === true).length} agree / {signal.validators.filter(v => v.agrees === false).length} disagree
                                 </span>
                               </div>
                             </div>
