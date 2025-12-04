@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -895,10 +895,16 @@ export default function TradingAdvisor() {
     refetchInterval: 30000,
   });
 
-  const { data: livePrices = [], isLoading: pricesLoading } = useQuery<LivePrice[]>({
+  const { data: allLivePrices = [], isLoading: pricesLoading } = useQuery<LivePrice[]>({
     queryKey: ["/api/prices/live"],
     refetchInterval: 5000,
   });
+
+  const livePrices = useMemo(() => {
+    return allLivePrices.filter(p => p.changePercent24h !== 0 || (p.volume24h && p.volume24h > 0));
+  }, [allLivePrices]);
+
+  const pendingPricesCount = allLivePrices.length - livePrices.length;
 
   const generateSignalMutation = useMutation({
     mutationFn: async (params: { symbol: string; exchange: string; timeframe: string }) => {
@@ -1050,6 +1056,9 @@ export default function TradingAdvisor() {
             Live Prices
             {livePrices.length > 0 && (
               <Badge variant="secondary" className="ml-1">{livePrices.length}</Badge>
+            )}
+            {pendingPricesCount > 0 && (
+              <Badge variant="outline" className="ml-1 text-muted-foreground">+{pendingPricesCount}</Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="signals" className="flex items-center gap-2" data-testid="tab-signals">
