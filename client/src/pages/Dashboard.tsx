@@ -171,8 +171,8 @@ export default function Dashboard() {
   const logs = wsState.logs.length > 0 ? wsState.logs : fetchedLogs;
   const simulationTree = wsState.simulations.length > 0 ? wsState.simulations : fetchedSimulations;
 
-  // Active and pending signals for display (show both so users can see what's being evaluated)
-  const activeSignals = villageSignals.filter(s => s.status === "active" || s.status === "pending").slice(0, 4);
+  // Only show confirmed/active signals on Dashboard (pending ones go to Trading Advisor)
+  const activeSignals = villageSignals.filter(s => s.status === "active").slice(0, 4);
 
   // Mutations for control actions
   const simulationMutation = useMutation({

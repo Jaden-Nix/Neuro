@@ -64,7 +64,7 @@ interface TradingSignal {
     volume24h: number;
     volatility: number;
   };
-  status: "active" | "closed" | "expired";
+  status: "pending" | "active" | "closed" | "expired";
   createdAt: number;
   expiresAt: number;
   agentId: string;
@@ -842,6 +842,7 @@ export default function TradingAdvisor() {
   });
 
   const activeSignals = signals.filter(s => s.status === "active");
+  const pendingSignals = signals.filter(s => s.status === "pending");
   const closedSignals = signals.filter(s => s.status === "closed");
   const activeAirdrops = airdrops.filter(a => a.status === "active");
 
@@ -1087,58 +1088,188 @@ export default function TradingAdvisor() {
         </TabsContent>
 
         <TabsContent value="signals" className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <Select value={selectedExchange} onValueChange={setSelectedExchange}>
-                <SelectTrigger className="w-40" data-testid="select-exchange">
-                  <SelectValue placeholder="All Exchanges" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Exchanges</SelectItem>
-                  <SelectItem value="binance">Binance</SelectItem>
-                  <SelectItem value="hyperliquid">Hyperliquid</SelectItem>
-                  <SelectItem value="coinbase">Coinbase</SelectItem>
-                  <SelectItem value="bybit">Bybit</SelectItem>
-                </SelectContent>
-              </Select>
+          <Tabs defaultValue="active" className="w-full">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <TabsList>
+                <TabsTrigger value="active" className="flex items-center gap-2" data-testid="subtab-active-signals">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Active
+                  {activeSignals.length > 0 && (
+                    <Badge variant="default" className="ml-1">{activeSignals.length}</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="pending" className="flex items-center gap-2" data-testid="subtab-pending-signals">
+                  <Timer className="h-4 w-4" />
+                  Pending Review
+                  {pendingSignals.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">{pendingSignals.length}</Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <Button variant="ghost" size="sm" onClick={() => refetchSignals()} data-testid="button-refresh-signals">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => refetchSignals()} data-testid="button-refresh-signals">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
 
-          {signalsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredSignals.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Radar className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Active Signals</h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  Generate a new signal or scan all markets to find trading opportunities
-                </p>
-                <Button onClick={() => scanMarketsMutation.mutate()} disabled={scanMarketsMutation.isPending}>
-                  <Radar className="h-4 w-4 mr-2" />
-                  Scan Markets
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <AnimatePresence mode="popLayout">
-                {filteredSignals.map((signal) => (
-                  <SignalCard
-                    key={signal.id}
-                    signal={signal}
-                    onClose={(id, price) => closeSignalMutation.mutate({ id, exitPrice: price })}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
+            <TabsContent value="active" className="mt-0">
+              {signalsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredSignals.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <CheckCircle2 className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Confirmed Signals</h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      Signals appear here once AI agents agree on them. Check Pending Review for signals being evaluated.
+                    </p>
+                    {pendingSignals.length > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {pendingSignals.length} signal(s) currently being reviewed by agents
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <AnimatePresence mode="popLayout">
+                    {filteredSignals.map((signal) => (
+                      <SignalCard
+                        key={signal.id}
+                        signal={signal}
+                        onClose={(id, price) => closeSignalMutation.mutate({ id, exitPrice: price })}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="pending" className="mt-0">
+              {signalsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : pendingSignals.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Timer className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Pending Signals</h3>
+                    <p className="text-muted-foreground text-center mb-4">
+                      AI agents are constantly scanning markets. New signals will appear here for review.
+                    </p>
+                    <Button onClick={() => scanMarketsMutation.mutate()} disabled={scanMarketsMutation.isPending}>
+                      <Radar className="h-4 w-4 mr-2" />
+                      Scan Markets
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    These signals are being reviewed by AI agents. Signals with more agrees than disagrees will be confirmed.
+                  </p>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <AnimatePresence mode="popLayout">
+                      {pendingSignals.map((signal: any) => (
+                        <motion.div
+                          key={signal.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          className="border rounded-lg p-4 bg-card"
+                          data-testid={`pending-signal-${signal.id}`}
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              {signal.direction === "long" ? (
+                                <TrendingUp className="h-5 w-5 text-green-500" />
+                              ) : (
+                                <TrendingDown className="h-5 w-5 text-red-500" />
+                              )}
+                              <span className="font-bold text-lg">{signal.symbol}</span>
+                              <Badge variant={signal.direction === "long" ? "default" : "destructive"}>
+                                {signal.direction.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <Badge variant="outline" className="text-yellow-500 border-yellow-500/50">
+                              <Timer className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Entry:</span>
+                              <span className="font-mono">${signal.entryPrice?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Confidence:</span>
+                              <span className={signal.confidence >= 0.7 ? "text-green-500" : signal.confidence >= 0.5 ? "text-yellow-500" : "text-red-500"}>
+                                {(signal.confidence * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">SL:</span>
+                              <span className="text-red-500 font-mono">${signal.stopLoss?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">TP:</span>
+                              <span className="text-green-500 font-mono">${signal.takeProfit1?.toLocaleString(undefined, {maximumFractionDigits: 4}) || "-"}</span>
+                            </div>
+                          </div>
+
+                          <div className="text-xs text-muted-foreground mb-3 line-clamp-2">
+                            {signal.reasoning}
+                          </div>
+
+                          <div className="border-t pt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">Agent Votes</span>
+                              <span className="text-xs text-muted-foreground">By {signal.agentName || "Agent"}</span>
+                            </div>
+                            {signal.validators && signal.validators.length > 0 ? (
+                              <div className="space-y-2">
+                                {signal.validators.map((v: any, idx: number) => (
+                                  <div key={idx} className="flex items-start gap-2 text-xs">
+                                    {v.agrees ? (
+                                      <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                                    ) : (
+                                      <XCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                                    )}
+                                    <div>
+                                      <span className="font-medium">{v.agentName}</span>
+                                      <span className="text-muted-foreground ml-1">{v.comment?.slice(0, 60)}...</span>
+                                    </div>
+                                  </div>
+                                ))}
+                                <div className="flex items-center gap-2 mt-2 pt-2 border-t">
+                                  <Progress 
+                                    value={signal.validators.filter((v: any) => v.agrees).length / signal.validators.length * 100} 
+                                    className="h-2 flex-1"
+                                  />
+                                  <span className="text-xs text-muted-foreground">
+                                    {signal.validators.filter((v: any) => v.agrees).length}/{signal.validators.length} agree
+                                  </span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Waiting for agent reviews...
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
