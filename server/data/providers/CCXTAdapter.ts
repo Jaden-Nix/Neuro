@@ -141,16 +141,16 @@ const TOKEN_REGISTRY: Omit<TokenMetadata, 'addedAt' | 'updatedAt'>[] = [
 ];
 
 const EXCHANGE_CONFIGS: Record<SupportedExchange, { enabled: boolean; rateLimit: number; priority: number }> = {
-  binance: { enabled: false, rateLimit: 1200, priority: 99 },
-  kucoin: { enabled: true, rateLimit: 300, priority: 1 },
-  mexc: { enabled: true, rateLimit: 300, priority: 2 },
-  gate: { enabled: true, rateLimit: 300, priority: 3 },
-  bitget: { enabled: true, rateLimit: 400, priority: 4 },
-  kraken: { enabled: true, rateLimit: 500, priority: 5 },
-  bybit: { enabled: true, rateLimit: 400, priority: 6 },
-  okx: { enabled: true, rateLimit: 400, priority: 7 },
-  coinbase: { enabled: true, rateLimit: 500, priority: 8 },
-  huobi: { enabled: true, rateLimit: 400, priority: 9 },
+  binance: { enabled: true, rateLimit: 1200, priority: 1 },
+  kucoin: { enabled: true, rateLimit: 300, priority: 2 },
+  mexc: { enabled: true, rateLimit: 300, priority: 3 },
+  gate: { enabled: true, rateLimit: 300, priority: 4 },
+  bitget: { enabled: true, rateLimit: 400, priority: 5 },
+  kraken: { enabled: true, rateLimit: 500, priority: 6 },
+  bybit: { enabled: true, rateLimit: 400, priority: 7 },
+  okx: { enabled: true, rateLimit: 400, priority: 8 },
+  coinbase: { enabled: true, rateLimit: 500, priority: 9 },
+  huobi: { enabled: true, rateLimit: 400, priority: 10 },
 };
 
 const EXCHANGE_PRIORITY: SupportedExchange[] = Object.entries(EXCHANGE_CONFIGS)
