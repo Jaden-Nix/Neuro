@@ -5122,6 +5122,74 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/village/births", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const includeDb = req.query.db === "true";
+      
+      if (includeDb) {
+        const dbBirths = await tradingVillage.loadBirthsFromDB();
+        res.json(dbBirths.slice(0, limit));
+      } else {
+        const births = tradingVillage.getAgentBirths(limit);
+        res.json(births);
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent births" });
+    }
+  });
+
+  app.post("/api/village/spawn", writeLimiter, async (req, res) => {
+    try {
+      const { parentId, specialization } = req.body;
+      if (!parentId) {
+        return res.status(400).json({ error: "parentId is required" });
+      }
+      
+      const child = await tradingVillage.spawnAgent(parentId, specialization);
+      if (!child) {
+        const parent = tradingVillage.getAgent(parentId);
+        if (!parent) {
+          return res.status(404).json({ error: "Parent agent not found" });
+        }
+        const { reason } = tradingVillage.checkBirthConditions(parent);
+        return res.status(400).json({ error: reason });
+      }
+      
+      broadcastToClients({
+        type: "log",
+        data: { event: "agent_birth", child },
+        timestamp: Date.now(),
+      });
+      
+      res.json({ success: true, child });
+    } catch (error) {
+      console.error("[API] Spawn agent error:", error);
+      res.status(500).json({ error: "Failed to spawn agent" });
+    }
+  });
+
+  app.get("/api/village/agents/:id/birth-status", async (req, res) => {
+    try {
+      const agent = tradingVillage.getAgent(req.params.id);
+      if (!agent) {
+        return res.status(404).json({ error: "Agent not found" });
+      }
+      const status = tradingVillage.checkBirthConditions(agent);
+      res.json({ agent: agent.name, ...status });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check birth status" });
+    }
+  });
+
+  tradingVillage.on("agentBirth", (birth) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "village_agent_birth", birth },
+      timestamp: Date.now(),
+    });
+  });
+
   tradingVillage.on("thought", (thought) => {
     broadcastToClients({
       type: "log",

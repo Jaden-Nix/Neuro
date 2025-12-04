@@ -2460,6 +2460,56 @@ export const insertVillageSignalSchema = createInsertSchema(villageSignals).omit
 export type InsertVillageSignal = z.infer<typeof insertVillageSignalSchema>;
 export type SelectVillageSignal = typeof villageSignals.$inferSelect;
 
+// Village agents - persisted spawned agents that survive restarts
+export const villageAgents = pgTable("village_agents", {
+  id: varchar("id").primaryKey(),
+  name: varchar("name").notNull(),
+  role: varchar("role").$type<"hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran">().notNull(),
+  personality: varchar("personality").$type<"aggressive" | "conservative" | "balanced" | "contrarian" | "momentum" | "experimental">().notNull(),
+  specialties: jsonb("specialties").$type<string[]>().notNull(),
+  strategies: jsonb("strategies").$type<string[]>().notNull(),
+  generation: integer("generation").notNull().default(1),
+  creditScore: integer("credit_score").notNull().default(1000),
+  experience: integer("experience").notNull().default(0),
+  wins: integer("wins").notNull().default(0),
+  losses: integer("losses").notNull().default(0),
+  winRate: doublePrecision("win_rate").notNull().default(0),
+  totalPnl: doublePrecision("total_pnl").notNull().default(0),
+  parentId: varchar("parent_id"),
+  isSpawned: boolean("is_spawned").notNull().default(true),
+  memory: jsonb("memory").$type<{
+    learnedPatterns: string[];
+    successfulStrategies: string[];
+    failedStrategies: string[];
+    mentors: string[];
+    students: string[];
+    sharedInsights: { from: string; insight: string; adopted: boolean }[];
+    debateHistory: { topic: string; stance: string; outcome: "won" | "lost" | "consensus"; timestamp: number }[];
+  }>().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVillageAgentSchema = createInsertSchema(villageAgents).omit({ createdAt: true });
+export type InsertVillageAgent = z.infer<typeof insertVillageAgentSchema>;
+export type SelectVillageAgent = typeof villageAgents.$inferSelect;
+
+// Agent births - tracks when agents spawn new agents
+export const agentBirths = pgTable("agent_births", {
+  id: varchar("id").primaryKey(),
+  parentId: varchar("parent_id").notNull(),
+  parentName: varchar("parent_name").notNull(),
+  childId: varchar("child_id").notNull(),
+  childName: varchar("child_name").notNull(),
+  trigger: varchar("trigger").$type<"win_streak" | "pattern_mastery" | "knowledge_gap">().notNull(),
+  inheritedTraits: jsonb("inherited_traits").$type<{ specialties: string[]; strategies: string[] }>().notNull(),
+  mutations: jsonb("mutations").$type<string[]>().notNull(),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+export const insertAgentBirthSchema = createInsertSchema(agentBirths).omit({ timestamp: true });
+export type InsertAgentBirth = z.infer<typeof insertAgentBirthSchema>;
+export type SelectAgentBirth = typeof agentBirths.$inferSelect;
+
 // Insert schemas for new tables
 export const insertTokenRegistrySchema = createInsertSchema(tokenRegistry).omit({ addedAt: true, updatedAt: true });
 export const insertPriceHistorySchema = createInsertSchema(priceHistory).omit({ timestamp: true });

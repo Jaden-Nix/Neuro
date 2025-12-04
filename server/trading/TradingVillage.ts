@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
 import { db } from "../db";
-import { villageSignals } from "@shared/schema";
+import { villageSignals, villageAgents, agentBirths } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
 // Using Replit's AI Integrations for Anthropic access (no API key needed, billed to credits)
@@ -161,6 +161,18 @@ export interface SharedKnowledge {
   timestamp: number;
 }
 
+export interface AgentBirth {
+  id: string;
+  parentId: string;
+  parentName: string;
+  childId: string;
+  childName: string;
+  trigger: "win_streak" | "pattern_mastery" | "knowledge_gap";
+  inheritedTraits: { specialties: string[]; strategies: string[] };
+  mutations: string[];
+  timestamp: number;
+}
+
 export interface SignalClaim {
   signalId: string;
   symbol: string;
@@ -235,6 +247,7 @@ export class TradingVillage extends EventEmitter {
     super();
     this.initializeVillage();
     this.loadSignalsFromDB();
+    this.loadSpawnedAgentsFromDB();
     this.startBackgroundProcesses();
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
   }
@@ -269,6 +282,113 @@ export class TradingVillage extends EventEmitter {
       console.log(`[TradingVillage] Loaded ${this.tradeSignals.length} signals from database`);
     } catch (error) {
       console.error("[TradingVillage] Failed to load signals from DB:", error);
+    }
+  }
+
+  private async loadSpawnedAgentsFromDB() {
+    try {
+      const spawnedAgents = await db.select().from(villageAgents).orderBy(desc(villageAgents.createdAt));
+      
+      const mottos: Record<AgentPersonality, string> = {
+        aggressive: "Strike fast, strike hard",
+        conservative: "Patience is profit",
+        balanced: "Equilibrium in all trades",
+        contrarian: "When others panic, I profit",
+        momentum: "Ride the wave",
+        experimental: "Innovation drives evolution"
+      };
+
+      for (const sa of spawnedAgents) {
+        if (!this.agents.has(sa.id)) {
+          const agent: VillageAgent = {
+            id: sa.id,
+            name: sa.name,
+            role: sa.role,
+            personality: sa.personality,
+            creditScore: sa.creditScore,
+            experience: sa.experience,
+            generation: sa.generation,
+            wins: sa.wins,
+            losses: sa.losses,
+            winRate: sa.winRate,
+            totalPnl: sa.totalPnl,
+            bestTrade: null,
+            worstTrade: null,
+            currentStreak: { type: "win", count: 0 },
+            specialties: sa.specialties,
+            strategies: sa.strategies,
+            activeExperiments: [],
+            lastActive: Date.now(),
+            status: "hunting",
+            avatar: sa.role,
+            motto: mottos[sa.personality],
+            memory: sa.memory,
+            relationships: {},
+          };
+          
+          this.agents.set(agent.id, agent);
+          
+          const agents = Array.from(this.agents.values());
+          agents.forEach((other) => {
+            if (agent.id !== other.id) {
+              agent.relationships[other.id] = { trust: 50, agreements: 0, disagreements: 0 };
+              if (!other.relationships[agent.id]) {
+                other.relationships[agent.id] = { trust: 50, agreements: 0, disagreements: 0 };
+              }
+            }
+          });
+        }
+      }
+      
+      if (spawnedAgents.length > 0) {
+        console.log(`[TradingVillage] Loaded ${spawnedAgents.length} spawned agents from database`);
+      }
+    } catch (error) {
+      console.error("[TradingVillage] Failed to load spawned agents from DB:", error);
+    }
+  }
+
+  private async saveSpawnedAgentToDB(agent: VillageAgent, parentId: string) {
+    try {
+      await db.insert(villageAgents).values({
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        personality: agent.personality,
+        specialties: agent.specialties,
+        strategies: agent.strategies,
+        generation: agent.generation,
+        creditScore: agent.creditScore,
+        experience: agent.experience,
+        wins: agent.wins,
+        losses: agent.losses,
+        winRate: agent.winRate,
+        totalPnl: agent.totalPnl,
+        parentId: parentId,
+        isSpawned: true,
+        memory: agent.memory,
+      }).onConflictDoNothing();
+      console.log(`[TradingVillage] Saved spawned agent ${agent.name} to database`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to save spawned agent to DB:", error);
+    }
+  }
+
+  private async saveBirthRecordToDB(birth: AgentBirth) {
+    try {
+      await db.insert(agentBirths).values({
+        id: birth.id,
+        parentId: birth.parentId,
+        parentName: birth.parentName,
+        childId: birth.childId,
+        childName: birth.childName,
+        trigger: birth.trigger,
+        inheritedTraits: birth.inheritedTraits,
+        mutations: birth.mutations,
+      }).onConflictDoNothing();
+      console.log(`[TradingVillage] Saved birth record: ${birth.parentName} -> ${birth.childName}`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to save birth record to DB:", error);
     }
   }
 
@@ -703,6 +823,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
           insight: knowledge.content,
           adopted: true
         });
+        agent.memory.learnedPatterns.push(`adopted_${knowledge.type}`);
 
         this.addThought(agent.id, "agreement",
           `@${knowledge.contributorName}'s insight resonates with my analysis. Incorporating into my strategy.`,
@@ -1192,6 +1313,7 @@ Keep it under 20 words. Be direct.`
       }
 
       agent.memory.successfulStrategies.push(`${symbol}: ${reason}`);
+      agent.memory.learnedPatterns.push(`${agent.specialties[0]}_${symbol}`);
 
       this.addThought(agentId, "learning",
         `WIN on ${symbol}: +${pnl.toFixed(2)}%. My ${agent.specialties[0]} working. Sharing this pattern with the village.`,
@@ -1314,6 +1436,7 @@ Describe your evolution in 2-3 sentences:
         ];
         if (randomStrategy) {
           agent.strategies.push(`learned_from_${topPerformers[0].name}: ${randomStrategy}`);
+          agent.memory.learnedPatterns.push(`mentored_by_${topPerformers[0].name}`);
         }
       }
 
@@ -1381,6 +1504,7 @@ Describe your evolution in 2-3 sentences:
     if (success) {
       agent.creditScore += 25;
       agent.strategies.push(`${experiment.strategy}_validated`);
+      agent.memory.learnedPatterns.push(`experiment_${experiment.symbol}`);
 
       this.shareKnowledge(agent.id, "strategy", 
         `Experiment success: ${experiment.results.learnings}`
@@ -1416,6 +1540,7 @@ Describe your evolution in 2-3 sentences:
     setInterval(() => this.runKnowledgeSharingCycle(), 90000);
     setInterval(() => this.generateMarketInsights(), 20000);
     setInterval(() => this.runEvolutionCycle(), 120000);
+    setInterval(() => this.checkAndTriggerBirths(), 180000);
   }
 
   private async runInitialSignalGeneration() {
@@ -1472,6 +1597,7 @@ Describe your evolution in 2-3 sentences:
         if (newStrategy && !agent.strategies.includes(newStrategy)) {
           agent.strategies.push(newStrategy);
           agent.memory.successfulStrategies.push(newStrategy);
+          agent.memory.learnedPatterns.push(`evolved_${evolutionType}`);
         }
         
         this.addThought(agent.id, "learning",
@@ -1724,8 +1850,255 @@ Describe your evolution in 2-3 sentences:
       knowledgeShared: this.sharedKnowledge.length,
       topPerformer: agents.sort((a, b) => b.totalPnl - a.totalPnl)[0]?.name || "N/A",
       mostCredits: agents.sort((a, b) => b.creditScore - a.creditScore)[0]?.name || "N/A",
-      recentThoughts: this.thoughts.length
+      recentThoughts: this.thoughts.length,
+      totalBirths: this.agentBirths.length
     };
+  }
+
+  private agentBirths: AgentBirth[] = [];
+
+  checkBirthConditions(agent: VillageAgent): { canSpawn: boolean; reason: string; specialization?: string; trigger?: "win_streak" | "pattern_mastery" | "knowledge_gap" } {
+    if (this.agents.size >= 25) {
+      return { canSpawn: false, reason: "Village at maximum capacity (25 agents)" };
+    }
+
+    if (agent.creditScore < 550) {
+      return { canSpawn: false, reason: "Insufficient credit score (need 550+)" };
+    }
+
+    if (agent.currentStreak.type === "win" && agent.currentStreak.count >= 3) {
+      const newSpecialty = this.identifyEmergingSpecialty(agent);
+      if (newSpecialty) {
+        return { 
+          canSpawn: true, 
+          reason: `${agent.name} has mastered ${newSpecialty} through a ${agent.currentStreak.count} win streak`,
+          specialization: newSpecialty,
+          trigger: "win_streak"
+        };
+      }
+    }
+
+    const patternCategories = new Set<string>();
+    agent.memory.learnedPatterns.forEach(p => {
+      const category = p.split("_")[0];
+      patternCategories.add(category);
+    });
+    
+    if (patternCategories.size >= 3 && agent.memory.learnedPatterns.length >= 3) {
+      const latestPattern = agent.memory.learnedPatterns[agent.memory.learnedPatterns.length - 1];
+      return {
+        canSpawn: true,
+        reason: `${agent.name} has mastered ${patternCategories.size} pattern categories`,
+        specialization: latestPattern,
+        trigger: "pattern_mastery"
+      };
+    }
+
+    const knowledgeGap = this.findKnowledgeGap();
+    if (knowledgeGap && agent.experience >= 30 && agent.creditScore >= 600) {
+      return {
+        canSpawn: true,
+        reason: `${agent.name} identified gap in village expertise: ${knowledgeGap}`,
+        specialization: knowledgeGap,
+        trigger: "knowledge_gap"
+      };
+    }
+
+    return { canSpawn: false, reason: "Birth conditions not met" };
+  }
+
+  private identifyEmergingSpecialty(agent: VillageAgent): string | null {
+    const recentWins = agent.memory.successfulStrategies.slice(-5);
+    if (recentWins.length < 3) return null;
+
+    const strategyFreq = new Map<string, number>();
+    recentWins.forEach(s => strategyFreq.set(s, (strategyFreq.get(s) || 0) + 1));
+    
+    let dominant: string | null = null;
+    let maxCount = 0;
+    strategyFreq.forEach((count, strategy) => {
+      if (count > maxCount && count >= 2) {
+        maxCount = count;
+        dominant = strategy;
+      }
+    });
+
+    return dominant;
+  }
+
+  private findKnowledgeGap(): string | null {
+    const allSpecialties = Array.from(this.agents.values()).flatMap(a => a.specialties);
+    const specialtyCounts = new Map<string, number>();
+    allSpecialties.forEach(s => specialtyCounts.set(s, (specialtyCounts.get(s) || 0) + 1));
+
+    const potentialGaps = [
+      "options trading", "futures scalping", "whale tracking", 
+      "social sentiment", "on-chain analytics", "MEV detection",
+      "cross-chain arbitrage", "liquidity analysis", "derivatives"
+    ];
+
+    for (const gap of potentialGaps) {
+      if (!specialtyCounts.has(gap) || specialtyCounts.get(gap)! < 2) {
+        return gap;
+      }
+    }
+
+    return null;
+  }
+
+  async spawnAgent(parentId: string, specialization?: string, forceTrigger?: "win_streak" | "pattern_mastery" | "knowledge_gap"): Promise<VillageAgent | null> {
+    const parent = this.agents.get(parentId);
+    if (!parent) return null;
+
+    const { canSpawn, reason, trigger } = this.checkBirthConditions(parent);
+    if (!canSpawn && !specialization) {
+      console.log(`[TradingVillage] Birth blocked for ${parent.name}: ${reason}`);
+      return null;
+    }
+    
+    const birthTrigger = forceTrigger || trigger || "knowledge_gap";
+
+    const childNames: Record<AgentRole, string[]> = {
+      hunter: ["Striker", "Shadow", "Bolt", "Falcon", "Hawk"],
+      analyst: ["Oracle", "Sage", "Prism", "Lens", "Clarity"],
+      strategist: ["Compass", "Vector", "Matrix", "Axis", "Meridian"],
+      sentinel: ["Guardian", "Warden", "Aegis", "Bastion", "Vigil"],
+      scout: ["Pathfinder", "Ranger", "Seeker", "Pioneer", "Wayfinder"],
+      veteran: ["Elder", "Patriarch", "Archon", "Paragon", "Exemplar"]
+    };
+
+    const possibleNames = childNames[parent.role];
+    const existingNames = Array.from(this.agents.values()).map(a => a.name);
+    let childName = "";
+    for (const name of possibleNames) {
+      if (!existingNames.includes(name)) {
+        childName = name;
+        break;
+      }
+    }
+    if (!childName) {
+      childName = `${parent.name} II`;
+    }
+
+    const personalities: AgentPersonality[] = ["aggressive", "conservative", "balanced", "contrarian", "momentum", "experimental"];
+    let childPersonality = parent.personality;
+    if (Math.random() > 0.6) {
+      childPersonality = personalities[Math.floor(Math.random() * personalities.length)];
+    }
+
+    const spec = specialization || parent.specialties[Math.floor(Math.random() * parent.specialties.length)];
+    
+    const child = this.createAgent({
+      name: childName,
+      role: parent.role,
+      personality: childPersonality,
+      specialty: spec,
+      backstory: `Spawned from ${parent.name}'s expertise in ${spec}`
+    });
+
+    child.generation = parent.generation + 1;
+    child.creditScore = Math.floor(parent.creditScore * 0.4);
+    child.experience = Math.floor(parent.experience * 0.2);
+    child.memory.mentors = [parent.id];
+    child.specialties = [...new Set([...child.specialties, spec])];
+
+    parent.memory.students.push(child.id);
+    parent.creditScore -= 50;
+    parent.experience += 25;
+
+    this.agents.set(child.id, child);
+
+    Array.from(this.agents.values()).forEach(other => {
+      if (other.id !== child.id) {
+        child.relationships[other.id] = { trust: other.id === parent.id ? 80 : 40, agreements: 0, disagreements: 0 };
+        other.relationships[child.id] = { trust: other.id === parent.id ? 80 : 40, agreements: 0, disagreements: 0 };
+      }
+    });
+
+    const mutations = childPersonality !== parent.personality 
+      ? [`personality_shift_${childPersonality}`] 
+      : [];
+    if (spec && !parent.specialties.includes(spec)) {
+      mutations.push(`new_specialty_${spec}`);
+    }
+
+    const birth: AgentBirth = {
+      id: `birth-${nanoid(8)}`,
+      parentId: parent.id,
+      parentName: parent.name,
+      childId: child.id,
+      childName: child.name,
+      trigger: birthTrigger,
+      inheritedTraits: {
+        specialties: parent.specialties.slice(0, 2),
+        strategies: parent.strategies.slice(0, 2)
+      },
+      mutations,
+      timestamp: Date.now()
+    };
+    this.agentBirths.push(birth);
+    if (this.agentBirths.length > 50) {
+      this.agentBirths = this.agentBirths.slice(-40);
+    }
+
+    await this.saveSpawnedAgentToDB(child, parent.id);
+    await this.saveBirthRecordToDB(birth);
+
+    this.addThought(parent.id, "learning",
+      `I have trained ${child.name}, my ${child.generation}th generation student, specializing in ${spec}. May they surpass me.`,
+      { event: "agent_birth", childId: child.id, specialization: spec }
+    );
+
+    this.addThought(child.id, "observation",
+      `Greetings, village. I am ${child.name}, trained by ${parent.name} in ${spec}. Ready to prove my worth.`,
+      { event: "agent_introduced", parentId: parent.id, specialization: spec }
+    );
+
+    this.emit("agentBirth", birth);
+    console.log(`[TradingVillage] Agent ${child.name} spawned by ${parent.name} (Gen ${child.generation}) - persisted to DB`);
+
+    return child;
+  }
+
+  getAgentBirths(limit = 20): AgentBirth[] {
+    return [...this.agentBirths].reverse().slice(0, limit);
+  }
+
+  async loadBirthsFromDB(): Promise<AgentBirth[]> {
+    try {
+      const births = await db.select().from(agentBirths).orderBy(desc(agentBirths.timestamp)).limit(50);
+      return births.map(b => ({
+        id: b.id,
+        parentId: b.parentId,
+        parentName: b.parentName,
+        childId: b.childId,
+        childName: b.childName,
+        trigger: b.trigger,
+        inheritedTraits: b.inheritedTraits,
+        mutations: b.mutations,
+        timestamp: b.timestamp.getTime()
+      }));
+    } catch (error) {
+      console.error("[TradingVillage] Failed to load births from DB:", error);
+      return [];
+    }
+  }
+
+  async checkAndTriggerBirths() {
+    if (this.agents.size >= 25) return;
+
+    const eligibleAgents = Array.from(this.agents.values())
+      .filter(a => {
+        const { canSpawn } = this.checkBirthConditions(a);
+        return canSpawn;
+      })
+      .sort((a, b) => b.creditScore - a.creditScore);
+
+    if (eligibleAgents.length > 0) {
+      const parent = eligibleAgents[0];
+      const { specialization } = this.checkBirthConditions(parent);
+      await this.spawnAgent(parent.id, specialization);
+    }
   }
 }
 
