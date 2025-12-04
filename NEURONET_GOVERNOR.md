@@ -853,9 +853,7 @@ The Thought Stream provides complete transparency into agent decision-making, sh
 
 ### 4. Dream Mode - Autonomous Overnight Scanning
 
-Dream Mode allows NeuroNet to continue analyzing DeFi opportunities while you're away, generating a comprehensive morning report when you wake up.
-
-#### How Dream Mode Works
+Dream Mode allows NeuroNet to continue analyzing DeFi opportunities while you're away, generating a comprehensive morning report whream Mode Works
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
