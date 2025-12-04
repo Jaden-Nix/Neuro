@@ -4,8 +4,68 @@
  */
 
 import { EventEmitter } from 'events';
+import { createPublicClient, createWalletClient, http, type Address, type Hash, encodeFunctionData, keccak256, toHex } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+import { baseSepolia } from 'viem/chains';
 import type { EvolutionEvent } from '../evolution/EvolutionEngine';
 import type { AgentType } from '@shared/schema';
+
+const NEURON_BADGE_ABI = [
+  {
+    name: 'mintEvolutionBadge',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'agentName', type: 'string' },
+      { name: 'generation', type: 'uint256' },
+      { name: 'mutationType', type: 'uint8' },
+      { name: 'mutationDescription', type: 'string' },
+      { name: 'riskScoreBefore', type: 'uint256' },
+      { name: 'riskScoreAfter', type: 'uint256' },
+      { name: 'creditDelta', type: 'int256' },
+      { name: 'actionTag', type: 'string' },
+      { name: 'simulationId', type: 'string' },
+      { name: 'metadataURI', type: 'string' },
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'mintStressTestBadge',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'agentName', type: 'string' },
+      { name: 'scenarioName', type: 'string' },
+      { name: 'resilienceScore', type: 'uint256' },
+      { name: 'passed', type: 'bool' },
+      { name: 'metadataURI', type: 'string' },
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'mintHealingBadge',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'agentName', type: 'string' },
+      { name: 'failureType', type: 'string' },
+      { name: 'resolution', type: 'string' },
+      { name: 'recoveryTime', type: 'uint256' },
+      { name: 'metadataURI', type: 'string' },
+    ],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'totalSupply',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ type: 'uint256' }],
+  },
+] as const;
 
 export interface BlockchainConfig {
   enabled: boolean;
@@ -75,27 +135,58 @@ export class BlockchainSyncService extends EventEmitter {
   private mintedProofs: Map<string, OnChainProof> = new Map();
   private agentIdentities: Map<string, AgentOnChainIdentity> = new Map();
   private isProcessing: boolean = false;
+  private publicClient: ReturnType<typeof createPublicClient> | null = null;
+  private walletClient: ReturnType<typeof createWalletClient> | null = null;
+  private account: ReturnType<typeof privateKeyToAccount> | null = null;
   
   constructor(config?: Partial<BlockchainConfig>) {
     super();
     
+    const isEnabled = config?.enabled ?? (process.env.BLOCKCHAIN_ENABLED === 'true');
+    
     this.config = {
-      enabled: config?.enabled ?? false,
+      enabled: isEnabled,
       network: config?.network ?? 'base',
-      rpcUrl: config?.rpcUrl ?? process.env.BASE_RPC_URL ?? '',
+      rpcUrl: config?.rpcUrl ?? process.env.BASE_SEPOLIA_RPC_URL ?? 'https://sepolia.base.org',
       contractAddresses: config?.contractAddresses ?? {
         neuronBadge: process.env.NEURON_BADGE_ADDRESS ?? '',
         agentRegistry: process.env.AGENT_REGISTRY_ADDRESS ?? '',
         agentNFT: process.env.AGENT_NFT_ADDRESS ?? '',
       },
-      privateKey: config?.privateKey ?? process.env.BLOCKCHAIN_PRIVATE_KEY,
+      privateKey: config?.privateKey ?? process.env.DEPLOYER_PRIVATE_KEY,
     };
     
-    console.log('[BlockchainSync] Service initialized', {
-      enabled: this.config.enabled,
-      network: this.config.network,
-      hasContracts: !!this.config.contractAddresses.neuronBadge,
-    });
+    if (this.config.enabled && this.config.privateKey && this.config.contractAddresses.neuronBadge) {
+      try {
+        this.account = privateKeyToAccount(this.config.privateKey as `0x${string}`);
+        
+        this.publicClient = createPublicClient({
+          chain: baseSepolia,
+          transport: http(this.config.rpcUrl),
+        });
+        
+        this.walletClient = createWalletClient({
+          account: this.account,
+          chain: baseSepolia,
+          transport: http(this.config.rpcUrl),
+        });
+        
+        console.log('[BlockchainSync] Live mode enabled!', {
+          network: 'Base Sepolia',
+          contract: this.config.contractAddresses.neuronBadge,
+          wallet: this.account.address,
+        });
+      } catch (error) {
+        console.error('[BlockchainSync] Failed to initialize wallet:', error);
+        this.config.enabled = false;
+      }
+    } else {
+      console.log('[BlockchainSync] Demo mode (simulated minting)', {
+        enabled: this.config.enabled,
+        hasPrivateKey: !!this.config.privateKey,
+        hasContract: !!this.config.contractAddresses.neuronBadge,
+      });
+    }
   }
   
   /**
@@ -464,8 +555,24 @@ export class BlockchainSyncService extends EventEmitter {
       while (this.pendingMints.length > 0) {
         const request = this.pendingMints.shift()!;
         
-        // In production, this would call the actual contract
-        const proof = this.simulateMint(request);
+        let proof: OnChainProof;
+        
+        if (this.config.enabled && this.walletClient && this.publicClient && this.account) {
+          try {
+            proof = await this.mintOnChain(request);
+            console.log('[BlockchainSync] Minted on-chain!', {
+              agent: request.agentName,
+              txHash: proof.transactionHash,
+              badgeId: proof.badgeId,
+            });
+          } catch (error) {
+            console.error('[BlockchainSync] On-chain mint failed, simulating:', error);
+            proof = this.simulateMint(request);
+          }
+        } else {
+          proof = this.simulateMint(request);
+        }
+        
         this.mintedProofs.set(request.simulationId, proof);
         
         const identity = this.agentIdentities.get(request.agentName);
@@ -473,14 +580,80 @@ export class BlockchainSyncService extends EventEmitter {
           identity.badges.push(proof);
         }
         
-        this.emit('badgeMinted', { request, proof });
+        this.emit('badgeMinted', { 
+          request, 
+          proof,
+          agentName: request.agentName,
+          generation: request.generation,
+          mutationType: request.mutationType,
+          isLive: proof.verified && proof.transactionHash.startsWith('0x') && proof.transactionHash.length === 66,
+        });
         
-        // Rate limit
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     } finally {
       this.isProcessing = false;
     }
+  }
+  
+  private async mintOnChain(request: BadgeMintRequest): Promise<OnChainProof> {
+    if (!this.walletClient || !this.publicClient || !this.account) {
+      throw new Error('Blockchain not initialized');
+    }
+    
+    const contractAddress = this.config.contractAddresses.neuronBadge as Address;
+    const agentIdBytes32 = keccak256(toHex(request.agentName));
+    const mutationTypeIndex = MUTATION_TYPE_MAP[request.mutationType] ?? 0;
+    
+    console.log('[BlockchainSync] Minting badge on-chain...', {
+      contract: contractAddress,
+      agent: request.agentName,
+      generation: request.generation,
+      mutation: request.mutationType,
+    });
+    
+    const hash = await this.walletClient.writeContract({
+      address: contractAddress,
+      abi: NEURON_BADGE_ABI,
+      functionName: 'mintEvolutionBadge',
+      args: [
+        agentIdBytes32,
+        request.agentName,
+        BigInt(request.generation),
+        mutationTypeIndex,
+        request.mutationDescription,
+        BigInt(request.riskScoreBefore),
+        BigInt(request.riskScoreAfter),
+        BigInt(request.creditDelta),
+        request.actionTag,
+        request.simulationId,
+        request.metadataURI,
+      ],
+    });
+    
+    console.log('[BlockchainSync] Transaction submitted:', hash);
+    
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    
+    console.log('[BlockchainSync] Transaction confirmed!', {
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed.toString(),
+    });
+    
+    const totalSupply = await this.publicClient.readContract({
+      address: contractAddress,
+      abi: NEURON_BADGE_ABI,
+      functionName: 'totalSupply',
+    });
+    
+    return {
+      badgeId: `neuron-${totalSupply.toString()}`,
+      transactionHash: hash,
+      blockNumber: Number(receipt.blockNumber),
+      timestamp: Date.now(),
+      network: 'base-sepolia',
+      verified: true,
+    };
   }
   
   /**
@@ -492,14 +665,27 @@ export class BlockchainSyncService extends EventEmitter {
     pendingMints: number;
     totalMinted: number;
     totalAgents: number;
+    isLive: boolean;
+    contractAddress: string;
+    walletAddress: string | null;
   } {
     return {
       enabled: this.config.enabled,
-      network: this.config.network,
+      network: this.config.enabled ? 'base-sepolia' : this.config.network,
       pendingMints: this.pendingMints.length,
       totalMinted: this.mintedProofs.size,
       totalAgents: this.agentIdentities.size,
+      isLive: !!(this.config.enabled && this.walletClient && this.config.contractAddresses.neuronBadge),
+      contractAddress: this.config.contractAddresses.neuronBadge,
+      walletAddress: this.account?.address ?? null,
     };
+  }
+  
+  /**
+   * Check if live minting is ready
+   */
+  isLiveMintingReady(): boolean {
+    return !!(this.config.enabled && this.walletClient && this.publicClient && this.config.contractAddresses.neuronBadge);
   }
 }
 
