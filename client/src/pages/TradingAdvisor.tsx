@@ -260,8 +260,9 @@ function formatDuration(ms: number): string {
   return `${minutes}m`;
 }
 
-function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: string, price: number) => void }) {
+function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: string, price: number, exitType: "tp1" | "tp2" | "tp3" | "sl") => void }) {
   const [leverage, setLeverage] = useState(10);
+  const [selectedTP, setSelectedTP] = useState<"tp1" | "tp2" | "tp3">("tp1");
   const isLong = signal.direction === "long";
   const riskDiff = Math.abs(signal.entryPrice - signal.stopLoss);
   const rewardDiff = Math.abs(signal.takeProfit1 - signal.entryPrice);
@@ -475,25 +476,40 @@ function SignalCard({ signal, onClose }: { signal: TradingSignal; onClose: (id: 
 
           {signal.status === "active" && (
             <div className="flex gap-2 pt-2">
+              <div className="flex-1 flex gap-2">
+                <Select value={selectedTP} onValueChange={(v) => setSelectedTP(v as "tp1" | "tp2" | "tp3")}>
+                  <SelectTrigger className="w-24" data-testid={`select-tp-${signal.id}`}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tp1">TP1</SelectItem>
+                    <SelectItem value="tp2">TP2</SelectItem>
+                    <SelectItem value="tp3">TP3</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 border-green-500/30 text-green-500"
+                  onClick={() => {
+                    const tpPrice = selectedTP === "tp1" ? signal.takeProfit1 : selectedTP === "tp2" ? signal.takeProfit2 : signal.takeProfit3;
+                    onClose(signal.id, tpPrice, selectedTP);
+                  }}
+                  data-testid={`button-close-signal-${signal.id}`}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1" />
+                  Close (Win)
+                </Button>
+              </div>
               <Button
                 size="sm"
                 variant="outline"
-                className="flex-1"
-                onClick={() => onClose(signal.id, signal.takeProfit1)}
-                data-testid={`button-close-signal-${signal.id}`}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" />
-                Close at TP1
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="flex-1 border-red-500/30 text-red-500"
-                onClick={() => onClose(signal.id, signal.stopLoss)}
+                className="border-red-500/30 text-red-500"
+                onClick={() => onClose(signal.id, signal.stopLoss, "sl")}
                 data-testid={`button-stop-signal-${signal.id}`}
               >
                 <XCircle className="h-4 w-4 mr-1" />
-                Close at SL
+                Close at SL (Loss)
               </Button>
             </div>
           )}
@@ -658,25 +674,31 @@ function VillageAgentCard({ agent, rank }: { agent: VillageAgent; rank: number }
 
 function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
   return (
-    <ScrollArea className="h-[400px] pr-4">
-      <div className="space-y-2">
+    <ScrollArea className="h-[500px] pr-4">
+      <div className="space-y-3">
         {thoughts.map((thought) => {
           const typeInfo = THOUGHT_TYPE_INFO[thought.type] || { color: "border-l-gray-500" };
+          const topic = thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
           return (
             <motion.div
               key={thought.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              className={`p-3 rounded-md bg-muted/30 border-l-4 ${typeInfo.color}`}
+              className={`p-4 rounded-md bg-muted/30 border-l-4 ${typeInfo.color}`}
             >
-              <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm">{thought.agentName}</span>
                   <Badge variant="outline" className="text-xs capitalize">{thought.type}</Badge>
                 </div>
-                <span className="text-xs text-muted-foreground">{formatTimeAgo(thought.timestamp)}</span>
+                {topic && (
+                  <Badge variant="secondary" className="text-xs font-mono">
+                    {topic}
+                  </Badge>
+                )}
               </div>
-              <p className="text-sm text-muted-foreground">{thought.content}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{thought.content}</p>
+              <div className="mt-2 text-xs text-muted-foreground/70">{formatTimeAgo(thought.timestamp)}</div>
             </motion.div>
           );
         })}
@@ -689,6 +711,16 @@ function ThoughtStream({ thoughts }: { thoughts: AgentThought[] }) {
       </div>
     </ScrollArea>
   );
+}
+
+function extractTopic(content: string): string | null {
+  const cryptoMatch = content.match(/\b(BTC|ETH|SOL|AVAX|LINK|ARB|OP|MATIC|DOT|ATOM|UNI|AAVE|CRV|GMX|DYDX|SNX)\b/i);
+  if (cryptoMatch) return cryptoMatch[1].toUpperCase();
+  
+  const protocolMatch = content.match(/\b(Uniswap|Aave|Curve|Compound|MakerDAO|Lido|Convex|Yearn|GMX|dYdX|Synthetix)\b/i);
+  if (protocolMatch) return protocolMatch[1];
+  
+  return null;
 }
 
 function PerformanceMetrics({ performance }: { performance: TradingPerformance }) {
@@ -890,10 +922,13 @@ export default function TradingAdvisor() {
   });
 
   const closeSignalMutation = useMutation({
-    mutationFn: async ({ id, exitPrice }: { id: string; exitPrice: number }) => {
+    mutationFn: async ({ id, exitPrice, exitType }: { id: string; exitPrice: number; exitType: "tp1" | "tp2" | "tp3" | "sl" }) => {
+      const isWin = exitType !== "sl";
+      const exitReason = isWin ? `manual_${exitType.toUpperCase()}` : "manual_SL";
       const res = await apiRequest("POST", `/api/trading/signals/${id}/close`, { 
         exitPrice, 
-        exitReason: "manual" 
+        exitReason,
+        outcome: isWin ? "win" : "loss"
       });
       return res.json() as Promise<TradeOutcome>;
     },
@@ -902,10 +937,11 @@ export default function TradingAdvisor() {
       queryClient.invalidateQueries({ queryKey: ["/api/trading/outcomes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trading/performance"] });
       const profit = data.profitLossPercent;
+      const isWin = profit >= 0;
       toast({
-        title: profit >= 0 ? "Trade Closed - Profit" : "Trade Closed - Loss",
-        description: `${profit >= 0 ? "+" : ""}${profit.toFixed(2)}% ${data.evolutionTriggered ? "(Evolution triggered)" : ""}`,
-        variant: profit >= 0 ? "default" : "destructive",
+        title: isWin ? "Trade Closed - WIN" : "Trade Closed - LOSS",
+        description: `${isWin ? "+" : ""}${profit.toFixed(2)}% ${data.evolutionTriggered ? "(Evolution triggered)" : ""}`,
+        variant: isWin ? "default" : "destructive",
       });
     },
   });
@@ -1208,7 +1244,7 @@ export default function TradingAdvisor() {
                       <SignalCard
                         key={signal.id}
                         signal={signal}
-                        onClose={(id, price) => closeSignalMutation.mutate({ id, exitPrice: price })}
+                        onClose={(id, price, exitType) => closeSignalMutation.mutate({ id, exitPrice: price, exitType })}
                       />
                     ))}
                   </AnimatePresence>

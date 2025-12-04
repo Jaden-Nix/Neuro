@@ -59,12 +59,13 @@ const menuItems = [
     icon: FlaskConical,
     testId: "nav-backtesting",
   },
-  {
-    title: "Wallets",
-    url: "/wallets",
-    icon: Wallet,
-    testId: "nav-wallets",
-  },
+  // Wallets section commented out - no current use
+  // {
+  //   title: "Wallets",
+  //   url: "/wallets",
+  //   icon: Wallet,
+  //   testId: "nav-wallets",
+  // },
   {
     title: "Parliament",
     url: "/parliament",
