@@ -28,7 +28,6 @@ import DreamMode from "@/pages/DreamMode";
 import Insights from "@/pages/Insights";
 import TradingAdvisor from "@/pages/TradingAdvisor";
 import UltronSignals from "@/pages/UltronSignals";
-import TradeHistory from "@/pages/TradeHistory";
 import Airdrops from "@/pages/Airdrops";
 import NotFound from "@/pages/not-found";
 
@@ -50,6 +49,7 @@ function Router() {
     switch (location) {
       case "/": return <Dashboard />;
       case "/trading": return <TradingAdvisor />;
+      case "/history": return <TradingAdvisor />;
       case "/signals": return <UltronSignals />;
       case "/ml": return <MLInsights />;
       case "/alerts": return <Alerts />;
@@ -60,7 +60,6 @@ function Router() {
       case "/stress-lab": return <StressLab />;
       case "/dream-mode": return <DreamMode />;
       case "/insights": return <Insights />;
-      case "/history": return <TradeHistory />;
       case "/airdrops": return <Airdrops />;
       default: return <NotFound />;
     }

@@ -27,7 +27,6 @@ import {
   Activity,
   TrendingUp,
   Signal,
-  History,
   Gift,
 } from "lucide-react";
 
@@ -51,12 +50,6 @@ const menuItems: MenuItem[] = [
     url: "/trading",
     icon: TrendingUp,
     testId: "nav-trading",
-  },
-  {
-    title: "Trade History",
-    url: "/history",
-    icon: History,
-    testId: "nav-history",
   },
   {
     title: "AI Insights",
