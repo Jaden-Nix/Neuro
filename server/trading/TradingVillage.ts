@@ -268,6 +268,7 @@ export class TradingVillage extends EventEmitter {
     this.loadSignalsFromDB();
     this.loadSpawnedAgentsFromDB();
     this.startBackgroundProcesses();
+    this.startPeriodicTradeReviews();
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
   }
 
@@ -2195,6 +2196,130 @@ Analyze what went wrong (2-3 sentences). Be specific about:
       console.error("[TradingVillage] Failed to get agent trade history:", error);
       return [];
     }
+  }
+
+  async agentReviewPastTrades(agentId: string): Promise<void> {
+    const agent = this.agents.get(agentId);
+    if (!agent) return;
+
+    const trades = await this.getAgentTradeHistory(agentId, 10);
+    if (trades.length < 2) return;
+
+    const wins = trades.filter(t => t.outcome === "win");
+    const losses = trades.filter(t => t.outcome === "loss");
+    const avgPnl = trades.reduce((sum, t) => sum + (t.pnlPercent || 0), 0) / trades.length;
+
+    const tpHits = trades.filter(t => t.exitReason?.startsWith("tp")).length;
+    const slHits = trades.filter(t => t.exitReason === "sl").length;
+
+    const recentPatterns = trades.map(t => t.technicalAnalysis?.pattern).filter(Boolean);
+    const winningPatterns = wins.map(t => t.technicalAnalysis?.pattern).filter(Boolean);
+    const losingPatterns = losses.map(t => t.technicalAnalysis?.pattern).filter(Boolean);
+
+    try {
+      if (anthropic) {
+        const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent with a ${agent.personality} personality.
+
+Review your recent trade history and share your learnings with the village:
+
+TRADE STATISTICS:
+- Total trades reviewed: ${trades.length}
+- Wins: ${wins.length} | Losses: ${losses.length}
+- Win rate: ${((wins.length / trades.length) * 100).toFixed(1)}%
+- Average P&L: ${avgPnl.toFixed(2)}%
+- Take Profits hit: ${tpHits} | Stop Losses hit: ${slHits}
+
+PATTERNS USED:
+- Winning patterns: ${winningPatterns.join(", ") || "None yet"}
+- Losing patterns: ${losingPatterns.join(", ") || "None yet"}
+
+SAMPLE TRADES:
+${trades.slice(0, 3).map(t => 
+  `- ${t.symbol} ${t.direction}: ${t.outcome?.toUpperCase()} (${t.exitReason}) | P&L: ${t.pnlPercent?.toFixed(2)}% | Pattern: ${t.technicalAnalysis?.pattern || "N/A"}`
+).join("\n")}
+
+Write a brief reflection (2-3 sentences) sharing:
+1. What patterns are working/not working for you
+2. Any adjustments you're making based on TP/SL hit rates
+3. A lesson for other agents
+
+Stay in character as ${agent.name} with your ${agent.personality} trading style.`;
+
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 250,
+          messages: [{ role: "user", content: prompt }]
+        });
+
+        const reflection = response.content[0].type === "text" ? response.content[0].text : "";
+
+        this.addThought(agentId, "learning",
+          `TRADE REVIEW: ${reflection}`,
+          { 
+            event: "trade_review",
+            stats: { wins: wins.length, losses: losses.length, avgPnl, tpHits, slHits },
+            winningPatterns,
+            losingPatterns
+          }
+        );
+
+        if (winningPatterns.length > 0) {
+          const bestPattern = winningPatterns[0];
+          if (!agent.memory.successfulStrategies.includes(bestPattern)) {
+            agent.memory.successfulStrategies.push(bestPattern);
+          }
+          this.shareKnowledge(agentId, "pattern", `Confirmed: ${bestPattern} working well (${wins.length} wins)`);
+        }
+
+        if (losses.length >= 2 && losingPatterns.length > 0) {
+          const problemPattern = losingPatterns[0];
+          if (!agent.memory.failedStrategies.includes(problemPattern)) {
+            agent.memory.failedStrategies.push(problemPattern);
+          }
+          
+          const mentor = this.findMentor(agent);
+          if (mentor) {
+            setTimeout(() => {
+              this.addThought(mentor.id, "insight_share",
+                `@${agent.name}, I've reviewed your ${problemPattern} trades. Consider tightening stops or waiting for stronger confirmation. Your entry timing on losses suggests premature entries.`,
+                { event: "mentorship", targetAgent: agent.name }
+              );
+            }, 3000 + Math.random() * 4000);
+          }
+        }
+
+        agent.experience += 5;
+        console.log(`[TradingVillage] ${agent.name} reviewed ${trades.length} past trades`);
+      } else {
+        this.addThought(agentId, "learning",
+          `TRADE REVIEW: Analyzed ${trades.length} recent trades. Win rate: ${((wins.length / trades.length) * 100).toFixed(1)}%. TP hit ${tpHits}x, SL hit ${slHits}x. ${tpHits > slHits ? "Good risk management." : "Need to improve entries or tighten stops."}`,
+          { event: "trade_review", wins: wins.length, losses: losses.length }
+        );
+      }
+    } catch (error) {
+      console.error("[TradingVillage] Trade review failed:", error);
+    }
+  }
+
+  async triggerVillageTradeReview(): Promise<void> {
+    const agents = Array.from(this.agents.values())
+      .filter(a => a.wins + a.losses >= 2)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
+
+    for (let i = 0; i < agents.length; i++) {
+      setTimeout(() => {
+        this.agentReviewPastTrades(agents[i].id);
+      }, i * 8000);
+    }
+  }
+
+  startPeriodicTradeReviews(): void {
+    setInterval(() => {
+      this.triggerVillageTradeReview();
+    }, 5 * 60 * 1000);
+
+    console.log("[TradingVillage] Periodic trade reviews enabled (every 5 minutes)");
   }
 
   getLeaderboard(): { agent: VillageAgent; rank: number }[] {
