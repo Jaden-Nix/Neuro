@@ -738,7 +738,7 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
     
     setTypingAgent(nextThought.agentName);
     
-    const typingDelay = 800 + Math.random() * 1200;
+    const typingDelay = 2000 + Math.random() * 3000;
     await new Promise(resolve => setTimeout(resolve, typingDelay));
     
     setNewlyRevealedId(nextThought.id);
@@ -748,7 +748,7 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
       scrollRef.current.scrollTop = 0;
     }
     
-    const pauseDelay = 1000 + Math.random() * 2000;
+    const pauseDelay = 4000 + Math.random() * 6000;
     await new Promise(resolve => setTimeout(resolve, pauseDelay));
     
     processQueue();
