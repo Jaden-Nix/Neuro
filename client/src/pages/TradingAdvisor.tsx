@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatCryptoPrice } from "@/lib/utils";
@@ -689,26 +689,97 @@ function VillageAgentCard({ agent, rank }: { agent: VillageAgent; rank: number }
 }
 
 function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; className?: string }) {
-  const [, forceUpdate] = useState(0);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [typingAgent, setTypingAgent] = useState<string | null>(null);
+  const queueRef = useRef<AgentThought[]>([]);
+  const processingRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    const interval = setInterval(() => {
-      forceUpdate(n => n + 1);
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const newThoughts = thoughts.filter(t => !revealedIds.has(t.id));
+    
+    if (newThoughts.length > 0) {
+      queueRef.current = [...queueRef.current, ...newThoughts.filter(
+        t => !queueRef.current.some(q => q.id === t.id)
+      )];
+      
+      if (!processingRef.current) {
+        processQueue();
+      }
+    }
+  }, [thoughts]);
+  
+  const processQueue = async () => {
+    if (queueRef.current.length === 0) {
+      processingRef.current = false;
+      setTypingAgent(null);
+      return;
+    }
+    
+    processingRef.current = true;
+    const nextThought = queueRef.current.shift()!;
+    
+    setTypingAgent(nextThought.agentName);
+    
+    const typingDelay = 800 + Math.random() * 1200;
+    await new Promise(resolve => setTimeout(resolve, typingDelay));
+    
+    setRevealedIds(prev => new Set([...prev, nextThought.id]));
+    setTypingAgent(null);
+    
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+    
+    const pauseDelay = 1000 + Math.random() * 2000;
+    await new Promise(resolve => setTimeout(resolve, pauseDelay));
+    
+    processQueue();
+  };
+
+  const visibleThoughts = thoughts
+    .filter(t => revealedIds.has(t.id))
+    .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <ScrollArea className={className || "h-[600px]"}>
+    <ScrollArea className={className || "h-[600px]"} ref={scrollRef}>
       <div className="space-y-3 pr-4">
-        {thoughts.map((thought) => {
+        {typingAgent && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-4 rounded-md bg-muted/20 border border-dashed border-muted-foreground/30"
+          >
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-sm text-primary">{typingAgent}</span>
+              <span className="text-xs text-muted-foreground">is typing</span>
+              <motion.div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <motion.span
+                    key={i}
+                    className="w-1.5 h-1.5 bg-primary rounded-full"
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ 
+                      duration: 0.6, 
+                      repeat: Infinity, 
+                      delay: i * 0.15 
+                    }}
+                  />
+                ))}
+              </motion.div>
+            </div>
+          </motion.div>
+        )}
+        
+        {visibleThoughts.map((thought) => {
           const typeInfo = THOUGHT_TYPE_INFO[thought.type] || { color: "border-l-gray-500" };
           const topic = thought.metadata?.symbol || thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
           return (
             <motion.div
               key={thought.id}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className={`p-4 rounded-md bg-muted/30 border-l-4 ${typeInfo.color}`}
             >
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
@@ -727,10 +798,19 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
             </motion.div>
           );
         })}
-        {thoughts.length === 0 && (
+        
+        {visibleThoughts.length === 0 && !typingAgent && (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
             <Brain className="h-8 w-8 mb-2 opacity-50" />
             <p className="text-sm">Agents are thinking...</p>
+          </div>
+        )}
+        
+        {queueRef.current.length > 0 && !typingAgent && (
+          <div className="text-center py-2">
+            <Badge variant="outline" className="text-xs">
+              {queueRef.current.length} more messages incoming...
+            </Badge>
           </div>
         )}
       </div>
