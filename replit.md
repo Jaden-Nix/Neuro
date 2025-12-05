@@ -38,6 +38,13 @@ Frontend state uses React Query for server state and caching, with a WebSocket h
   - Trade History page with filtering by outcome (all/wins/losses) and agent
   - Detailed trade cards showing entry/exit prices, P&L, technical analysis, validators, and lessons learned
   - API endpoints: `/api/village/signals/:id/close` and `/api/village/history`
+- **Airdrop Opportunities (Coming Soon)**: AI-powered airdrop discovery and eligibility tracking. Planned features include:
+  - Eligibility Checker: AI-powered scanning to check wallet eligibility across upcoming airdrops
+  - Sybil Detection Avoidance: Smart strategies to ensure legitimate participation
+  - Opportunity Ranking: Scout Agent ranks airdrops by expected value and effort required
+  - Auto-Farming Tasks: Automated completion of on-chain interactions to maximize eligibility
+  - Community Alerts: Early notifications from agent network monitoring new opportunities
+  - Portfolio Tracking: Track claimed and unclaimed airdrops across all connected wallets
 
 ## Ultron 3-Layer Hybrid AI Architecture (NEW)
 

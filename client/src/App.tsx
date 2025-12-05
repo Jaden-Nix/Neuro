@@ -29,6 +29,7 @@ import Insights from "@/pages/Insights";
 import TradingAdvisor from "@/pages/TradingAdvisor";
 import UltronSignals from "@/pages/UltronSignals";
 import TradeHistory from "@/pages/TradeHistory";
+import Airdrops from "@/pages/Airdrops";
 import NotFound from "@/pages/not-found";
 
 const pageVariants = {
@@ -60,6 +61,7 @@ function Router() {
       case "/dream-mode": return <DreamMode />;
       case "/insights": return <Insights />;
       case "/history": return <TradeHistory />;
+      case "/airdrops": return <Airdrops />;
       default: return <NotFound />;
     }
   };

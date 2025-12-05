@@ -12,6 +12,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { 
   Zap, 
   Brain, 
@@ -27,9 +28,18 @@ import {
   TrendingUp,
   Signal,
   History,
+  Gift,
 } from "lucide-react";
 
-const menuItems = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  testId: string;
+  badge?: string;
+}
+
+const menuItems: MenuItem[] = [
   {
     title: "Command Center",
     url: "/",
@@ -97,6 +107,13 @@ const menuItems = [
     icon: Moon,
     testId: "nav-dream-mode",
   },
+  {
+    title: "Airdrops",
+    url: "/airdrops",
+    icon: Gift,
+    testId: "nav-airdrops",
+    badge: "Soon",
+  },
 ];
 
 export function AppSidebar() {
@@ -150,7 +167,12 @@ export function AppSidebar() {
                       >
                         <a href={item.url} className="flex items-center gap-3 px-3 py-2">
                           <item.icon className={`h-4 w-4 ${isActive ? "text-primary" : ""}`} />
-                          <span className="text-sm">{item.title}</span>
+                          <span className="text-sm flex-1">{item.title}</span>
+                          {item.badge && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                              {item.badge}
+                            </Badge>
+                          )}
                           {isActive && (
                             <motion.div
                               layoutId="activeIndicator"
