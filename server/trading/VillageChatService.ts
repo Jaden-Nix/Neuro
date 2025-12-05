@@ -1,72 +1,23 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { EventEmitter } from "events";
 import { nanoid } from "nanoid";
-import pLimit from "p-limit";
-import pRetry from "p-retry";
 import { marketDataService } from "../data/MarketDataService";
 import { livePriceService } from "../data/LivePriceService";
+import { ultronAI } from "../ai/UltronHybridAI";
 
-const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
-const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
-
-const anthropic = claudeApiKey ? new Anthropic({
-  apiKey: claudeApiKey,
-  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
-}) : null;
-
-const isAnthropicConfigured = !!anthropic;
-if (isAnthropicConfigured) {
-  console.log("[VillageChat] Anthropic AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
-} else {
-  console.log("[VillageChat] Anthropic AI not configured - chat will use template responses");
-}
-
-const rateLimiter = pLimit(2);
-
-function isRateLimitError(error: any): boolean {
-  const errorMsg = error?.message || String(error);
-  return (
-    errorMsg.includes("429") ||
-    errorMsg.includes("RATELIMIT_EXCEEDED") ||
-    errorMsg.toLowerCase().includes("quota") ||
-    errorMsg.toLowerCase().includes("rate limit")
-  );
-}
+// Use the 3-Layer Ultron Architecture:
+// Layer 1 (Fast/Gemini): Agent debates, discussions, real-time thoughts
+// Layer 2 (Judge/GPT-5): High-IQ decisions, conflict resolution
+// Layer 3 (Local): Free backtesting and simulation
+console.log("[VillageChat] Using Ultron 3-Layer Hybrid AI Architecture");
 
 async function generateWithRetry(prompt: string, maxTokens: number = 300): Promise<string> {
-  if (!anthropic) {
-    console.warn("[VillageChat] Anthropic not configured, returning empty response");
+  try {
+    // Route through Layer 1 (Fast) for agent discussions
+    return await ultronAI.queryFastLayer(prompt, maxTokens);
+  } catch (error: any) {
+    console.error("[VillageChat] Layer 1 query failed:", error?.message);
     return "";
   }
-  
-  return rateLimiter(() =>
-    pRetry(
-      async () => {
-        try {
-          const message = await anthropic.messages.create({
-            model: "claude-sonnet-4-5",
-            max_tokens: maxTokens,
-            messages: [{ role: "user", content: prompt }],
-          });
-          const content = message.content[0];
-          return content.type === "text" ? content.text : "";
-        } catch (error: any) {
-          if (isRateLimitError(error)) {
-            throw error;
-          }
-          const abortError = new Error(error?.message || "Request failed");
-          (abortError as any).isAbortError = true;
-          throw abortError;
-        }
-      },
-      {
-        retries: 3,
-        minTimeout: 2000,
-        maxTimeout: 30000,
-        factor: 2,
-      }
-    )
-  );
 }
 
 export interface ChatMessage {
