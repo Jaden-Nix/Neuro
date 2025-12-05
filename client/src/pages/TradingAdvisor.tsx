@@ -77,11 +77,12 @@ interface TradeOutcome {
   signalId: string;
   exitPrice: number;
   exitReason: string;
-  profitLoss: number;
-  profitLossPercent: number;
-  duration: number;
-  closedAt: number;
+  pnlPercent: number;
+  outcome: "win" | "loss" | "breakeven";
+  holdingTimeMs: number;
+  closedAt: string;
   evolutionTriggered: boolean;
+  agentCreditChange: number;
 }
 
 interface AirdropOpportunity {
@@ -954,24 +955,30 @@ export default function TradingAdvisor() {
   const closeSignalMutation = useMutation({
     mutationFn: async ({ id, exitPrice, exitType }: { id: string; exitPrice: number; exitType: "tp1" | "tp2" | "tp3" | "sl" }) => {
       const isWin = exitType !== "sl";
-      const exitReason = isWin ? `manual_${exitType.toUpperCase()}` : "manual_SL";
-      const res = await apiRequest("POST", `/api/trading/signals/${id}/close`, { 
+      const exitReason = exitType === "sl" ? "sl" : exitType;
+      const res = await apiRequest("POST", `/api/village/signals/${id}/close`, { 
         exitPrice, 
-        exitReason,
-        outcome: isWin ? "win" : "loss"
+        exitReason
       });
       return res.json() as Promise<TradeOutcome>;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/village/signals"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trading/outcomes"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trading/performance"] });
-      const profit = data.profitLossPercent;
+      queryClient.invalidateQueries({ queryKey: ["/api/village/history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/village/agents"] });
+      const profit = data.pnlPercent ?? 0;
       const isWin = profit >= 0;
       toast({
         title: isWin ? "Trade Closed - WIN" : "Trade Closed - LOSS",
         description: `${isWin ? "+" : ""}${profit.toFixed(2)}% ${data.evolutionTriggered ? "(Evolution triggered)" : ""}`,
         variant: isWin ? "default" : "destructive",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Failed to close signal",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
       });
     },
   });
@@ -1453,12 +1460,12 @@ export default function TradingAdvisor() {
                       <div
                         key={outcome.id}
                         className={`flex items-center justify-between p-3 rounded-md border ${
-                          outcome.profitLoss >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
+                          outcome.pnlPercent >= 0 ? "border-green-500/20 bg-green-500/5" : "border-red-500/20 bg-red-500/5"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-md ${outcome.profitLoss >= 0 ? "bg-green-500/10" : "bg-red-500/10"}`}>
-                            {outcome.profitLoss >= 0 ? (
+                          <div className={`p-2 rounded-md ${outcome.pnlPercent >= 0 ? "bg-green-500/10" : "bg-red-500/10"}`}>
+                            {outcome.pnlPercent >= 0 ? (
                               <ArrowUpRight className="h-4 w-4 text-green-500" />
                             ) : (
                               <ArrowDownRight className="h-4 w-4 text-red-500" />
@@ -1467,16 +1474,16 @@ export default function TradingAdvisor() {
                           <div>
                             <div className="font-medium">Signal #{outcome.signalId.slice(-8)}</div>
                             <div className="text-xs text-muted-foreground">
-                              {outcome.exitReason} | {formatDuration(outcome.duration)}
+                              {outcome.exitReason} | {formatDuration(outcome.holdingTimeMs)}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className={`font-bold ${outcome.profitLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            {outcome.profitLossPercent >= 0 ? "+" : ""}{outcome.profitLossPercent.toFixed(2)}%
+                          <div className={`font-bold ${outcome.pnlPercent >= 0 ? "text-green-500" : "text-red-500"}`}>
+                            {outcome.pnlPercent >= 0 ? "+" : ""}{outcome.pnlPercent.toFixed(2)}%
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            ${Math.abs(outcome.profitLoss).toFixed(2)}
+                            {outcome.outcome.toUpperCase()}
                           </div>
                         </div>
                       </div>
