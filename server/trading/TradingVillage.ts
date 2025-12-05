@@ -1899,7 +1899,48 @@ Describe your evolution in 2-3 sentences:
   }
 
   async closeSignal(signalId: string, exitPrice: number, exitReason: "tp1" | "tp2" | "tp3" | "sl" | "manual"): Promise<SelectTradeHistory | null> {
-    const signal = this.tradeSignals.find(s => s.id === signalId);
+    let signal = this.tradeSignals.find(s => s.id === signalId);
+    
+    if (!signal) {
+      console.log(`[TradingVillage] Signal ${signalId} not found in memory, checking database...`);
+      try {
+        const [dbSignal] = await db.select().from(villageSignals).where(eq(villageSignals.id, signalId)).limit(1);
+        if (dbSignal && (dbSignal.status === "active" || dbSignal.status === "pending")) {
+          signal = {
+            id: dbSignal.id,
+            agentId: dbSignal.agentId,
+            agentName: dbSignal.agentName,
+            agentRole: dbSignal.agentRole as AgentRole,
+            symbol: dbSignal.symbol,
+            direction: dbSignal.direction,
+            entry: dbSignal.entry,
+            stopLoss: dbSignal.stopLoss,
+            takeProfit1: dbSignal.takeProfit1,
+            takeProfit2: dbSignal.takeProfit2,
+            takeProfit3: dbSignal.takeProfit3,
+            confidence: dbSignal.confidence,
+            timeframe: dbSignal.timeframe,
+            reasoning: dbSignal.reasoning,
+            technicalAnalysis: dbSignal.technicalAnalysis,
+            riskReward: dbSignal.riskReward,
+            positionSize: dbSignal.positionSize,
+            status: dbSignal.status,
+            validators: dbSignal.validators,
+            createdAt: dbSignal.createdAt.getTime(),
+            closedAt: dbSignal.closedAt?.getTime(),
+            outcome: dbSignal.outcome ?? undefined,
+          };
+          this.tradeSignals.push(signal);
+          console.log(`[TradingVillage] Signal ${signalId} loaded from database`);
+        } else if (dbSignal) {
+          console.log(`[TradingVillage] Signal ${signalId} found in DB but status is ${dbSignal.status}, cannot close`);
+          return null;
+        }
+      } catch (error) {
+        console.error(`[TradingVillage] Error loading signal from database:`, error);
+      }
+    }
+    
     if (!signal || (signal.status !== "active" && signal.status !== "pending")) {
       console.log(`[TradingVillage] Signal ${signalId} not found or already closed (status: ${signal?.status})`);
       return null;
