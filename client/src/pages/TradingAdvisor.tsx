@@ -689,19 +689,34 @@ function VillageAgentCard({ agent, rank }: { agent: VillageAgent; rank: number }
 }
 
 function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; className?: string }) {
-  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
   const [typingAgent, setTypingAgent] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [newlyRevealedId, setNewlyRevealedId] = useState<string | null>(null);
   const queueRef = useRef<AgentThought[]>([]);
   const processingRef = useRef(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    const newThoughts = thoughts.filter(t => !revealedIds.has(t.id));
+    if (thoughts.length === 0) return;
+    
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      thoughts.forEach(t => knownIdsRef.current.add(t.id));
+      return;
+    }
+    
+    const newThoughts = thoughts.filter(t => 
+      !knownIdsRef.current.has(t.id) && 
+      !queueRef.current.some(q => q.id === t.id)
+    );
     
     if (newThoughts.length > 0) {
-      queueRef.current = [...queueRef.current, ...newThoughts.filter(
-        t => !queueRef.current.some(q => q.id === t.id)
-      )];
+      newThoughts.forEach(t => knownIdsRef.current.add(t.id));
+      const sortedNewThoughts = [...newThoughts].sort((a, b) => b.timestamp - a.timestamp);
+      queueRef.current = [...sortedNewThoughts, ...queueRef.current];
+      setPendingCount(queueRef.current.length);
       
       if (!processingRef.current) {
         processQueue();
@@ -713,18 +728,20 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
     if (queueRef.current.length === 0) {
       processingRef.current = false;
       setTypingAgent(null);
+      setPendingCount(0);
       return;
     }
     
     processingRef.current = true;
     const nextThought = queueRef.current.shift()!;
+    setPendingCount(queueRef.current.length);
     
     setTypingAgent(nextThought.agentName);
     
     const typingDelay = 800 + Math.random() * 1200;
     await new Promise(resolve => setTimeout(resolve, typingDelay));
     
-    setRevealedIds(prev => new Set([...prev, nextThought.id]));
+    setNewlyRevealedId(nextThought.id);
     setTypingAgent(null);
     
     if (scrollRef.current) {
@@ -738,7 +755,6 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
   };
 
   const visibleThoughts = thoughts
-    .filter(t => revealedIds.has(t.id))
     .sort((a, b) => b.timestamp - a.timestamp);
 
   return (
@@ -774,13 +790,14 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
         {visibleThoughts.map((thought) => {
           const typeInfo = THOUGHT_TYPE_INFO[thought.type] || { color: "border-l-gray-500" };
           const topic = thought.metadata?.symbol || thought.symbol || thought.metadata?.protocol || thought.metadata?.topic || extractTopic(thought.content);
+          const isNewlyRevealed = thought.id === newlyRevealedId;
           return (
             <motion.div
               key={thought.id}
-              initial={{ opacity: 0, y: -20, scale: 0.95 }}
+              initial={isNewlyRevealed ? { opacity: 0, y: -20, scale: 0.95 } : false}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className={`p-4 rounded-md bg-muted/30 border-l-4 ${typeInfo.color}`}
+              className={`p-4 rounded-md bg-muted/30 border-l-4 ${typeInfo.color} ${isNewlyRevealed ? 'ring-2 ring-primary/30' : ''}`}
             >
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -806,10 +823,10 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
           </div>
         )}
         
-        {queueRef.current.length > 0 && !typingAgent && (
+        {pendingCount > 0 && !typingAgent && (
           <div className="text-center py-2">
             <Badge variant="outline" className="text-xs">
-              {queueRef.current.length} more messages incoming...
+              {pendingCount} more messages incoming...
             </Badge>
           </div>
         )}
