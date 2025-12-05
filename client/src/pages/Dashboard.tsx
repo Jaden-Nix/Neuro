@@ -14,6 +14,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { cacheMetrics, cachedMetrics } from "@/lib/queryClient";
 import { TrendingUp, TrendingDown, Zap, RefreshCw, ArrowRight, Brain, Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import { VillageChat } from "@/components/VillageChat";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -325,24 +326,15 @@ export default function Dashboard() {
                 </Card>
               </Link>
 
-              <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-purple-500/10 text-purple-500">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">Airdrop Discovery</h3>
-                      <Badge variant="outline" className="text-[10px] ml-2">Coming Soon</Badge>
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    AI-powered discovery of potential airdrops and farming opportunities
-                  </p>
-                </CardContent>
-              </Card>
+              <VillageChat compact />
             </motion.div>
           </div>
+
+          <motion.div variants={itemVariants}>
+            <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
+              <VillageChat maxHeight="400px" />
+            </Card>
+          </motion.div>
         </motion.div>
       </main>
 
