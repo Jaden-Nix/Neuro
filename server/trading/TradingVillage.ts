@@ -1900,8 +1900,8 @@ Describe your evolution in 2-3 sentences:
 
   async closeSignal(signalId: string, exitPrice: number, exitReason: "tp1" | "tp2" | "tp3" | "sl" | "manual"): Promise<SelectTradeHistory | null> {
     const signal = this.tradeSignals.find(s => s.id === signalId);
-    if (!signal || signal.status !== "active") {
-      console.log(`[TradingVillage] Signal ${signalId} not found or not active`);
+    if (!signal || (signal.status !== "active" && signal.status !== "pending")) {
+      console.log(`[TradingVillage] Signal ${signalId} not found or already closed (status: ${signal?.status})`);
       return null;
     }
 
