@@ -54,8 +54,10 @@ async function initStripe() {
   }
 }
 
-// Initialize Stripe first
-await initStripe();
+// Initialize Stripe first (wrapped in IIFE for CommonJS compatibility)
+(async () => {
+  await initStripe();
+})();
 
 // Stripe webhook handler function
 const handleStripeWebhook = async (req: express.Request, res: express.Response) => {
