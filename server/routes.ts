@@ -15,6 +15,7 @@ import { mlPatternRecognition } from "./ml/MLPatternRecognition";
 import { governanceSystem } from "./governance/GovernanceSystem";
 import { PersonalityTrait, AgentType } from "@shared/schema";
 import type { WSMessage, LogEntry, TrainingDataPoint, ParliamentVote } from "@shared/schema";
+import { z } from "zod";
 import { initializeApiKeys, requireAuth, requireWriteAuth, type AuthenticatedRequest } from "./middleware/auth";
 import { rateLimit, writeLimiter, strictLimiter } from "./middleware/rateLimit";
 import { preventInjection, validateContentType } from "./middleware/validation";
@@ -35,6 +36,8 @@ import { tradingVillage } from "./trading/TradingVillage";
 import { livePriceService } from "./data/LivePriceService";
 import { marketDataService } from "./data/MarketDataService";
 import { ccxtAdapter } from "./data/providers/CCXTAdapter";
+import { ultronAI } from "./ai/UltronHybridAI";
+import { ultronAgentManager } from "./agents/UltronAgentPersonality";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -5643,6 +5646,232 @@ export async function registerRoutes(
 
   livePriceService.start().catch(err => {
     console.error('[Routes] Failed to start live price service:', err);
+  });
+
+  // ==========================================
+  // Ultron 3-Layer Hybrid AI Routes
+  // ==========================================
+
+  app.get("/api/ultron/status", async (req, res) => {
+    try {
+      const status = ultronAI.getStatus();
+      res.json({
+        ...status,
+        message: "Ultron 3-Layer Hybrid AI System Online",
+        intelligence: "9.5/10"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Ultron status" });
+    }
+  });
+
+  app.get("/api/ultron/agents", async (req, res) => {
+    try {
+      const agents = ultronAgentManager.getAgentStatus();
+      res.json(agents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Ultron agents" });
+    }
+  });
+
+  app.get("/api/ultron/leaderboard", async (req, res) => {
+    try {
+      const leaderboard = ultronAgentManager.getLeaderboard();
+      res.json(leaderboard);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Ultron leaderboard" });
+    }
+  });
+
+  app.get("/api/ultron/thoughts", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const thoughts = ultronAgentManager.getThoughtStream(limit);
+      res.json(thoughts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Ultron thought stream" });
+    }
+  });
+
+  const ultronDebateSchema = z.object({
+    symbol: z.string().min(1).max(20),
+    topic: z.string().max(200).optional()
+  });
+
+  app.post("/api/ultron/debate", writeLimiter, async (req, res) => {
+    try {
+      const parsed = ultronDebateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
+      }
+      const { symbol, topic } = parsed.data;
+
+      const prices = livePriceService.getAllPrices();
+      const marketData = {
+        symbol,
+        price: prices[symbol]?.price || 0,
+        change24h: prices[symbol]?.change24h || 0,
+        volume: prices[symbol]?.volume || 0,
+        timestamp: Date.now()
+      };
+
+      const agents = ultronAgentManager.getAgentForDebate(4);
+      const debate = await ultronAI.runAgentDebate(
+        topic || `Should we trade ${symbol}?`,
+        symbol,
+        marketData,
+        agents
+      );
+
+      res.json(debate);
+    } catch (error: any) {
+      console.error("[Ultron] Debate error:", error);
+      res.status(500).json({ error: "Failed to run debate", details: error.message });
+    }
+  });
+
+  const ultronAnalyzeSchema = z.object({
+    symbol: z.string().min(1).max(20)
+  });
+
+  app.post("/api/ultron/analyze", writeLimiter, async (req, res) => {
+    try {
+      const parsed = ultronAnalyzeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
+      }
+      const { symbol } = parsed.data;
+
+      const prices = livePriceService.getAllPrices();
+      const marketData = {
+        symbol,
+        price: prices[symbol]?.price || 0,
+        change24h: prices[symbol]?.change24h || 0,
+        volume: prices[symbol]?.volume || 0,
+        timestamp: Date.now()
+      };
+
+      const agents = ultronAgentManager.getAgentForDebate(6);
+      const result = await ultronAI.executeFullPipeline(symbol, marketData, agents);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Ultron] Analysis error:", error);
+      res.status(500).json({ error: "Failed to run analysis", details: error.message });
+    }
+  });
+
+  const ultronJudgeSchema = z.object({
+    symbol: z.string().min(1).max(20),
+    debateMessages: z.array(z.any()).min(1),
+    marketData: z.record(z.any()).optional(),
+    signalProposal: z.any().optional()
+  });
+
+  app.post("/api/ultron/judge", writeLimiter, async (req, res) => {
+    try {
+      const parsed = ultronJudgeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
+      }
+      const { symbol, debateMessages, marketData, signalProposal } = parsed.data;
+
+      const verdict = await ultronAI.judgeArbitration(
+        symbol,
+        debateMessages,
+        marketData || {},
+        signalProposal
+      );
+
+      res.json(verdict);
+    } catch (error: any) {
+      console.error("[Ultron] Judge error:", error);
+      res.status(500).json({ error: "Failed to get judge verdict", details: error.message });
+    }
+  });
+
+  const ultronSimulateSchema = z.object({
+    signal: z.object({
+      id: z.string(),
+      symbol: z.string(),
+      direction: z.enum(["long", "short"]),
+      entry: z.number(),
+      stopLoss: z.number(),
+      takeProfit1: z.number(),
+      takeProfit2: z.number().optional(),
+      takeProfit3: z.number().optional(),
+      confidence: z.number()
+    }),
+    scenarios: z.array(z.string()).optional()
+  });
+
+  app.post("/api/ultron/simulate", writeLimiter, async (req, res) => {
+    try {
+      const parsed = ultronSimulateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request", details: parsed.error.issues });
+      }
+      const { signal, scenarios } = parsed.data;
+
+      const result = await ultronAI.runLocalSimulation(
+        signal as any,
+        [],
+        scenarios || ["flash_crash", "liquidity_crisis", "whale_dump", "high_volatility"]
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[Ultron] Simulation error:", error);
+      res.status(500).json({ error: "Failed to run simulation", details: error.message });
+    }
+  });
+
+  ultronAI.on("debate_started", (data) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_debate_started", ...data },
+      timestamp: Date.now(),
+    });
+  });
+
+  ultronAI.on("debate_message", (message) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_debate_message", message },
+      timestamp: Date.now(),
+    });
+  });
+
+  ultronAI.on("judge_verdict", (verdict) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_judge_verdict", verdict },
+      timestamp: Date.now(),
+    });
+  });
+
+  ultronAI.on("pipeline_complete", (result) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_pipeline_complete", ...result },
+      timestamp: Date.now(),
+    });
+  });
+
+  ultronAgentManager.on("agent_thought", (data) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_agent_thought", ...data },
+      timestamp: Date.now(),
+    });
+  });
+
+  ultronAgentManager.on("trade_recorded", (data) => {
+    broadcastToClients({
+      type: "log",
+      data: { event: "ultron_trade_recorded", ...data },
+      timestamp: Date.now(),
+    });
   });
 
   return httpServer;

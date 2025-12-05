@@ -32,13 +32,67 @@ Frontend state uses React Query for server state and caching, with a WebSocket h
 - **Multi-Wallet Support**: Tracks wallets and token holdings across Ethereum, Base, Fraxtal, and Solana with an aggregate portfolio view.
 - **AI Trading Village**: Collaborative multi-agent ecosystem where 10 specialized AI trader agents hunt for trading opportunities and share knowledge, featuring agent roles, personalities, a credit-based economy, detailed trade signals, signal validation, agent collaboration, memory systems, and a real-time thought stream with 12 thought types. Full documentation in NEURONET_GOVERNOR.md.
 
+## Ultron 3-Layer Hybrid AI Architecture (NEW)
+
+The system has been upgraded to an "Ultron-smart" autonomous multi-agent DeFi trading system using a 3-layer hybrid AI architecture:
+
+### Layer 1: Fast Operations (Gemini Flash)
+- Ultra-fast agent debates and discussions
+- Real-time thought generation
+- Cost-optimized for high-volume operations
+- Used for: Signal analysis, market scanning, agent interactions
+
+### Layer 2: Judge Arbitration (GPT-5)
+- High-IQ decision making for conflicts
+- Mathematical verification and safety checks
+- Final authority on trade approvals
+- Used for: Overruling agents, validating signals, risk verification
+
+### Layer 3: Local Simulation (Free)
+- Cost-free backtesting and stress testing
+- Scenario simulation (flash crash, whale dump, etc.)
+- No API costs for historical analysis
+- Used for: Strategy validation, risk assessment
+
+### Enhanced Agent Personalities
+10 Ultron agents with dynamic personalities, emotions, and relationships:
+- **Atlas** (Aggressive): Breakout Detection - First to spot momentum shifts
+- **Nova** (Conservative): Risk Assessment - Spots danger before it materializes
+- **Cipher** (Analytical): Position Sizing - Optimal bet sizing for any scenario
+- **Vega** (Contrarian): Sentiment Reversal - Profits from crowd psychology
+- **Orion** (Momentum): Early Detection - Spots emerging trends
+- **Nebula** (Experimental): Pattern Memory - Recognizes historical market rhymes
+- **Phoenix** (Aggressive): Recovery Master - Bounces back from losses stronger
+- **Quantum** (Analytical): Pattern Recognition - Sees micro-patterns others miss
+- **Echo** (Contrarian): Sentiment Analysis - Reads crowd psychology like a book
+- **Apex** (Analytical): Macro Synthesis - Sees the big picture across all timeframes
+
+### Agent Features
+- **Emotional States**: confident, cautious, excited, frustrated, curious, skeptical, aggressive, fearful
+- **Dynamic Moods**: Changes based on market conditions and interactions
+- **Relationships**: Trust, respect, rivalry scores between agents
+- **Memory System**: Remembers past trades, debates, and learned patterns
+- **Credit Scores**: Performance-based reputation system
+
+### Ultron API Endpoints
+- `GET /api/ultron/status` - System status and configuration
+- `GET /api/ultron/agents` - All agent statuses and emotions
+- `GET /api/ultron/leaderboard` - Agent rankings by credit score
+- `GET /api/ultron/thoughts` - Real-time thought stream
+- `POST /api/ultron/debate` - Run a multi-agent debate
+- `POST /api/ultron/analyze` - Full pipeline analysis for a symbol
+- `POST /api/ultron/judge` - Request judge arbitration
+- `POST /api/ultron/simulate` - Run stress test simulations
+
 ## External Dependencies
 
 ### AI Services
-- **Hybrid AI System**:
-  - **Anthropic Claude API**: For complex reasoning (Risk, Meta agents) via Replit AI Integrations.
-  - **Google Gemini API**: For fast analysis (Scout, Execution agents) via Replit AI Integrations.
-  - **HybridAIService**: Manages intelligent routing and fallbacks.
+- **Ultron 3-Layer Hybrid AI**:
+  - **Google Gemini API**: Layer 1 - Fast agent operations and debates via Replit AI Integrations.
+  - **OpenAI GPT-5**: Layer 2 - High-IQ judge arbitration and conflict resolution.
+  - **Anthropic Claude API**: Fallback for judge layer via Replit AI Integrations.
+  - **Local Simulation**: Layer 3 - Free backtesting and stress testing.
+- **HybridAIService**: Manages intelligent routing and fallbacks.
 - **ADK-TS (IQ AI Agent Development Kit)**: Multi-agent framework.
 
 ### Blockchain Integration
