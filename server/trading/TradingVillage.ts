@@ -1533,16 +1533,16 @@ Describe your evolution in 2-3 sentences:
   }
 
   private startBackgroundProcesses() {
-    console.log("[TradingVillage] Starting active signal generation and evolution...");
+    console.log("[TradingVillage] Starting active signal generation and evolution (RATE LIMITED to save credits)...");
     
-    setTimeout(() => this.runInitialSignalGeneration(), 3000);
+    setTimeout(() => this.runInitialSignalGeneration(), 5000);
     
-    setInterval(() => this.runHuntingCycle(), 30000);
-    setInterval(() => this.runDebateCycle(), 60000);
-    setInterval(() => this.runKnowledgeSharingCycle(), 90000);
-    setInterval(() => this.generateMarketInsights(), 20000);
-    setInterval(() => this.runEvolutionCycle(), 120000);
-    setInterval(() => this.checkAndTriggerBirths(), 180000);
+    setInterval(() => this.runHuntingCycle(), 5 * 60 * 1000);
+    setInterval(() => this.runDebateCycle(), 15 * 60 * 1000);
+    setInterval(() => this.runKnowledgeSharingCycle(), 20 * 60 * 1000);
+    setInterval(() => this.generateMarketInsights(), 10 * 60 * 1000);
+    setInterval(() => this.runEvolutionCycle(), 30 * 60 * 1000);
+    setInterval(() => this.checkAndTriggerBirths(), 60 * 60 * 1000);
   }
 
   private async runInitialSignalGeneration() {
