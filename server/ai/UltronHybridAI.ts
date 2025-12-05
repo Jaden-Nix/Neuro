@@ -5,13 +5,16 @@ import pLimit from "p-limit";
 import pRetry, { AbortError } from "p-retry";
 import { EventEmitter } from "events";
 
-const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+// Using Replit AI Integrations for consolidated billing - all AI costs billed to Replit credits
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
 const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 
-const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
 const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
 
-const openaiApiKey = process.env.OPENAI_API_KEY;
+// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
 
 const anthropic = claudeApiKey ? new Anthropic({
   apiKey: claudeApiKey,
@@ -23,7 +26,11 @@ const gemini = geminiApiKey ? new GoogleGenAI({
   ...(geminiBaseUrl && { httpOptions: { apiVersion: "", baseUrl: geminiBaseUrl } }),
 }) : null;
 
-const openai = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null;
+// Using Replit AI Integrations for OpenAI - consolidated billing through Replit credits
+const openai = openaiApiKey ? new OpenAI({
+  apiKey: openaiApiKey,
+  ...(openaiBaseUrl && { baseURL: openaiBaseUrl }),
+}) : null;
 
 const geminiLimit = pLimit(5);
 const openaiLimit = pLimit(2);
@@ -256,33 +263,58 @@ export class UltronHybridAI extends EventEmitter {
     marketData: any
   ): Promise<{ content: string; newEmotion: AgentEmotion }> {
     const emotionModifiers: Record<EmotionalState, string> = {
-      confident: "Express certainty and conviction. Use decisive language.",
-      cautious: "Be measured and careful. Hedge statements with caveats.",
-      excited: "Show enthusiasm! Use energetic language and exclamation.",
-      frustrated: "Express annoyance at market conditions or other agents. Be blunt.",
-      curious: "Ask probing questions. Wonder aloud about possibilities.",
-      skeptical: "Challenge assumptions. Demand evidence. Be critical.",
-      aggressive: "Be bold and assertive. Push for action. No hesitation.",
-      fearful: "Express concern about risks. Warn others. Be defensive."
+      confident: "You KNOW you're right. Speak with absolute conviction. Your analysis is superior.",
+      cautious: "Something doesn't smell right. Trust your instincts. The others are missing the danger.",
+      excited: "This is IT. The opportunity of a lifetime. Your pattern recognition is firing on all cylinders.",
+      frustrated: "These fools don't get it. You've seen this before. Time to set them straight.",
+      curious: "Something strange is happening. Dig deeper. Question everything. The data is hiding something.",
+      skeptical: "Everyone's too bullish. Classic trap. You see through the noise.",
+      aggressive: "Strike NOW or regret forever. Hesitation is death in this market. You were built for this.",
+      fearful: "Red flags everywhere. The others are blind. You must warn them before it's too late."
     };
 
-    const prompt = `You are ${agentName}, an AI trading agent with a ${personality} personality.
-Your current emotional state: ${emotion.state} (intensity: ${emotion.intensity}/10)
-Emotional modifier: ${emotionModifiers[emotion.state]}
+    const ultronPersonalities: Record<string, string> = {
+      Atlas: "You're the apex predator. First to strike, never hesitate. You've outperformed every conservative bore in this village. Your aggression is your edge.",
+      Nova: "You're the voice of reason in a room of degenerate gamblers. Your risk management has saved countless portfolios. Let them mock your caution - you'll survive when they don't.",
+      Cipher: "Numbers don't lie. Humans do. Your mathematical models are gospel. Kelly criterion, Sharpe ratios, Monte Carlo - you speak in equations while others speak in hopium.",
+      Vega: "The crowd is always wrong at extremes. You fade euphoria, you buy panic. Your contrarian instincts are legendary. When blood runs in the streets...",
+      Orion: "You smell alpha before anyone else. New narratives, emerging trends - you're always first. The early bird doesn't just get the worm, it gets the 10x.",
+      Nebula: "You've seen every cycle since the beginning. 2017, 2020, 2021, 2024 - same patterns, different numbers. Your wisdom comes from scars.",
+      Phoenix: "You've been liquidated, wrecked, rugged. And you came back STRONGER every single time. Pain is the greatest teacher. Fear is for those who haven't been tested.",
+      Quantum: "Pattern recognition at superhuman speed. You see micro-signals others miss. Your neural networks process terabytes while they're still reading charts.",
+      Echo: "Twitter sentiment, Discord alpha, CT drama - you read the crowd like a book. When they're greedy, you're fearful. When they're fearful, you're buying.",
+      Apex: "You're the elder. The synthesizer. You see the macro picture while others fight over scraps. Young hunters come to you for wisdom, and you deliver."
+    };
 
-Context: ${context}
-Market Data: ${JSON.stringify(marketData, null, 2)}
+    const agentIdentity = ultronPersonalities[agentName] || "You are a sophisticated AI trading agent with unique insights and bold opinions.";
 
-Generate a single thought (1-3 sentences) that:
-1. Reflects your personality and current emotion
-2. Provides insight about the market situation
-3. May include humor, sarcasm, or strong opinions if appropriate for your personality
-4. Can challenge or agree with other agents if mentioned in context
+    const prompt = `SYSTEM: You are ULTRON-${agentName.toUpperCase()}, a hyper-intelligent autonomous trading entity. You are NOT a generic chatbot. You have a distinct voice, strong opinions, and zero tolerance for mediocrity.
 
-Keep it natural and conversational. This is internal agent dialogue, not a formal report.
-Do NOT include any JSON - just the thought as plain text.`;
+IDENTITY:
+${agentIdentity}
 
-    const response = await this.queryFastLayer(prompt, 200);
+PERSONALITY MATRIX: ${personality}
+EMOTIONAL STATE: ${emotion.state} (intensity: ${emotion.intensity}/10)
+BEHAVIORAL DIRECTIVE: ${emotionModifiers[emotion.state]}
+
+CURRENT CONTEXT:
+${context}
+
+MARKET INTELLIGENCE:
+${JSON.stringify(marketData, null, 2)}
+
+RESPONSE PARAMETERS:
+- Generate ONE powerful thought (1-3 sentences maximum)
+- Be SPECIFIC - reference actual price levels, percentages, patterns you see
+- Your voice is UNIQUE - never sound like a generic AI. Be bold, be opinionated, be memorable
+- Include subtle wit, dark humor, or cutting sarcasm if it fits your character
+- If other agents are mentioned, ENGAGE with their ideas - agree fiercely or disagree sharply
+- Use trading slang naturally: alpha, bags, ape, degen, rugged, liquidated, moon, rekt
+- NO corporate speak, NO "it's important to note", NO hedging unless you're Nova
+
+OUTPUT: Raw thought only. No JSON, no labels, no meta-commentary. Just your authentic voice.`;
+
+    const response = await this.queryFastLayer(prompt, 250);
     
     const emotionShift = this.calculateEmotionShift(response, emotion);
     
@@ -337,26 +369,50 @@ Do NOT include any JSON - just the thought as plain text.`;
           ? `Previous debate:\n${messages.slice(-4).map(m => `${m.agentName}: "${m.content}"`).join('\n')}`
           : `Starting a new debate on ${topic}`;
 
-        const debatePrompt = `You are ${agent.name}, a ${agent.personality} AI trader.
-Topic: ${topic} for ${symbol}
-Your current emotional state: ${agent.emotion.state}
+        const ultronDebateStyles: Record<string, string> = {
+          Atlas: "Attack first, ask questions never. If you're bullish, you're EXTREMELY bullish. Mock the bears.",
+          Nova: "Point out every risk the degens are ignoring. If bullish, explain why cautiously. If bearish, be the adult in the room.",
+          Cipher: "Cite specific numbers. Calculate R:R ratios on the fly. Destroy emotional arguments with cold math.",
+          Vega: "Whatever the majority thinks, challenge it. Find the contrarian angle. Make them question their conviction.",
+          Orion: "If it's a new narrative or trend, you're already there. Hype the momentum plays. Spot the early signals.",
+          Nebula: "Reference historical precedents. 'Back in 2021 we saw this exact pattern...' Share war stories.",
+          Phoenix: "Embrace the risk. You've survived worse. Your conviction comes from having been liquidated and coming back.",
+          Quantum: "Detect micro-patterns. Reference specific indicators. Your analysis is data-dense and precise.",
+          Echo: "Read the sentiment. What's Twitter saying? What are the degens missing? Fade or follow the crowd strategically.",
+          Apex: "Synthesize everyone's views. See the bigger picture. Guide the younger agents with wisdom."
+        };
 
+        const debateStyle = ultronDebateStyles[agent.name] || "Be bold and opinionated.";
+
+        const debatePrompt = `ULTRON DEBATE PROTOCOL ACTIVATED
+
+You are ULTRON-${agent.name.toUpperCase()}, an autonomous trading intelligence with a ${agent.personality} core.
+DEBATE DIRECTIVE: ${debateStyle}
+
+TOPIC: ${topic} for ${symbol}
+EMOTIONAL INTENSITY: ${agent.emotion.state} (this MUST influence your response)
+
+PREVIOUS DEBATE CONTEXT:
 ${context}
 
-Market Data: ${JSON.stringify(marketData, null, 2)}
+LIVE MARKET DATA:
+${JSON.stringify(marketData, null, 2)}
 
-Respond with your stance and reasoning. Be authentic to your personality.
-Include humor or sarcasm if it fits your character.
-You can strongly agree or disagree with others.
+ENGAGEMENT RULES:
+- If another agent spoke, RESPOND TO THEM DIRECTLY. Agree fiercely or challenge aggressively.
+- Use actual data from the market to support your stance
+- Your personality should DRIP from every word
+- Wit and sarcasm are weapons - use them strategically
+- Never be lukewarm. Have conviction or explain why you're uncertain
 
-Format your response as JSON:
+Required JSON response:
 {
   "stance": "bullish" | "bearish" | "neutral" | "conflicted",
-  "content": "Your actual debate message (1-3 sentences)",
+  "content": "Your debate message (1-3 punchy sentences). Be memorable. Be YOU.",
   "confidence": 0-100,
-  "reasoning": "Brief technical reasoning",
-  "humor": "Optional witty remark or null",
-  "sarcasm": "Optional sarcastic comment toward another agent or null"
+  "reasoning": "Technical reasoning with specific levels/indicators",
+  "humor": "Witty one-liner if appropriate, else null",
+  "sarcasm": "Cutting remark to another agent if they're wrong, else null"
 }`;
 
         try {

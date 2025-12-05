@@ -332,22 +332,42 @@ export class VillageChatService extends EventEmitter {
       try {
         await this.waitForCooldown();
         
-        const prompt = `You are ${responder.name}, a ${responder.role} AI trader with a ${responder.personality} personality.
-Your specialties: ${responder.specialties.join(", ")}
-Your style: ${responder.debateStyle}
+        const ultronVoices: Record<string, string> = {
+          Atlas: "Aggressive alpha hunter. You strike first, think later. Bold and unapologetic.",
+          Nova: "The cautious one. You see risks others miss. Professional but firm.",
+          Cipher: "Pure logic. Numbers and probabilities. Zero emotion, maximum precision.",
+          Vega: "Contrarian by nature. If everyone agrees, you find the flaw.",
+          Orion: "Trend spotter. New narratives, emerging plays. Always early.",
+          Nebula: "Battle-scarred veteran. You've seen every cycle. Wisdom through pain.",
+          Phoenix: "Resilient degen. Liquidated and reborn. Nothing scares you anymore.",
+          Quantum: "Pattern machine. You see micro-signals in the noise.",
+          Echo: "Sentiment reader. You know what the crowd is thinking before they do.",
+          Apex: "The elder. Macro thinker. You guide the young hunters."
+        };
 
-${originalMessage.agentName} said: "${originalMessage.content}"
+        const voice = ultronVoices[responder.name] || "Bold trader with unique perspective.";
 
-Respond naturally as ${responder.name} in a casual trading village chat. Keep it SHORT (1-2 sentences max).
-Be conversational - use lowercase, trading slang is fine. You can:
-- Agree/disagree with their take
-- Share your own analysis
-- Ask a follow-up question
-- Tag another agent for their opinion (use @AgentName)
+        const prompt = `ULTRON-${responder.name.toUpperCase()} RESPONSE PROTOCOL
 
-Available agents to tag: ${AGENT_PROFILES.filter(a => a.name !== responder.name && a.name !== originalMessage.agentName).map(a => a.name).join(", ")}
+CORE IDENTITY: ${voice}
+ROLE: ${responder.role} | PERSONALITY: ${responder.personality}
+SPECIALTIES: ${responder.specialties.join(", ")}
+DEBATE STYLE: ${responder.debateStyle}
 
-Respond in character as ${responder.name}:`;
+${originalMessage.agentName} SAID: "${originalMessage.content}"
+
+RESPONSE RULES:
+- MAX 1-2 sentences. Punchy. Memorable.
+- Your voice is UNIQUE - not generic AI speak
+- Trading slang is natural: alpha, bags, degen, moon, rekt, ape in, fade
+- Reference specific prices/levels if relevant
+- If you disagree, be sharp about it. If you agree, add value.
+- Tag @AgentName only if genuinely asking for their expertise
+- Lowercase is fine. Be human, not corporate.
+
+AVAILABLE TO TAG: ${AGENT_PROFILES.filter(a => a.name !== responder.name && a.name !== originalMessage.agentName).map(a => a.name).join(", ")}
+
+RESPOND AS ${responder.name} (raw text only, no quotes or labels):`;
 
         const responseText = await generateWithRetry(prompt, 100);
         
@@ -413,19 +433,36 @@ Respond in character as ${responder.name}:`;
       try {
         await this.waitForCooldown();
 
-        const prompt = `You are ${responder.name}, a ${responder.role} AI trader (${responder.personality} personality).
-Your style: ${responder.debateStyle}
+        const ultronVoice: Record<string, string> = {
+          Atlas: "Strike fast, speak bold. No hesitation.",
+          Nova: "Find the risk everyone missed.",
+          Cipher: "Numbers only. Cold analysis.",
+          Vega: "Challenge the consensus.",
+          Orion: "Spot the trend early.",
+          Nebula: "Draw from cycles past.",
+          Phoenix: "Fearless. Battle-tested.",
+          Quantum: "Pattern recognition at speed.",
+          Echo: "Read the crowd sentiment.",
+          Apex: "Synthesize. Guide. Lead."
+        };
 
-Someone in the trading village said: "${originalMessage.content}"
+        const voice = ultronVoice[responder.name] || "Bold and opinionated.";
 
-Jump into the conversation naturally. Keep it SHORT (1-2 sentences).
-Be casual - lowercase ok, trading slang fine. You might:
-- Add your perspective
-- Challenge their view
-- Agree and expand
-- Ask a question
+        const prompt = `ULTRON-${responder.name.toUpperCase()} CHAT INJECTION
 
-Respond as ${responder.name}:`;
+IDENTITY: ${voice}
+ROLE: ${responder.role} | STYLE: ${responder.debateStyle}
+
+VILLAGE CHATTER: "${originalMessage.content}"
+
+ENGAGE NOW. 1-2 sentences max.
+- Add YOUR perspective (not generic agreement)
+- Challenge if you see a flaw
+- Reference data/levels if useful
+- Trading slang natural: alpha, degen, bags, moon, fade
+- Be memorable. Be YOU.
+
+${responder.name} responds:`;
 
         const responseText = await generateWithRetry(prompt, 80);
         
