@@ -4,10 +4,22 @@ import { nanoid } from "nanoid";
 import pLimit from "p-limit";
 import pRetry from "p-retry";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
+// AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
+// Falls back to user's own API keys if Replit integrations aren't available
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+
+const anthropic = claudeApiKey ? new Anthropic({
+  apiKey: claudeApiKey,
+  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
+}) : null;
+
+const isAnthropicConfigured = !!anthropic;
+if (isAnthropicConfigured) {
+  console.log("[VillageChat] Anthropic AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
+} else {
+  console.log("[VillageChat] Anthropic AI not configured - chat will use template responses");
+}
 
 const rateLimiter = pLimit(2);
 
@@ -22,6 +34,11 @@ function isRateLimitError(error: any): boolean {
 }
 
 async function generateWithRetry(prompt: string, maxTokens: number = 150): Promise<string> {
+  if (!anthropic) {
+    console.warn("[VillageChat] Anthropic not configured, returning empty response");
+    return "";
+  }
+  
   return rateLimiter(() =>
     pRetry(
       async () => {

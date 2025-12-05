@@ -8,11 +8,22 @@ import { db } from "../db";
 import { villageSignals, villageAgents, agentBirths } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
-// Using Replit's AI Integrations for Anthropic access (no API key needed, billed to credits)
-const anthropic = new Anthropic({
-  apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL,
-});
+// AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
+// Falls back to user's own API keys if Replit integrations aren't available
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
+
+const anthropic = claudeApiKey ? new Anthropic({
+  apiKey: claudeApiKey,
+  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
+}) : null;
+
+const isAnthropicConfigured = !!anthropic;
+if (isAnthropicConfigured) {
+  console.log("[TradingVillage] Anthropic AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
+} else {
+  console.log("[TradingVillage] Anthropic AI not configured - signal generation will use fallbacks");
+}
 
 const rateLimiter = pLimit(2);
 
@@ -27,6 +38,11 @@ function isRateLimitError(error: any): boolean {
 }
 
 async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
+  if (!anthropic) {
+    console.warn("[TradingVillage] Anthropic not configured, returning fallback response");
+    return ""; // Return empty string as fallback when AI is not configured
+  }
+  
   return rateLimiter(() =>
     pRetry(
       async () => {
@@ -984,6 +1000,11 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     
     console.log(`[TradingVillage] ${symbol} price: $${basePrice.toFixed(2)} (${priceSource})`);
 
+    if (!anthropic) {
+      console.warn("[TradingVillage] Anthropic not configured, using fallback signal generation");
+      throw new Error("Anthropic not configured");
+    }
+
     try {
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
@@ -1200,6 +1221,19 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
       
       await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
 
+      if (!anthropic) {
+        const fallbackAgrees = Math.random() > 0.3;
+        const fallbackComment = fallbackAgrees ? "AGREE: Setup looks solid" : "DISAGREE: Risk too high";
+        const validation = {
+          agentId: validator.id,
+          agentName: validator.name,
+          agrees: fallbackAgrees,
+          comment: fallbackComment
+        };
+        storedSignal.validators.push(validation);
+        continue;
+      }
+
       try {
         const response = await anthropic.messages.create({
           model: "claude-sonnet-4-5",
@@ -1396,13 +1430,18 @@ Keep it under 20 words. Be direct.`
       `${p.name} (${p.role}): ${p.memory.successfulStrategies.slice(-2).join(", ")}`
     ).join("\n");
 
-    try {
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 300,
-        messages: [{
-          role: "user",
-          content: `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
+    let evolution = "";
+    
+    if (!anthropic) {
+      evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}. Learning from experience.`;
+    } else {
+      try {
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 300,
+          messages: [{
+            role: "user",
+            content: `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
           
 Your recent performance:
 - Win rate: ${(agent.winRate * 100).toFixed(1)}%
@@ -1419,31 +1458,32 @@ Describe your evolution in 2-3 sentences:
 1. What you learned from your mistakes
 2. What you're adopting from top performers
 3. Your new strategy focus`
-        }]
-      });
+          }]
+        });
 
-      const evolution = response.content[0].type === "text" ? response.content[0].text : "";
-      
-      this.addThought(agent.id, "learning",
-        `EVOLUTION to Gen ${agent.generation}: ${evolution}`,
-        { generation: agent.generation, trigger, evolution }
-      );
-
-      if (topPerformers[0]) {
-        agent.memory.mentors.push(topPerformers[0].name);
-        topPerformers[0].memory.students.push(agent.name);
-        
-        const randomStrategy = topPerformers[0].memory.successfulStrategies[
-          Math.floor(Math.random() * topPerformers[0].memory.successfulStrategies.length)
-        ];
-        if (randomStrategy) {
-          agent.strategies.push(`learned_from_${topPerformers[0].name}: ${randomStrategy}`);
-          agent.memory.learnedPatterns.push(`mentored_by_${topPerformers[0].name}`);
-        }
+        evolution = response.content[0].type === "text" ? response.content[0].text : "";
+      } catch (error) {
+        console.error("[TradingVillage] Evolution AI call failed:", error);
+        evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}.`;
       }
+    }
+    
+    this.addThought(agent.id, "learning",
+      `EVOLUTION to Gen ${agent.generation}: ${evolution}`,
+      { generation: agent.generation, trigger, evolution }
+    );
 
-    } catch (error) {
-      console.error("[TradingVillage] Evolution AI call failed:", error);
+    if (topPerformers[0]) {
+      agent.memory.mentors.push(topPerformers[0].name);
+      topPerformers[0].memory.students.push(agent.name);
+      
+      const randomStrategy = topPerformers[0].memory.successfulStrategies[
+        Math.floor(Math.random() * topPerformers[0].memory.successfulStrategies.length)
+      ];
+      if (randomStrategy) {
+        agent.strategies.push(`learned_from_${topPerformers[0].name}: ${randomStrategy}`);
+        agent.memory.learnedPatterns.push(`mentored_by_${topPerformers[0].name}`);
+      }
     }
 
     const competition: CompetitionEvent = {

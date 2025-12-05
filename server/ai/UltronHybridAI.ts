@@ -5,15 +5,16 @@ import pLimit from "p-limit";
 import pRetry, { AbortError } from "p-retry";
 import { EventEmitter } from "events";
 
-// Using Replit AI Integrations for consolidated billing - all AI costs billed to Replit credits
-const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY;
+// AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
+// Falls back to user's own API keys if Replit integrations aren't available
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 
-const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY;
+const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
 
 // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
 const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
 
 const anthropic = claudeApiKey ? new Anthropic({
@@ -420,7 +421,7 @@ Required JSON response:
           const parsed = this.parseJSON(response);
           
           if (parsed) {
-            const { thought, newEmotion } = await this.generateAgentThought(
+            const { content: generatedContent, newEmotion } = await this.generateAgentThought(
               agent.name, agent.personality, agent.emotion, context, marketData
             );
             
@@ -430,7 +431,7 @@ Required JSON response:
               personality: agent.personality,
               emotion: newEmotion,
               stance: parsed.stance || "neutral",
-              content: parsed.content || thought,
+              content: parsed.content || generatedContent,
               confidence: parsed.confidence || 50,
               reasoning: parsed.reasoning || "",
               humor: parsed.humor,
