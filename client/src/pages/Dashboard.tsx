@@ -14,7 +14,6 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { cacheMetrics, cachedMetrics } from "@/lib/queryClient";
 import { TrendingUp, TrendingDown, Zap, RefreshCw, ArrowRight, Brain, Sparkles } from "lucide-react";
 import { Link } from "wouter";
-import { VillageChat } from "@/components/VillageChat";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -326,15 +325,8 @@ export default function Dashboard() {
                 </Card>
               </Link>
 
-              <VillageChat compact />
             </motion.div>
           </div>
-
-          <motion.div variants={itemVariants}>
-            <Card className="shadow-sm border-border/60 dark:border-border/40 bg-card/80 backdrop-blur-sm">
-              <VillageChat maxHeight="400px" />
-            </Card>
-          </motion.div>
         </motion.div>
       </main>
 
