@@ -269,6 +269,7 @@ export class TradingVillage extends EventEmitter {
     this.loadSpawnedAgentsFromDB();
     this.startBackgroundProcesses();
     this.startPeriodicTradeReviews();
+    this.startPriceMonitoring();
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
   }
 
@@ -2320,6 +2321,53 @@ Stay in character as ${agent.name} with your ${agent.personality} trading style.
     }, 5 * 60 * 1000);
 
     console.log("[TradingVillage] Periodic trade reviews enabled (every 5 minutes)");
+  }
+
+  startPriceMonitoring(): void {
+    setInterval(async () => {
+      await this.checkSignalsAgainstPrices();
+    }, 30 * 1000);
+
+    console.log("[TradingVillage] Price monitoring enabled (every 30 seconds)");
+  }
+
+  private async checkSignalsAgainstPrices(): Promise<void> {
+    const activeSignals = this.tradeSignals.filter(s => s.status === "active" || s.status === "pending");
+    if (activeSignals.length === 0) return;
+
+    const symbols = [...new Set(activeSignals.map(s => s.symbol))];
+    
+    try {
+      const prices = await marketDataService.getMultiplePrices(symbols);
+      
+      for (const signal of activeSignals) {
+        const currentPrice = prices[signal.symbol];
+        if (!currentPrice) continue;
+
+        const isLong = signal.direction === "long";
+        
+        const hitTP1 = isLong ? currentPrice >= signal.takeProfit1 : currentPrice <= signal.takeProfit1;
+        const hitTP2 = isLong ? currentPrice >= signal.takeProfit2 : currentPrice <= signal.takeProfit2;
+        const hitTP3 = isLong ? currentPrice >= signal.takeProfit3 : currentPrice <= signal.takeProfit3;
+        const hitSL = isLong ? currentPrice <= signal.stopLoss : currentPrice >= signal.stopLoss;
+
+        if (hitTP3) {
+          console.log(`[PriceMonitor] ${signal.symbol} hit TP3! Closing signal ${signal.id}`);
+          await this.closeSignal(signal.id, currentPrice, "tp3");
+        } else if (hitTP2) {
+          console.log(`[PriceMonitor] ${signal.symbol} hit TP2! Closing signal ${signal.id}`);
+          await this.closeSignal(signal.id, currentPrice, "tp2");
+        } else if (hitTP1) {
+          console.log(`[PriceMonitor] ${signal.symbol} hit TP1! Closing signal ${signal.id}`);
+          await this.closeSignal(signal.id, currentPrice, "tp1");
+        } else if (hitSL) {
+          console.log(`[PriceMonitor] ${signal.symbol} hit SL! Closing signal ${signal.id}`);
+          await this.closeSignal(signal.id, currentPrice, "sl");
+        }
+      }
+    } catch (error) {
+      console.error("[PriceMonitor] Error checking prices:", error);
+    }
   }
 
   getLeaderboard(): { agent: VillageAgent; rank: number }[] {
