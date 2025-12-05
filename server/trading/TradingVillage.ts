@@ -5,7 +5,8 @@ import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
 import { db } from "../db";
-import { villageSignals, villageAgents, agentBirths } from "@shared/schema";
+import { villageSignals, villageAgents, agentBirths, tradeHistory } from "@shared/schema";
+import type { InsertTradeHistory, SelectTradeHistory } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
 // AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
@@ -450,6 +451,31 @@ export class TradingVillage extends EventEmitter {
       await db.update(villageSignals).set(dbUpdates).where(eq(villageSignals.id, signalId));
     } catch (error) {
       console.error("[TradingVillage] Failed to update signal in DB:", error);
+    }
+  }
+
+  private async updateAgentInDB(agent: VillageAgent) {
+    try {
+      await db.update(villageAgents).set({
+        creditScore: agent.creditScore,
+        experience: agent.experience,
+        wins: agent.wins,
+        losses: agent.losses,
+        winRate: agent.winRate,
+        totalPnl: agent.totalPnl,
+        memory: {
+          learnedPatterns: agent.memory.learnedPatterns,
+          successfulStrategies: agent.memory.successfulStrategies,
+          failedStrategies: agent.memory.failedStrategies,
+          mentors: agent.memory.mentors,
+          students: agent.memory.students,
+          sharedInsights: agent.memory.sharedInsights,
+          debateHistory: agent.memory.debateHistory
+        }
+      }).where(eq(villageAgents.id, agent.id));
+      console.log(`[TradingVillage] Agent ${agent.name} persisted to database`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to update agent in DB:", error);
     }
   }
 
@@ -1868,6 +1894,307 @@ Describe your evolution in 2-3 sentences:
     signals.sort((a, b) => b.confidence - a.confidence);
     
     return signals.slice(0, limit);
+  }
+
+  async closeSignal(signalId: string, exitPrice: number, exitReason: "tp1" | "tp2" | "tp3" | "sl" | "manual"): Promise<SelectTradeHistory | null> {
+    const signal = this.tradeSignals.find(s => s.id === signalId);
+    if (!signal || signal.status !== "active") {
+      console.log(`[TradingVillage] Signal ${signalId} not found or not active`);
+      return null;
+    }
+
+    const agent = this.agents.get(signal.agentId);
+    if (!agent) {
+      console.log(`[TradingVillage] Agent ${signal.agentId} not found`);
+      return null;
+    }
+
+    const isLong = signal.direction === "long";
+    const pnlPercent = isLong
+      ? ((exitPrice - signal.entry) / signal.entry) * 100
+      : ((signal.entry - exitPrice) / signal.entry) * 100;
+
+    const outcome: "win" | "loss" | "breakeven" = 
+      pnlPercent > 0.1 ? "win" : pnlPercent < -0.1 ? "loss" : "breakeven";
+
+    const holdingTimeMs = Date.now() - signal.createdAt;
+    
+    console.log(`[TradingVillage] Closing signal ${signalId}: ${outcome.toUpperCase()} | PnL: ${pnlPercent.toFixed(2)}% | Agent: ${agent.name}`);
+
+    let aiAnalysis = "";
+    let lessonsLearned = "";
+    let evolutionTriggered = false;
+    let creditChange = 0;
+
+    if (outcome === "win") {
+      creditChange = Math.floor(10 + pnlPercent * 2);
+      agent.wins++;
+      agent.creditScore += creditChange;
+      
+      if (agent.currentStreak.type === "win") {
+        agent.currentStreak.count++;
+      } else {
+        agent.currentStreak = { type: "win", count: 1 };
+      }
+      
+      if (!agent.bestTrade || pnlPercent > agent.bestTrade.pnl) {
+        agent.bestTrade = { symbol: signal.symbol, pnl: pnlPercent };
+      }
+
+      const strategyDescription = `${signal.symbol} ${signal.direction} via ${signal.technicalAnalysis.pattern}`;
+      if (!agent.memory.successfulStrategies.includes(strategyDescription)) {
+        agent.memory.successfulStrategies.push(strategyDescription);
+      }
+      if (agent.memory.successfulStrategies.length > 20) {
+        agent.memory.successfulStrategies = agent.memory.successfulStrategies.slice(-20);
+      }
+
+      aiAnalysis = await this.generateWinAnalysis(agent, signal, pnlPercent, exitReason);
+      lessonsLearned = `Strategy validated: ${signal.technicalAnalysis.pattern} with ${(signal.confidence * 100).toFixed(0)}% confidence hit ${exitReason.toUpperCase()}. Reinforcing this pattern for ${signal.symbol}.`;
+
+      this.addThought(agent.id, "decision",
+        `CLOSED WIN on ${signal.symbol}: +${pnlPercent.toFixed(2)}%. My ${signal.technicalAnalysis.pattern} strategy working as planned. Confidence was ${(signal.confidence * 100).toFixed(0)}% and it paid off.`,
+        { symbol: signal.symbol, pnl: pnlPercent, exitReason }
+      );
+
+      this.shareKnowledge(agent.id, "pattern", `Winning ${signal.direction} strategy on ${signal.symbol}: ${signal.technicalAnalysis.pattern}`);
+
+      if (agent.currentStreak.count >= 3) {
+        evolutionTriggered = true;
+        await this.triggerEvolution(agent, "win_streak_mastery");
+      }
+
+    } else if (outcome === "loss") {
+      creditChange = -Math.floor(5 + Math.abs(pnlPercent) * 3);
+      agent.losses++;
+      agent.creditScore = Math.max(100, agent.creditScore + creditChange);
+      
+      if (agent.currentStreak.type === "loss") {
+        agent.currentStreak.count++;
+      } else {
+        agent.currentStreak = { type: "loss", count: 1 };
+      }
+      
+      if (!agent.worstTrade || pnlPercent < agent.worstTrade.pnl) {
+        agent.worstTrade = { symbol: signal.symbol, pnl: pnlPercent };
+      }
+
+      const failedStrategy = `${signal.symbol} ${signal.direction}: ${signal.technicalAnalysis.pattern} failed at ${(signal.confidence * 100).toFixed(0)}% confidence`;
+      if (!agent.memory.failedStrategies.includes(failedStrategy)) {
+        agent.memory.failedStrategies.push(failedStrategy);
+      }
+      if (agent.memory.failedStrategies.length > 20) {
+        agent.memory.failedStrategies = agent.memory.failedStrategies.slice(-20);
+      }
+
+      aiAnalysis = await this.generateLossAnalysis(agent, signal, exitPrice, pnlPercent);
+      lessonsLearned = aiAnalysis;
+
+      const mentor = this.findMentor(agent);
+      if (mentor) {
+        this.addThought(agent.id, "learning",
+          `LOSS on ${signal.symbol}: ${pnlPercent.toFixed(2)}%. @${mentor.name}, analyzing what went wrong. My ${signal.technicalAnalysis.pattern} read was off.`,
+          { symbol: signal.symbol, pnl: pnlPercent, exitReason },
+          undefined,
+          [mentor.id]
+        );
+      } else {
+        this.addThought(agent.id, "learning",
+          `LOSS on ${signal.symbol}: ${pnlPercent.toFixed(2)}%. Analyzing failure... ${aiAnalysis.substring(0, 100)}`,
+          { symbol: signal.symbol, pnl: pnlPercent, exitReason }
+        );
+      }
+
+      if (agent.currentStreak.count >= 2) {
+        evolutionTriggered = true;
+        await this.triggerEvolution(agent, "loss_adaptation");
+      }
+
+      await this.initiateExperiment(agent, signal.symbol, `${signal.technicalAnalysis.pattern} failed`);
+    }
+
+    agent.totalPnl += pnlPercent;
+    agent.winRate = agent.wins / Math.max(1, agent.wins + agent.losses);
+    agent.experience += outcome === "win" ? 15 : 10;
+
+    signal.status = exitReason === "sl" ? "stopped" : "closed";
+    signal.outcome = { pnl: pnlPercent, exitPrice, exitReason };
+    signal.closedAt = Date.now();
+
+    const marketConditions = await this.getMarketConditions(signal.symbol);
+
+    const historyEntry: InsertTradeHistory = {
+      id: `th-${nanoid(12)}`,
+      signalId: signal.id,
+      agentId: agent.id,
+      agentName: agent.name,
+      agentRole: agent.role,
+      symbol: signal.symbol,
+      direction: signal.direction,
+      entryPrice: signal.entry,
+      exitPrice,
+      stopLoss: signal.stopLoss,
+      takeProfit1: signal.takeProfit1,
+      takeProfit2: signal.takeProfit2,
+      takeProfit3: signal.takeProfit3,
+      confidence: signal.confidence,
+      timeframe: signal.timeframe,
+      originalReasoning: signal.reasoning,
+      technicalAnalysis: signal.technicalAnalysis,
+      validators: signal.validators,
+      outcome,
+      pnlPercent,
+      pnlUsd: null,
+      exitReason,
+      holdingTimeMs,
+      aiAnalysis,
+      lessonsLearned,
+      strategyUpdated: outcome === "win",
+      evolutionTriggered,
+      agentCreditChange: creditChange,
+      marketConditions,
+      signalCreatedAt: new Date(signal.createdAt),
+    };
+
+    let persistedHistoryEntry: SelectTradeHistory;
+    try {
+      const [inserted] = await db.insert(tradeHistory).values(historyEntry).returning();
+      persistedHistoryEntry = inserted;
+      console.log(`[TradingVillage] Trade history saved: ${inserted.id}`);
+    } catch (error) {
+      console.error("[TradingVillage] Failed to save trade history:", error);
+      persistedHistoryEntry = historyEntry as SelectTradeHistory;
+    }
+
+    await this.updateSignalInDB(signal.id, {
+      status: signal.status,
+      outcome: signal.outcome,
+      closedAt: signal.closedAt
+    });
+
+    await this.updateAgentInDB(agent);
+
+    const competition: CompetitionEvent = {
+      id: `comp-${nanoid(8)}`,
+      type: outcome === "win" ? "trade_win" : "trade_loss",
+      agents: [agent.id],
+      description: `${agent.name} ${outcome === "win" ? "won" : "lost"} on ${signal.symbol}: ${pnlPercent >= 0 ? "+" : ""}${pnlPercent.toFixed(2)}%`,
+      creditChange: { [agent.id]: creditChange },
+      timestamp: Date.now()
+    };
+    this.competitions.push(competition);
+    this.emit("competition", competition);
+    this.emit("trade_closed", { signal, historyEntry: persistedHistoryEntry, agent });
+
+    return persistedHistoryEntry;
+  }
+
+  private async generateWinAnalysis(agent: VillageAgent, signal: VillageTradeSignal, pnlPercent: number, exitReason: string): Promise<string> {
+    if (!anthropic) {
+      return `Successful ${signal.direction} trade. Pattern ${signal.technicalAnalysis.pattern} validated at ${(signal.confidence * 100).toFixed(0)}% confidence.`;
+    }
+
+    try {
+      const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent (${agent.personality} personality).
+
+You just closed a WINNING trade:
+- Symbol: ${signal.symbol}
+- Direction: ${signal.direction.toUpperCase()}
+- Entry: $${signal.entry.toFixed(2)}
+- Exit: ${exitReason.toUpperCase()} hit
+- P&L: +${pnlPercent.toFixed(2)}%
+- Pattern used: ${signal.technicalAnalysis.pattern}
+- Key levels: Support $${signal.technicalAnalysis.keyLevels.support.toFixed(2)}, Resistance $${signal.technicalAnalysis.keyLevels.resistance.toFixed(2)}
+- Confidence was: ${(signal.confidence * 100).toFixed(0)}%
+- Your current streak: ${agent.currentStreak.count} ${agent.currentStreak.type}s
+
+Briefly explain (2-3 sentences) what worked well and what this win teaches you about your strategy. Be specific about the pattern recognition.`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 200,
+        messages: [{ role: "user", content: prompt }]
+      });
+
+      return response.content[0].type === "text" ? response.content[0].text : "";
+    } catch (error) {
+      console.error("[TradingVillage] Win analysis AI call failed:", error);
+      return `Strategy confirmed: ${signal.technicalAnalysis.pattern} pattern at ${(signal.confidence * 100).toFixed(0)}% confidence delivered ${pnlPercent.toFixed(2)}% return.`;
+    }
+  }
+
+  private async generateLossAnalysis(agent: VillageAgent, signal: VillageTradeSignal, exitPrice: number, pnlPercent: number): Promise<string> {
+    if (!anthropic) {
+      return `Stop loss hit. The ${signal.direction} signal at ${(signal.confidence * 100).toFixed(0)}% confidence did not hold. Reviewing ${signal.technicalAnalysis.pattern} pattern recognition.`;
+    }
+
+    try {
+      const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent (${agent.personality} personality).
+
+You just closed a LOSING trade:
+- Symbol: ${signal.symbol}
+- Direction: ${signal.direction.toUpperCase()}
+- Entry: $${signal.entry.toFixed(2)}
+- Stop Loss: $${signal.stopLoss.toFixed(2)}
+- Exit Price: $${exitPrice.toFixed(2)}
+- P&L: ${pnlPercent.toFixed(2)}%
+- Pattern used: ${signal.technicalAnalysis.pattern}
+- Key levels: Support $${signal.technicalAnalysis.keyLevels.support.toFixed(2)}, Resistance $${signal.technicalAnalysis.keyLevels.resistance.toFixed(2)}
+- Confidence was: ${(signal.confidence * 100).toFixed(0)}%
+- Your recent failed strategies: ${agent.memory.failedStrategies.slice(-3).join("; ")}
+
+Analyze what went wrong (2-3 sentences). Be specific about:
+1. Where your pattern recognition failed
+2. What you should have noticed differently
+3. How you'll adapt your strategy`;
+
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 250,
+        messages: [{ role: "user", content: prompt }]
+      });
+
+      return response.content[0].type === "text" ? response.content[0].text : "";
+    } catch (error) {
+      console.error("[TradingVillage] Loss analysis AI call failed:", error);
+      return `Stop loss hit at $${exitPrice.toFixed(2)}. The ${signal.direction} signal based on ${signal.technicalAnalysis.pattern} at ${(signal.confidence * 100).toFixed(0)}% confidence failed. Need to recalibrate pattern recognition for ${signal.symbol}.`;
+    }
+  }
+
+  private async getMarketConditions(symbol: string): Promise<{ volatility: "low" | "medium" | "high"; trend: "bullish" | "bearish" | "sideways"; volume: "low" | "average" | "high" }> {
+    try {
+      const data = await marketDataService.getMarketData(symbol.replace("USDT", ""));
+      return {
+        volatility: data.volatility > 0.03 ? "high" : data.volatility > 0.015 ? "medium" : "low",
+        trend: data.priceChange24h > 2 ? "bullish" : data.priceChange24h < -2 ? "bearish" : "sideways",
+        volume: data.volume24h > 100000000 ? "high" : data.volume24h > 10000000 ? "average" : "low"
+      };
+    } catch {
+      return { volatility: "medium", trend: "sideways", volume: "average" };
+    }
+  }
+
+  async getTradeHistory(limit = 50): Promise<SelectTradeHistory[]> {
+    try {
+      const history = await db.select().from(tradeHistory).orderBy(desc(tradeHistory.closedAt)).limit(limit);
+      return history;
+    } catch (error) {
+      console.error("[TradingVillage] Failed to get trade history:", error);
+      return [];
+    }
+  }
+
+  async getAgentTradeHistory(agentId: string, limit = 20): Promise<SelectTradeHistory[]> {
+    try {
+      const history = await db.select().from(tradeHistory)
+        .where(eq(tradeHistory.agentId, agentId))
+        .orderBy(desc(tradeHistory.closedAt))
+        .limit(limit);
+      return history;
+    } catch (error) {
+      console.error("[TradingVillage] Failed to get agent trade history:", error);
+      return [];
+    }
   }
 
   getLeaderboard(): { agent: VillageAgent; rank: number }[] {

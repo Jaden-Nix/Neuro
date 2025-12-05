@@ -31,6 +31,13 @@ Frontend state uses React Query for server state and caching, with a WebSocket h
 - **Strategy Backtesting**: Historical replay of agent decision-making cycles for performance metrics and strategy comparison.
 - **Multi-Wallet Support**: Tracks wallets and token holdings across Ethereum, Base, Fraxtal, and Solana with an aggregate portfolio view.
 - **AI Trading Village**: Collaborative multi-agent ecosystem where 10 specialized AI trader agents hunt for trading opportunities and share knowledge, featuring agent roles, personalities, a credit-based economy, detailed trade signals, signal validation, agent collaboration, memory systems, and a real-time thought stream with 12 thought types. Full documentation in NEURONET_GOVERNOR.md.
+- **Trade History System**: Comprehensive trade tracking with database persistence (tradeHistory table). Features include:
+  - Signal closing with timestamps (signal created, closed) and exit reasons (TP1/TP2/TP3/SL/Manual)
+  - AI learning integration: wins confirm successful strategies, losses trigger detailed analysis
+  - Agent evolution triggered after 3-loss streaks with AI-generated learning insights
+  - Trade History page with filtering by outcome (all/wins/losses) and agent
+  - Detailed trade cards showing entry/exit prices, P&L, technical analysis, validators, and lessons learned
+  - API endpoints: `/api/village/signals/:id/close` and `/api/village/history`
 
 ## Ultron 3-Layer Hybrid AI Architecture (NEW)
 

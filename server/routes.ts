@@ -5422,6 +5422,61 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/village/signals/:id/close", writeLimiter, async (req, res) => {
+    try {
+      const { exitPrice, exitReason } = req.body;
+      if (!exitPrice || !exitReason) {
+        return res.status(400).json({ error: "exitPrice and exitReason are required" });
+      }
+      
+      const historyEntry = await tradingVillage.closeSignal(
+        req.params.id,
+        exitPrice,
+        exitReason as "tp1" | "tp2" | "tp3" | "sl" | "manual"
+      );
+      
+      if (!historyEntry) {
+        return res.status(404).json({ error: "Signal not found or not active" });
+      }
+      
+      broadcastToClients({
+        type: "log",
+        data: { 
+          event: "village_trade_closed", 
+          trade: historyEntry,
+          outcome: historyEntry.outcome,
+          pnlPercent: historyEntry.pnlPercent,
+          evolutionTriggered: historyEntry.evolutionTriggered,
+          agentName: historyEntry.agentName
+        },
+        timestamp: Date.now(),
+      });
+      
+      res.json(historyEntry);
+    } catch (error) {
+      console.error("[API] Close signal error:", error);
+      res.status(500).json({ error: "Failed to close signal" });
+    }
+  });
+
+  app.get("/api/village/history", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const agentId = req.query.agentId as string | undefined;
+      
+      if (agentId) {
+        const history = await tradingVillage.getAgentTradeHistory(agentId, limit);
+        res.json(history);
+      } else {
+        const history = await tradingVillage.getTradeHistory(limit);
+        res.json(history);
+      }
+    } catch (error) {
+      console.error("[API] Get trade history error:", error);
+      res.status(500).json({ error: "Failed to get trade history" });
+    }
+  });
+
   app.get("/api/village/births", async (req, res) => {
     try {
       const limit = parseInt(req.query.limit as string) || 20;

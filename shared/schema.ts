@@ -2460,6 +2460,49 @@ export const insertVillageSignalSchema = createInsertSchema(villageSignals).omit
 export type InsertVillageSignal = z.infer<typeof insertVillageSignalSchema>;
 export type SelectVillageSignal = typeof villageSignals.$inferSelect;
 
+// Trade History - Complete record of all closed trades with agent learning
+export const tradeHistory = pgTable("trade_history", {
+  id: varchar("id").primaryKey(),
+  signalId: varchar("signal_id").notNull(),
+  agentId: varchar("agent_id").notNull(),
+  agentName: varchar("agent_name").notNull(),
+  agentRole: varchar("agent_role").notNull(),
+  symbol: varchar("symbol").notNull(),
+  direction: varchar("direction").$type<"long" | "short">().notNull(),
+  entryPrice: doublePrecision("entry_price").notNull(),
+  exitPrice: doublePrecision("exit_price").notNull(),
+  stopLoss: doublePrecision("stop_loss").notNull(),
+  takeProfit1: doublePrecision("take_profit_1").notNull(),
+  takeProfit2: doublePrecision("take_profit_2").notNull(),
+  takeProfit3: doublePrecision("take_profit_3").notNull(),
+  confidence: doublePrecision("confidence").notNull(),
+  timeframe: varchar("timeframe").notNull(),
+  originalReasoning: text("original_reasoning").notNull(),
+  technicalAnalysis: jsonb("technical_analysis").$type<{ pattern: string; indicators: string[]; keyLevels: { support: number; resistance: number } }>().notNull(),
+  validators: jsonb("validators").$type<{ agentId: string; agentName: string; agrees: boolean; comment: string }[]>().notNull(),
+  outcome: varchar("outcome").$type<"win" | "loss" | "breakeven">().notNull(),
+  pnlPercent: doublePrecision("pnl_percent").notNull(),
+  pnlUsd: doublePrecision("pnl_usd"),
+  exitReason: varchar("exit_reason").$type<"tp1" | "tp2" | "tp3" | "sl" | "manual" | "expired">().notNull(),
+  holdingTimeMs: integer("holding_time_ms").notNull(),
+  aiAnalysis: text("ai_analysis"),
+  lessonsLearned: text("lessons_learned"),
+  strategyUpdated: boolean("strategy_updated").notNull().default(false),
+  evolutionTriggered: boolean("evolution_triggered").notNull().default(false),
+  agentCreditChange: integer("agent_credit_change").notNull().default(0),
+  marketConditions: jsonb("market_conditions").$type<{
+    volatility: "low" | "medium" | "high";
+    trend: "bullish" | "bearish" | "sideways";
+    volume: "low" | "average" | "high";
+  }>(),
+  signalCreatedAt: timestamp("signal_created_at").notNull(),
+  closedAt: timestamp("closed_at").notNull().defaultNow(),
+});
+
+export const insertTradeHistorySchema = createInsertSchema(tradeHistory).omit({ closedAt: true });
+export type InsertTradeHistory = z.infer<typeof insertTradeHistorySchema>;
+export type SelectTradeHistory = typeof tradeHistory.$inferSelect;
+
 // Village agents - persisted spawned agents that survive restarts
 export const villageAgents = pgTable("village_agents", {
   id: varchar("id").primaryKey(),
