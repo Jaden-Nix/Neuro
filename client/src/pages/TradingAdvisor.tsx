@@ -695,17 +695,17 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
   const queueRef = useRef<AgentThought[]>([]);
   const processingRef = useRef(false);
   const knownIdsRef = useRef<Set<string>>(new Set());
-  const initialLoadRef = useRef(true);
+  const initializedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    if (thoughts.length === 0) return;
-    
-    if (initialLoadRef.current) {
-      initialLoadRef.current = false;
+    if (!initializedRef.current && thoughts.length > 0) {
+      initializedRef.current = true;
       thoughts.forEach(t => knownIdsRef.current.add(t.id));
       return;
     }
+    
+    if (!initializedRef.current) return;
     
     const newThoughts = thoughts.filter(t => 
       !knownIdsRef.current.has(t.id) && 
@@ -738,7 +738,7 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
     
     setTypingAgent(nextThought.agentName);
     
-    const typingDelay = 2000 + Math.random() * 3000;
+    const typingDelay = 3000 + Math.random() * 4000;
     await new Promise(resolve => setTimeout(resolve, typingDelay));
     
     setNewlyRevealedId(nextThought.id);
@@ -748,7 +748,7 @@ function ThoughtStream({ thoughts, className }: { thoughts: AgentThought[]; clas
       scrollRef.current.scrollTop = 0;
     }
     
-    const pauseDelay = 4000 + Math.random() * 6000;
+    const pauseDelay = 8000 + Math.random() * 12000;
     await new Promise(resolve => setTimeout(resolve, pauseDelay));
     
     processQueue();
