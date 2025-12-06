@@ -218,11 +218,11 @@ export class EvolutionEngine {
   
   constructor() {
     this.initializeMutationStats();
-    this.seedInitialEvolutionEvents();
+    // Removed seeded evolution - agents now evolve based on real performance only
     
     setTimeout(() => {
       this.startAutoEvolution();
-      console.log('[Evolution] Auto-evolution enabled - agents will self-heal and adapt');
+      console.log('[Evolution] Auto-evolution enabled - agents will self-heal and adapt (no seeded data)');
     }, 5000);
   }
 
