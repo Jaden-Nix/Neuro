@@ -1,3 +1,5 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
@@ -5,26 +7,71 @@ import { db } from "../db";
 import { villageSignals, villageAgents, agentBirths, tradeHistory } from "@shared/schema";
 import type { InsertTradeHistory, SelectTradeHistory } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
-import { ultronAI } from "../ai/UltronHybridAI";
 
-console.log("[TradingVillage] Using 3-layer Ultron AI architecture (Gemini fast -> GPT-5 judge -> Claude fallback)");
+// AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
+// Falls back to user's own API keys if Replit integrations aren't available
+const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
+const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 
-async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
-  try {
-    return await ultronAI.queryFastLayer(prompt, maxTokens);
-  } catch (error) {
-    console.warn("[TradingVillage] Fast layer failed, returning empty response:", error);
-    return "";
-  }
+const anthropic = claudeApiKey ? new Anthropic({
+  apiKey: claudeApiKey,
+  ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
+}) : null;
+
+const isAnthropicConfigured = !!anthropic;
+if (isAnthropicConfigured) {
+  console.log("[TradingVillage] Anthropic AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
+} else {
+  console.log("[TradingVillage] Anthropic AI not configured - signal generation will use fallbacks");
 }
 
-async function generateWithJudge(prompt: string, maxTokens: number = 2048): Promise<string> {
-  try {
-    return await ultronAI.queryJudgeLayer(prompt, maxTokens);
-  } catch (error) {
-    console.warn("[TradingVillage] Judge layer failed, falling back to fast layer:", error);
-    return generateWithRetry(prompt, maxTokens);
+const rateLimiter = createLimit(2);
+
+function isRateLimitError(error: any): boolean {
+  const errorMsg = error?.message || String(error);
+  return (
+    errorMsg.includes("429") ||
+    errorMsg.includes("RATELIMIT_EXCEEDED") ||
+    errorMsg.toLowerCase().includes("quota") ||
+    errorMsg.toLowerCase().includes("rate limit")
+  );
+}
+
+async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
+  if (!anthropic) {
+    console.warn("[TradingVillage] Anthropic not configured, returning fallback response");
+    return ""; // Return empty string as fallback when AI is not configured
   }
+  
+  return rateLimiter(() =>
+    retry(
+      async () => {
+        try {
+          const message = await anthropic.messages.create({
+            model: "claude-sonnet-4-5",
+            max_tokens: maxTokens,
+            messages: [{ role: "user", content: prompt }],
+          });
+          const content = message.content[0];
+          return content.type === "text" ? content.text : "";
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            throw error; // Rethrow to trigger retry
+          }
+          // For non-rate-limit errors, create an abort error to stop retrying
+          const abortError = new Error(error?.message || "Request failed");
+          (abortError as any).isAbortError = true;
+          throw abortError;
+        }
+      },
+      {
+        retries: 5,
+        minTimeout: 2000,
+        maxTimeout: 64000,
+        factor: 2,
+      }
+    )
+  );
 }
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
@@ -630,11 +677,6 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
 
       const responseText = await generateWithRetry(prompt, 200);
       
-      if (!responseText || responseText.trim().length === 0) {
-        console.log(`[TradingVillage] Skipping empty response from ${responder.name}`);
-        return;
-      }
-      
       const isAgreement = responseText.toLowerCase().includes("agree") || 
                           responseText.toLowerCase().includes("right") ||
                           responseText.toLowerCase().includes("good point");
@@ -647,6 +689,7 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
         [originalThought.agentId]
       );
 
+      // Update relationship if it exists
       if (relationship) {
         if (isAgreement) {
           relationship.trust = Math.min(100, relationship.trust + 2);
@@ -1012,8 +1055,18 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     
     console.log(`[TradingVillage] ${symbol} price: $${basePrice.toFixed(2)} (${priceSource})`);
 
+    if (!anthropic) {
+      console.warn("[TradingVillage] Anthropic not configured, using fallback signal generation");
+      throw new Error("Anthropic not configured");
+    }
+
     try {
-      const prompt = `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 400,
+        messages: [{
+          role: "user",
+          content: `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
 Your specialty: ${agent.specialties.join(", ")}
 
 CRITICAL: The CURRENT LIVE price of ${symbol} is EXACTLY $${basePrice.toFixed(2)}. Do NOT use any other price from your training data. All your entry, stop loss, and take profit levels MUST be based on this current price of $${basePrice.toFixed(2)}.
@@ -1038,13 +1091,11 @@ Respond in this exact JSON format (no markdown):
 
 REMEMBER: Current price is $${basePrice.toFixed(2)}. Entry must be within 1% of this price.
 For ${direction}: SL should be ${(volatility * 100).toFixed(1)}% away from entry.
-TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
+TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
+        }]
+      });
 
-      const text = await generateWithRetry(prompt, 400);
-      
-      if (!text) {
-        throw new Error("Empty AI response");
-      }
+      const text = response.content[0].type === "text" ? response.content[0].text : "";
       
       let parsed;
       try {
@@ -1225,8 +1276,26 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
       
       await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
 
+      if (!anthropic) {
+        const fallbackAgrees = Math.random() > 0.3;
+        const fallbackComment = fallbackAgrees ? "AGREE: Setup looks solid" : "DISAGREE: Risk too high";
+        const validation = {
+          agentId: validator.id,
+          agentName: validator.name,
+          agrees: fallbackAgrees,
+          comment: fallbackComment
+        };
+        storedSignal.validators.push(validation);
+        continue;
+      }
+
       try {
-        const prompt = `You are ${validator.name}, a ${validator.role} (${validator.personality}).
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 150,
+          messages: [{
+            role: "user",
+            content: `You are ${validator.name}, a ${validator.role} (${validator.personality}).
 
 ${signal.agentName} proposed: ${signal.direction.toUpperCase()} ${signal.symbol}
 Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP: $${signal.takeProfit1.toFixed(2)}
@@ -1234,14 +1303,11 @@ Reasoning: ${signal.reasoning}
 
 Do you agree? Reply with:
 - "AGREE: <brief reason>" or "DISAGREE: <brief reason>"
-Keep it under 20 words. Be direct.`;
+Keep it under 20 words. Be direct.`
+          }]
+        });
 
-        const text = await generateWithRetry(prompt, 150);
-        
-        if (!text) {
-          throw new Error("Empty validation response");
-        }
-        
+        const text = response.content[0].type === "text" ? response.content[0].text : "";
         const agrees = text.toUpperCase().startsWith("AGREE");
 
         const validation = {
@@ -1421,8 +1487,16 @@ Keep it under 20 words. Be direct.`;
 
     let evolution = "";
     
-    try {
-      const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
+    if (!anthropic) {
+      evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}. Learning from experience.`;
+    } else {
+      try {
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 300,
+          messages: [{
+            role: "user",
+            content: `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
           
 Your recent performance:
 - Win rate: ${(agent.winRate * 100).toFixed(1)}%
@@ -1438,15 +1512,15 @@ Evolution trigger: ${trigger}
 Describe your evolution in 2-3 sentences:
 1. What you learned from your mistakes
 2. What you're adopting from top performers
-3. Your new strategy focus`;
+3. Your new strategy focus`
+          }]
+        });
 
-      evolution = await generateWithRetry(prompt, 300);
-      if (!evolution) {
+        evolution = response.content[0].type === "text" ? response.content[0].text : "";
+      } catch (error) {
+        console.error("[TradingVillage] Evolution AI call failed:", error);
         evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}.`;
       }
-    } catch (error) {
-      console.error("[TradingVillage] Evolution AI call failed:", error);
-      evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}.`;
     }
     
     this.addThought(agent.id, "learning",
@@ -2086,6 +2160,10 @@ Describe your evolution in 2-3 sentences:
   }
 
   private async generateWinAnalysis(agent: VillageAgent, signal: VillageTradeSignal, pnlPercent: number, exitReason: string): Promise<string> {
+    if (!anthropic) {
+      return `Successful ${signal.direction} trade. Pattern ${signal.technicalAnalysis.pattern} validated at ${(signal.confidence * 100).toFixed(0)}% confidence.`;
+    }
+
     try {
       const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent (${agent.personality} personality).
 
@@ -2102,8 +2180,13 @@ You just closed a WINNING trade:
 
 Briefly explain (2-3 sentences) what worked well and what this win teaches you about your strategy. Be specific about the pattern recognition.`;
 
-      const result = await generateWithRetry(prompt, 200);
-      return result || `Strategy confirmed: ${signal.technicalAnalysis.pattern} pattern at ${(signal.confidence * 100).toFixed(0)}% confidence delivered ${pnlPercent.toFixed(2)}% return.`;
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 200,
+        messages: [{ role: "user", content: prompt }]
+      });
+
+      return response.content[0].type === "text" ? response.content[0].text : "";
     } catch (error) {
       console.error("[TradingVillage] Win analysis AI call failed:", error);
       return `Strategy confirmed: ${signal.technicalAnalysis.pattern} pattern at ${(signal.confidence * 100).toFixed(0)}% confidence delivered ${pnlPercent.toFixed(2)}% return.`;
@@ -2111,6 +2194,10 @@ Briefly explain (2-3 sentences) what worked well and what this win teaches you a
   }
 
   private async generateLossAnalysis(agent: VillageAgent, signal: VillageTradeSignal, exitPrice: number, pnlPercent: number): Promise<string> {
+    if (!anthropic) {
+      return `Stop loss hit. The ${signal.direction} signal at ${(signal.confidence * 100).toFixed(0)}% confidence did not hold. Reviewing ${signal.technicalAnalysis.pattern} pattern recognition.`;
+    }
+
     try {
       const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent (${agent.personality} personality).
 
@@ -2131,8 +2218,13 @@ Analyze what went wrong (2-3 sentences). Be specific about:
 2. What you should have noticed differently
 3. How you'll adapt your strategy`;
 
-      const result = await generateWithRetry(prompt, 250);
-      return result || `Stop loss hit at $${exitPrice.toFixed(2)}. The ${signal.direction} signal based on ${signal.technicalAnalysis.pattern} at ${(signal.confidence * 100).toFixed(0)}% confidence failed. Need to recalibrate pattern recognition for ${signal.symbol}.`;
+      const response = await anthropic.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 250,
+        messages: [{ role: "user", content: prompt }]
+      });
+
+      return response.content[0].type === "text" ? response.content[0].text : "";
     } catch (error) {
       console.error("[TradingVillage] Loss analysis AI call failed:", error);
       return `Stop loss hit at $${exitPrice.toFixed(2)}. The ${signal.direction} signal based on ${signal.technicalAnalysis.pattern} at ${(signal.confidence * 100).toFixed(0)}% confidence failed. Need to recalibrate pattern recognition for ${signal.symbol}.`;
@@ -2194,7 +2286,8 @@ Analyze what went wrong (2-3 sentences). Be specific about:
     const losingPatterns = losses.map(t => t.technicalAnalysis?.pattern).filter(Boolean);
 
     try {
-      const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent with a ${agent.personality} personality.
+      if (anthropic) {
+        const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent with a ${agent.personality} personality.
 
 Review your recent trade history and share your learnings with the village:
 
@@ -2221,9 +2314,14 @@ Write a brief reflection (2-3 sentences) sharing:
 
 Stay in character as ${agent.name} with your ${agent.personality} trading style.`;
 
-      const reflection = await generateWithRetry(prompt, 250);
+        const response = await anthropic.messages.create({
+          model: "claude-sonnet-4-5",
+          max_tokens: 250,
+          messages: [{ role: "user", content: prompt }]
+        });
 
-      if (reflection) {
+        const reflection = response.content[0].type === "text" ? response.content[0].text : "";
+
         this.addThought(agentId, "learning",
           `TRADE REVIEW: ${reflection}`,
           { 
