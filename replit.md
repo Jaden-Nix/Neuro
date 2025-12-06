@@ -3,6 +3,9 @@
 ## Overview
 NeuroNet Governor is an advanced multi-agent AI system for autonomous DeFi protocol governance. It orchestrates specialized AI agents (Meta, Scout, Risk, Execution) using an internal economy, credit scores, and distinct responsibilities. Key features include real-time market simulation, on-chain memory for continuous learning, 24/7 monitoring via a Sentinel system, and full decision replay capabilities. The project aims to provide an autonomous DeFi governance solution with a cinematic command center interface, supporting multiple chains like Ethereum, Base, and Fraxtal, with a vision to enhance market potential through advanced AI-driven financial autonomy.
 
+## Complete Documentation
+For fully detailed documentation covering architecture, technical specifications, design system, API reference, smart contracts, all features, and the full 2025-2026 roadmap, see: **`docs/COMPLETE_DOCUMENTATION.md`**
+
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
