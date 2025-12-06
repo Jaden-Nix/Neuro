@@ -208,11 +208,11 @@ export class EvolutionEngine {
   private autoEvolutionTimer: NodeJS.Timeout | null = null;
   private autoEvolutionConfig: AutoEvolutionConfig = {
     enabled: true,
-    intervalMs: 60000,
-    minIntervalMs: 30000,
-    maxIntervalMs: 180000,
-    agentsPerCycle: 2,
-    evolutionChance: 0.6
+    intervalMs: 20000,      // Every 20 seconds (was 60s)
+    minIntervalMs: 10000,   // Min 10 seconds
+    maxIntervalMs: 60000,   // Max 60 seconds
+    agentsPerCycle: 3,      // More agents per cycle
+    evolutionChance: 0.7    // 70% chance (was 60%)
   };
   private eventCallbacks: Set<EvolutionEventCallback> = new Set();
   
