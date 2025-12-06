@@ -199,7 +199,7 @@ const CACHE_TTL = {
   correlation: 300000,
 };
 
-class EnhancedMarketIntelligenceService extends EventEmitter {
+export class EnhancedMarketIntelligenceService extends EventEmitter {
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   
   constructor() {

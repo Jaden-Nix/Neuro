@@ -33,6 +33,7 @@ import {
   type MultiTimeframeAnalysis,
   type DataQuality
 } from "./AdvancedIntelligence";
+import { enhancedMarketIntelligence } from "../data/providers";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -764,6 +765,15 @@ Return ONLY valid JSON array:
       
       const mtfAnalysis = await advancedIntelligence.analyzeMultiTimeframe(symbol, timeframe);
       
+      // Fetch comprehensive market intelligence (Fear & Greed, Derivatives, On-Chain, Social, News, DEX, Correlation)
+      let comprehensiveIntel;
+      try {
+        comprehensiveIntel = await enhancedMarketIntelligence.getComprehensiveIntelligence(symbol.replace("-USD", "").replace("USDT", ""));
+      } catch (error) {
+        console.warn(`[TradingIntelligence] Failed to fetch comprehensive intelligence for ${symbol}, using defaults`);
+        comprehensiveIntel = null;
+      }
+      
       const longConfluence = this.calculateConfluenceScore(indicators, "long");
       const shortConfluence = this.calculateConfluenceScore(indicators, "short");
       
@@ -781,6 +791,9 @@ Return ONLY valid JSON array:
                          (bestDirection === 'short' && mtfAnalysis.htfTrend === 'bearish');
       
       console.log(`[TradingIntelligence] ${symbol} ENHANCED: Technical ${bestConfluence.score.toFixed(1)}%, Overall ${intelligenceScore.overallScore.toFixed(1)}%, Volatility: ${volatilityRegime.regime}, Patterns: ${patterns.length}, HTF: ${mtfAnalysis.htfTrend}, DataQuality: ${intelligenceScore.dataQuality.overallQuality}`);
+      if (comprehensiveIntel) {
+        console.log(`[TradingIntelligence] ${symbol} COMPREHENSIVE INTEL: F&G ${comprehensiveIntel.fearGreed?.value ?? 'N/A'}, Score: ${comprehensiveIntel.overallScore?.toFixed(1) ?? 'N/A'}%, Action: ${comprehensiveIntel.recommendedAction ?? 'N/A'}, Risk: ${comprehensiveIntel.riskLevel ?? 'N/A'}`);
+      }
       
       let riskWarnings: string[] = [];
       
@@ -806,6 +819,11 @@ Return ONLY valid JSON array:
       
       if (!isDataReal) {
         riskWarnings.push('Using synthetic data');
+      }
+      
+      if (comprehensiveIntel && (comprehensiveIntel.riskLevel === 'high' || comprehensiveIntel.riskLevel === 'extreme')) {
+        riskWarnings.push(`Enhanced intel risk: ${comprehensiveIntel.riskLevel}`);
+        console.log(`[TradingIntelligence] ${symbol} WARNING - High risk from comprehensive intelligence (${comprehensiveIntel.riskLevel})`);
       }
       
       const stochRSIStr = indicators.stochRSI ? `StochRSI K: ${indicators.stochRSI.k.toFixed(1)}, D: ${indicators.stochRSI.d.toFixed(1)}` : "N/A";
@@ -914,6 +932,8 @@ DATA QUALITY ASSESSMENT
 - Quality Score: ${intelligenceScore.dataQuality.qualityScore.toFixed(0)}% (${intelligenceScore.dataQuality.realDataCount}/${intelligenceScore.dataQuality.totalModules} real sources)
 - Overall Quality: ${intelligenceScore.dataQuality.overallQuality.toUpperCase()}
 
+${comprehensiveIntel ? enhancedMarketIntelligence.formatForPrompt(comprehensiveIntel) : '(Enhanced market intelligence unavailable)'}
+
 ═══════════════════════════════════════════════════════════
 CONFLUENCE ANALYSIS
 ═══════════════════════════════════════════════════════════
@@ -945,7 +965,10 @@ ULTRON DECISION RULES:
 3. Beware of liquidation cascades near price
 4. Weight pattern confidence in final decision
 5. Only signal when OVERALL intelligence score > 60%
-6. This signal has ALREADY passed multi-layer filtering`;
+${comprehensiveIntel ? `6. Consider Fear & Greed Index: ${comprehensiveIntel.fearGreed?.value ?? 'N/A'} (${comprehensiveIntel.fearGreed?.classification ?? 'N/A'})
+7. Factor in enhanced intelligence recommended action: ${(comprehensiveIntel.recommendedAction ?? 'HOLD').toUpperCase().replace('_', ' ')}
+8. Risk Level from comprehensive analysis: ${(comprehensiveIntel.riskLevel ?? 'MEDIUM').toUpperCase()}` : '6-8. Enhanced market intelligence unavailable'}
+9. This signal has ALREADY passed multi-layer filtering`;
 
       const response = await this.callClaude(analysisPrompt);
       
