@@ -38,7 +38,6 @@ import { marketDataService } from "./data/MarketDataService";
 import { ccxtAdapter } from "./data/providers/CCXTAdapter";
 import { ultronAI } from "./ai/UltronHybridAI";
 import { ultronAgentManager } from "./agents/UltronAgentPersonality";
-import { villageChatService } from "./trading/VillageChatService";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -5607,33 +5606,6 @@ export async function registerRoutes(
       data: { event: "village_competition", competition },
       timestamp: Date.now(),
     });
-  });
-
-  villageChatService.on("message", (message) => {
-    broadcastToClients({
-      type: "village_chat",
-      data: message,
-      timestamp: Date.now(),
-    });
-  });
-
-  app.get("/api/village/chat", async (req, res) => {
-    try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const messages = villageChatService.getRecentMessages(limit);
-      res.json(messages);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get chat messages" });
-    }
-  });
-
-  app.get("/api/village/chat/agents", async (req, res) => {
-    try {
-      const agents = villageChatService.getAgentProfiles();
-      res.json(agents);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to get agent profiles" });
-    }
   });
 
   // ==========================================
