@@ -630,6 +630,11 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
 
       const responseText = await generateWithRetry(prompt, 200);
       
+      if (!responseText || responseText.trim().length === 0) {
+        console.log(`[TradingVillage] Skipping empty response from ${responder.name}`);
+        return;
+      }
+      
       const isAgreement = responseText.toLowerCase().includes("agree") || 
                           responseText.toLowerCase().includes("right") ||
                           responseText.toLowerCase().includes("good point");
@@ -642,7 +647,6 @@ Keep response under 2 sentences. Be conversational, not formal. Reference your s
         [originalThought.agentId]
       );
 
-      // Update relationship if it exists
       if (relationship) {
         if (isAgreement) {
           relationship.trust = Math.min(100, relationship.trust + 2);
