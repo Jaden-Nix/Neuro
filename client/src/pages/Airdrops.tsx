@@ -97,7 +97,7 @@ export default function Airdrops() {
             </Button>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="w-4 h-4" />
-              <span>Expected Q1 2025</span>
+              <span>Expected Q1 2026</span>
             </div>
           </div>
         </CardContent>

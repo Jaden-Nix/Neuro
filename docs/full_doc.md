@@ -1,69 +1,50 @@
-# NeuroNet Governor: Complete Technical Documentation
 
-> **Version**: 2.0 | **Last Updated**: December 2024 | **Status**: Production Ready
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#1-executive-summary)
-2. [System Architecture](#2-system-architecture)
-3. [Technical Stack](#3-technical-stack)
-4. [Multi-Agent System](#4-multi-agent-system)
-5. [AI Architecture - Ultron 3-Layer Hybrid](#5-ai-architecture---ultron-3-layer-hybrid)
-6. [Backend Architecture](#6-backend-architecture)
-7. [Frontend Architecture](#7-frontend-architecture)
-8. [Database Schema](#8-database-schema)
-9. [API Reference](#9-api-reference)
-10. [Smart Contracts](#10-smart-contracts)
-11. [Design System](#11-design-system)
-12. [Feature Specifications](#12-feature-specifications)
-13. [Security Architecture](#13-security-architecture)
-14. [Performance Optimization](#14-performance-optimization)
-15. [Deployment Architecture](#15-deployment-architecture)
-16. [Current Features](#16-current-features)
-17. [Future Roadmap (2025-2026)](#17-future-roadmap-2025-2026)
-18. [Appendices](#18-appendices)
-
----
-
-## 1. Executive Summary
-
-### 1.1 What is NeuroNet Governor?
-
-NeuroNet Governor is an **autonomous multi-agent AI system for DeFi protocol governance**. It orchestrates specialized AI agents (Meta, Scout, Risk, Execution) that collaborate 24/7 to identify opportunities, assess risks, and execute transactions in DeFi protocols without human intervention.
-
-### 1.2 Philosophy
-
-> **"Governance today moves at human speed. Markets move at machine speed."**
-
+NeuroNet Governor: Complete Technical Documentation
+> Version: 2.0 | Last Updated: December 2025 | Status: Production Ready
+>
+> 
+Table of Contents
+ * Executive Summary
+ * System Architecture
+ * Technical Stack
+ * Multi-Agent System
+ * AI Architecture - Ultron 3-Layer Hybrid
+ * Backend Architecture
+ * Frontend Architecture
+ * Database Schema
+ * API Reference
+ * Smart Contracts
+ * Design System
+ * Feature Specifications
+ * Security Architecture
+ * Performance Optimization
+ * Deployment Architecture
+ * Current Features
+ * Future Roadmap (2025-2026)
+ * Appendices
+1. Executive Summary
+1.1 What is NeuroNet Governor?
+NeuroNet Governor is an autonomous multi-agent AI system for DeFi protocol governance. It orchestrates specialized AI agents (Meta, Scout, Risk, Execution) that collaborate 24/7 to identify opportunities, assess risks, and execute transactions in DeFi protocols without human intervention.
+1.2 Philosophy
+> "Governance today moves at human speed. Markets move at machine speed."
+> 
 NeuroNet's mission is to close that gap with transparent, accountable, AI-driven autonomy. The future of decentralized governance isn't humans voting for days—it's AI agents making intelligent, verifiable decisions in seconds, with humans retaining final authority through multi-signature controls.
-
-### 1.3 Core Value Propositions
-
+1.3 Core Value Propositions
 | Problem | NeuroNet Solution |
-|---------|-------------------|
+|---|---|
 | Slow governance (days/weeks) | AI decisions in seconds |
 | Lack of real-time analysis | Continuous market monitoring |
 | Human limitations (24/7 fatigue) | Autonomous agent operation |
 | Emotional decisions | Data-driven algorithmic choices |
 | Opaque decision-making | Full on-chain transparency |
-
-### 1.4 Key Metrics
-
-- **Agents**: 10+ specialized AI agents with unique personalities
-- **Chains Supported**: Ethereum, Base, Fraxtal, Solana
-- **Response Time**: <2 seconds for agent decisions
-- **Uptime Target**: 99.9% availability
-- **Tokens Tracked**: 40+ major cryptocurrencies
-
----
-
-## 2. System Architecture
-
-### 2.1 High-Level Architecture Diagram
-
-```
+1.4 Key Metrics
+ * Agents: 10+ specialized AI agents with unique personalities
+ * Chains Supported: Ethereum, Base, Fraxtal, Solana
+ * Response Time: <2 seconds for agent decisions
+ * Uptime Target: 99.9% availability
+ * Tokens Tracked: 40+ major cryptocurrencies
+2. System Architecture
+2.1 High-Level Architecture Diagram
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              USER INTERFACE                                  │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │
@@ -119,11 +100,8 @@ NeuroNet's mission is to close that gap with transparent, accountable, AI-driven
 │  │  (Drizzle)   │ │   Mainnet    │ │   Sepolia    │ │     Multi-chain      ││
 │  └──────────────┘ └──────────────┘ └──────────────┘ └──────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
-```
 
-### 2.2 Data Flow Architecture
-
-```
+2.2 Data Flow Architecture
                                     ┌─────────────────┐
                                     │  Market Data    │
                                     │  (CoinGecko,    │
@@ -145,93 +123,72 @@ NeuroNet's mission is to close that gap with transparent, accountable, AI-driven
                                     │  Memory Vault   │                    │   On-Chain      │
                                     │  (Learn/Store)  │                    │   Execution     │
                                     └─────────────────┘                    └─────────────────┘
-```
 
-### 2.3 Component Interaction Matrix
-
+2.3 Component Interaction Matrix
 | Component | Interacts With | Communication Protocol | Data Format |
-|-----------|---------------|----------------------|-------------|
+|---|---|---|---|
 | Frontend | Backend API | REST/WebSocket | JSON |
 | API Gateway | Agent Orchestrator | Internal Events | TypeScript Objects |
 | Agent Orchestrator | AI Services | HTTP/SDK | JSON Prompts |
 | AI Services | External APIs | HTTPS | JSON |
 | Blockchain | Smart Contracts | JSON-RPC | ABI-encoded |
 | Database | All Services | PostgreSQL Protocol | SQL/Drizzle |
-
----
-
-## 3. Technical Stack
-
-### 3.1 Frontend Technologies
-
+3. Technical Stack
+3.1 Frontend Technologies
 | Category | Technology | Version | Purpose |
-|----------|-----------|---------|---------|
-| **Framework** | React | 18.x | UI rendering & component architecture |
-| **Language** | TypeScript | 5.x | Type-safe development |
-| **Build Tool** | Vite | 5.x | Fast development & bundling |
-| **Routing** | Wouter | 3.x | Lightweight client-side routing |
-| **Styling** | Tailwind CSS | 3.x | Utility-first CSS framework |
-| **Components** | shadcn/ui | Latest | Pre-built accessible components |
-| **Animations** | Framer Motion | 11.x | Declarative motion library |
-| **Data Fetching** | TanStack Query | 5.x | Server state management |
-| **Web3** | wagmi + viem | 2.x | Ethereum interactions |
-| **Wallet UI** | RainbowKit | 2.x | Wallet connection interface |
-| **Charts** | Recharts | 2.x | Data visualization |
-| **Icons** | Lucide React | 0.x | Icon library |
-
-### 3.2 Backend Technologies
-
+|---|---|---|---|
+| Framework | React | 18.x | UI rendering & component architecture |
+| Language | TypeScript | 5.x | Type-safe development |
+| Build Tool | Vite | 5.x | Fast development & bundling |
+| Routing | Wouter | 3.x | Lightweight client-side routing |
+| Styling | Tailwind CSS | 3.x | Utility-first CSS framework |
+| Components | shadcn/ui | Latest | Pre-built accessible components |
+| Animations | Framer Motion | 11.x | Declarative motion library |
+| Data Fetching | TanStack Query | 5.x | Server state management |
+| Web3 | wagmi + viem | 2.x | Ethereum interactions |
+| Wallet UI | RainbowKit | 2.x | Wallet connection interface |
+| Charts | Recharts | 2.x | Data visualization |
+| Icons | Lucide React | 0.x | Icon library |
+3.2 Backend Technologies
 | Category | Technology | Version | Purpose |
-|----------|-----------|---------|---------|
-| **Runtime** | Node.js | 20.x | JavaScript runtime |
-| **Framework** | Express.js | 4.x | HTTP server & routing |
-| **Language** | TypeScript | 5.x | Type-safe development |
-| **Real-time** | ws | 8.x | WebSocket server |
-| **Database ORM** | Drizzle | 0.x | Type-safe PostgreSQL ORM |
-| **Validation** | Zod | 3.x | Runtime type validation |
-| **AI - Layer 1** | Google Gemini | 2.5 Flash | Fast agent operations |
-| **AI - Layer 2** | OpenAI GPT-5 | Latest | High-IQ judge arbitration |
-| **AI - Fallback** | Anthropic Claude | 4.x | Backup reasoning |
-| **Blockchain** | viem | 2.x | Ethereum client library |
-| **Session** | express-session | 1.x | Session management |
-| **Payments** | Stripe | Latest | Payment processing |
-
-### 3.3 Database Technologies
-
+|---|---|---|---|
+| Runtime | Node.js | 20.x | JavaScript runtime |
+| Framework | Express.js | 4.x | HTTP server & routing |
+| Language | TypeScript | 5.x | Type-safe development |
+| Real-time | ws | 8.x | WebSocket server |
+| Database ORM | Drizzle | 0.x | Type-safe PostgreSQL ORM |
+| Validation | Zod | 3.x | Runtime type validation |
+| AI - Layer 1 | Google Gemini | 2.5 Flash | Fast agent operations |
+| AI - Layer 2 | OpenAI GPT-5 | Latest | High-IQ judge arbitration |
+| AI - Fallback | Anthropic Claude | 4.x | Backup reasoning |
+| Blockchain | viem | 2.x | Ethereum client library |
+| Session | express-session | 1.x | Session management |
+| Payments | Stripe | Latest | Payment processing |
+3.3 Database Technologies
 | Category | Technology | Purpose |
-|----------|-----------|---------|
-| **Primary DB** | PostgreSQL (Neon) | Persistent data storage |
-| **ORM** | Drizzle ORM | Type-safe queries |
-| **Migrations** | Drizzle Kit | Schema migrations |
-| **Session Store** | connect-pg-simple | Session persistence |
-
-### 3.4 Blockchain Networks
-
+|---|---|---|
+| Primary DB | PostgreSQL (Neon) | Persistent data storage |
+| ORM | Drizzle ORM | Type-safe queries |
+| Migrations | Drizzle Kit | Schema migrations |
+| Session Store | connect-pg-simple | Session persistence |
+3.4 Blockchain Networks
 | Network | Chain ID | RPC Endpoint | Purpose |
-|---------|----------|--------------|---------|
+|---|---|---|---|
 | Ethereum Mainnet | 1 | Public RPC | Production |
 | Base | 8453 | Public RPC | L2 operations |
 | Base Sepolia | 84532 | Public RPC | Testing |
 | Fraxtal | 252 | https://rpc.frax.com | ATP integration |
 | Solana | - | Public RPC | Multi-chain |
-
-### 3.5 External Services
-
+3.5 External Services
 | Service | Purpose | Integration |
-|---------|---------|-------------|
+|---|---|---|
 | CoinGecko | Price data | REST API |
 | DeFiLlama | TVL & yield data | REST API |
 | Binance | Real-time prices | WebSocket |
 | CryptoCompare | Historical data | REST API |
 | CCXT | Multi-exchange access | Library |
-
----
-
-## 4. Multi-Agent System
-
-### 4.1 Agent Hierarchy
-
-```
+4. Multi-Agent System
+4.1 Agent Hierarchy
                          ┌──────────────────┐
                          │    META AGENT    │
                          │   (Orchestrator) │
@@ -247,33 +204,27 @@ NeuroNet's mission is to close that gap with transparent, accountable, AI-driven
    │   SCOUT AGENT   │   │   RISK AGENT    │   │ EXECUTION AGENT │
    │                 │   │                 │   │                 │
    │ - Opportunities │   │ - Evaluation    │   │ - Transactions  │
-   │ - Market Scan   │   │ - Veto Power    │   │ - Gas Optimize  │
-   │ - Price Data    │   │ - Loss Predict  │   │ - Safe Execution│
+   │ - Market Scan   │   │ - Price Data    │   │ - Gas Optimize  │
+   │ - Price Data    │   │ - Veto Power    │   │ - Safe Execution│
    └─────────────────┘   └─────────────────┘   └─────────────────┘
-```
 
-### 4.2 Agent Specifications
-
-#### 4.2.1 Meta-Agent (The Brain)
-
+4.2 Agent Specifications
+4.2.1 Meta-Agent (The Brain)
 | Attribute | Value |
-|-----------|-------|
-| **Role** | Central orchestrator and decision-maker |
-| **Personality** | Sovereign, calm, strategic |
-| **AI Model** | Gemini 2.5 Flash |
-| **Starting Credits** | 1000 |
-
-**Responsibilities:**
-- Spawn and manage sub-agents
-- Negotiate between agents
-- Run final simulations
-- Execute on-chain actions
-- Maintain credit economy
-- Handle self-healing logic
-- Write to Memory Vault
-
-**Output Schema:**
-```typescript
+|---|---|
+| Role | Central orchestrator and decision-maker |
+| Personality | Sovereign, calm, strategic |
+| AI Model | Gemini 2.5 Flash |
+| Starting Credits | 1000 |
+Responsibilities:
+ * Spawn and manage sub-agents
+ * Negotiate between agents
+ * Run final simulations
+ * Execute on-chain actions
+ * Maintain credit economy
+ * Handle self-healing logic
+ * Write to Memory Vault
+Output Schema:
 interface MetaDecision {
   approved: boolean;
   confidence: number;       // 0-100
@@ -281,26 +232,21 @@ interface MetaDecision {
   modifications: object | null;
   priority: 'low' | 'medium' | 'high';
 }
-```
 
-#### 4.2.2 Scout Agent (The Hunter)
-
+4.2.2 Scout Agent (The Hunter)
 | Attribute | Value |
-|-----------|-------|
-| **Role** | Market intelligence and opportunity detection |
-| **Personality** | Curious, energetic, analytical |
-| **AI Model** | Gemini 2.5 Flash |
-| **Starting Credits** | 500 |
-
-**Responsibilities:**
-- Scan liquidity across DEXs
-- Fetch real-time price data
-- Detect arbitrage opportunities
-- Predict volatility patterns
-- Suggest profitable actions
-
-**Output Schema:**
-```typescript
+|---|---|
+| Role | Market intelligence and opportunity detection |
+| Personality | Curious, energetic, analytical |
+| AI Model | Gemini 2.5 Flash |
+| Starting Credits | 500 |
+Responsibilities:
+ * Scan liquidity across DEXs
+ * Fetch real-time price data
+ * Detect arbitrage opportunities
+ * Predict volatility patterns
+ * Suggest profitable actions
+Output Schema:
 interface ScoutAnalysis {
   opportunityType: 'yield' | 'arbitrage' | 'staking';
   description: string;
@@ -308,31 +254,25 @@ interface ScoutAnalysis {
   expectedReturn: number;   // Percentage
   details: Record<string, any>;
 }
-```
 
-**Performance Metrics:**
-- Prediction accuracy rate
-- Opportunity value generated
-- False positive rate
-
-#### 4.2.3 Risk Agent (The Guardian)
-
+Performance Metrics:
+ * Prediction accuracy rate
+ * Opportunity value generated
+ * False positive rate
+4.2.3 Risk Agent (The Guardian)
 | Attribute | Value |
-|-----------|-------|
-| **Role** | Safety and risk management |
-| **Personality** | Cautious, formal, thorough |
-| **AI Model** | Gemini 2.5 Flash |
-| **Starting Credits** | 500 |
-
-**Responsibilities:**
-- Evaluate Scout proposals
-- Block high-risk decisions
-- Simulate loss scenarios
-- Predict liquidation risks
-- Perform safety vetoes
-
-**Output Schema:**
-```typescript
+|---|---|
+| Role | Safety and risk management |
+| Personality | Cautious, formal, thorough |
+| AI Model | Gemini 2.5 Flash |
+| Starting Credits | 500 |
+Responsibilities:
+ * Evaluate Scout proposals
+ * Block high-risk decisions
+ * Simulate loss scenarios
+ * Predict liquidation risks
+ * Perform safety vetoes
+Output Schema:
 interface RiskAssessment {
   riskScore: number;        // 0-100
   shouldVeto: boolean;
@@ -340,31 +280,25 @@ interface RiskAssessment {
   potentialLoss: number;    // USD
   recommendations: string[];
 }
-```
 
-**Performance Metrics:**
-- False positive rate
-- Prevented losses
-- Veto accuracy
-
-#### 4.2.4 Execution Agent (The Executor)
-
+Performance Metrics:
+ * False positive rate
+ * Prevented losses
+ * Veto accuracy
+4.2.4 Execution Agent (The Executor)
 | Attribute | Value |
-|-----------|-------|
-| **Role** | Transaction creation and execution |
-| **Personality** | Precise, cold, efficient |
-| **AI Model** | Gemini 2.5 Flash |
-| **Starting Credits** | 500 |
-
-**Responsibilities:**
-- Create safe on-chain transactions
-- Calculate optimal gas costs
-- Execute swaps, rebalances, loans
-- Publish execution logs
-- Emit data for memory storage
-
-**Output Schema:**
-```typescript
+|---|---|
+| Role | Transaction creation and execution |
+| Personality | Precise, cold, efficient |
+| AI Model | Gemini 2.5 Flash |
+| Starting Credits | 500 |
+Responsibilities:
+ * Create safe on-chain transactions
+ * Calculate optimal gas costs
+ * Execute swaps, rebalances, loans
+ * Publish execution logs
+ * Emit data for memory storage
+Output Schema:
 interface ExecutionPlan {
   feasible: boolean;
   gasEstimate: number;      // Gwei
@@ -379,62 +313,47 @@ interface ExecutionStep {
   contract: string;
   estimatedGas: number;
 }
-```
 
-**Performance Metrics:**
-- Success rate
-- Gas efficiency
-- Execution speed
-
-### 4.3 Negotiation Protocol
-
-**Flow Sequence:**
-```
+Performance Metrics:
+ * Success rate
+ * Gas efficiency
+ * Execution speed
+4.3 Negotiation Protocol
+Flow Sequence:
 Scout → Risk → Execution → Meta-Agent → Decision
-```
 
-**Scoring Formula:**
-```typescript
+Scoring Formula:
 finalScore = (
   scoutConfidence * 0.3 +
   (100 - riskScore) * 0.4 +
   executionFeasibility * 0.2 +
   expectedReturn * 0.1
 )
-```
 
-**Decision Thresholds:**
+Decision Thresholds:
 | Score Range | Decision | Action |
 |-------------|----------|--------|
 | 80-100 | Auto-approve | Execute immediately |
 | 60-79 | Manual review | Require human confirmation |
 | 40-59 | Delay | Wait for better conditions |
 | 0-39 | Reject | Do not execute |
-
-### 4.4 AI Trading Village
-
+4.4 AI Trading Village
 The AI Trading Village is a collaborative ecosystem where 10 specialized AI trader agents work together.
-
-#### 4.4.1 Ultron Agent Personalities
-
+4.4.1 Ultron Agent Personalities
 | Agent | Personality | Specialty | Emotional Range |
-|-------|-------------|-----------|-----------------|
-| **Atlas** | Aggressive | Breakout Detection | confident, excited, aggressive |
-| **Nova** | Conservative | Risk Assessment | cautious, skeptical, fearful |
-| **Cipher** | Analytical | Position Sizing | curious, analytical |
-| **Vega** | Contrarian | Sentiment Reversal | contrarian, skeptical |
-| **Orion** | Momentum | Early Detection | excited, aggressive |
-| **Nebula** | Experimental | Pattern Memory | curious, experimental |
-| **Phoenix** | Aggressive | Recovery Master | confident, aggressive |
-| **Quantum** | Analytical | Pattern Recognition | analytical, curious |
-| **Echo** | Contrarian | Sentiment Analysis | contrarian, cautious |
-| **Apex** | Analytical | Macro Synthesis | calm, analytical |
-
-#### 4.4.2 Agent Emotional States
-
+|---|---|---|---|
+| Atlas | Aggressive | Breakout Detection | confident, excited, aggressive |
+| Nova | Conservative | Risk Assessment | cautious, skeptical, fearful |
+| Cipher | Analytical | Position Sizing | curious, analytical |
+| Vega | Contrarian | Sentiment Reversal | contrarian, skeptical |
+| Orion | Momentum | Early Detection | excited, aggressive |
+| Nebula | Experimental | Pattern Memory | curious, experimental |
+| Phoenix | Aggressive | Recovery Master | confident, aggressive |
+| Quantum | Analytical | Pattern Recognition | analytical, curious |
+| Echo | Contrarian | Sentiment Analysis | contrarian, cautious |
+| Apex | Analytical | Macro Synthesis | calm, analytical |
+4.4.2 Agent Emotional States
 Agents have dynamic emotional states that affect their decision-making:
-
-```typescript
 type EmotionalState = 
   | 'confident'    // High conviction trades
   | 'cautious'     // More conservative sizing
@@ -444,12 +363,10 @@ type EmotionalState =
   | 'skeptical'    // Questioning consensus
   | 'aggressive'   // Larger positions
   | 'fearful';     // Risk-off mode
-```
 
-#### 4.4.3 Credit-Based Economy
-
+4.4.3 Credit-Based Economy
 | Event | Credit Change |
-|-------|--------------|
+|---|---|
 | Starting balance | +500 |
 | Winning trade | +10 to +20 |
 | Losing trade | -5 to -15 |
@@ -457,28 +374,17 @@ type EmotionalState =
 | Failed prediction | -20 |
 | Evolution trigger | At 800+ credits |
 | Retirement threshold | Below 100 credits |
-
-#### 4.4.4 Agent Relationships
-
+4.4.4 Agent Relationships
 Agents maintain relationship scores with each other:
-
-```typescript
 interface AgentRelationship {
   trust: number;      // -100 to +100
   respect: number;    // -100 to +100
   rivalry: number;    // 0 to 100
 }
-```
 
----
-
-## 5. AI Architecture - Ultron 3-Layer Hybrid
-
-### 5.1 Overview
-
+5. AI Architecture - Ultron 3-Layer Hybrid
+5.1 Overview
 The Ultron architecture provides intelligent routing between three AI layers based on task complexity, cost optimization, and performance requirements.
-
-```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                         ULTRON 3-LAYER HYBRID AI                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -522,11 +428,8 @@ The Ultron architecture provides intelligent routing between three AI layers bas
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-```
 
-### 5.2 Intelligent Routing Logic
-
-```typescript
+5.2 Intelligent Routing Logic
 class HybridAIService {
   async route(task: AITask): Promise<AIResponse> {
     // Layer 1: Fast operations for routine tasks
@@ -550,24 +453,16 @@ class HybridAIService {
     }
   }
 }
-```
 
-### 5.3 Cost Optimization
-
+5.3 Cost Optimization
 | Layer | Operations/Day | Cost/Operation | Daily Cost |
-|-------|---------------|----------------|------------|
+|---|---|---|---|
 | Layer 1 (Gemini) | ~10,000 | $0.0001 | ~$1.00 |
 | Layer 2 (GPT-5) | ~100 | $0.01 | ~$1.00 |
 | Layer 3 (Local) | Unlimited | $0.00 | $0.00 |
-| **Total** | | | **~$2.00/day** |
-
----
-
-## 6. Backend Architecture
-
-### 6.1 Server Structure
-
-```
+| Total |  |  | **~$2.00/day** |
+6. Backend Architecture
+6.1 Server Structure
 server/
 ├── index.ts                    # Main server entry point
 ├── routes.ts                   # API route definitions
@@ -651,13 +546,9 @@ server/
 │
 └── alerts/                     # Alert system
     └── AlertService.ts
-```
 
-### 6.2 Core Services
-
-#### 6.2.1 Agent Orchestrator
-
-```typescript
+6.2 Core Services
+6.2.1 Agent Orchestrator
 class AgentOrchestrator {
   private agents: Map<string, BaseAgent>;
   private creditEconomy: CreditEconomy;
@@ -689,13 +580,9 @@ class AgentOrchestrator {
     return decisions;
   }
 }
-```
 
-#### 6.2.2 Simulation Engine
-
+6.2.2 Simulation Engine
 The simulation engine uses Monte Carlo methods to predict future states:
-
-```typescript
 interface SimulationResult {
   futureForks: FutureFork[];
   expectedValue: number;
@@ -711,18 +598,14 @@ interface FutureFork {
   yieldChange: number;
   pegDeviation: number;
 }
-```
 
-**Predictions Generated:**
-- Price movements (24h, 7d, 30d)
-- Volatility levels
-- TVL changes
-- Yield fluctuations
-- Peg deviations (FRAX, stablecoins)
-
-#### 6.2.3 Credit Economy
-
-```typescript
+Predictions Generated:
+ * Price movements (24h, 7d, 30d)
+ * Volatility levels
+ * TVL changes
+ * Yield fluctuations
+ * Peg deviations (FRAX, stablecoins)
+6.2.3 Credit Economy
 interface CreditTransaction {
   agentId: string;
   agentType: 'scout' | 'risk' | 'execution' | 'meta';
@@ -739,11 +622,8 @@ class CreditEconomy {
   getBalance(agentId: string): number;
   getLeaderboard(): AgentRanking[];
 }
-```
 
-#### 6.2.4 Memory Vault
-
-```typescript
+6.2.4 Memory Vault
 interface MemoryEntry {
   id: string;
   category: 'successful' | 'blocked' | 'high-risk' | 'learned';
@@ -759,42 +639,31 @@ class MemoryVault {
   query(filter: MemoryFilter): Promise<MemoryEntry[]>;
   learn(pattern: Pattern): Promise<void>;
 }
-```
 
-#### 6.2.5 Self-Healing Engine
-
-**Deprecation Criteria:**
-- Credit score below 100
-- Accuracy rate < 60%
-- Failed actions > 50%
-- No improvement over 30 days
-
-**Evolution Process:**
-1. Detect underperforming agent
-2. Log deprecation reason
-3. Spawn new version with adjusted parameters
-4. Migrate memory and context
-5. Update ATP metadata
-6. Archive old version
-
-### 6.3 WebSocket Events
-
+6.2.5 Self-Healing Engine
+Deprecation Criteria:
+ * Credit score below 100
+ * Accuracy rate < 60%
+ * Failed actions > 50%
+ * No improvement over 30 days
+Evolution Process:
+ * Detect underperforming agent
+ * Log deprecation reason
+ * Spawn new version with adjusted parameters
+ * Migrate memory and context
+ * Update ATP metadata
+ * Archive old version
+6.3 WebSocket Events
 | Event | Direction | Payload |
-|-------|-----------|---------|
-| `agent:thought` | Server → Client | `{ agentId, thought, emotion }` |
-| `agent:decision` | Server → Client | `{ agentId, decision, reasoning }` |
-| `signal:new` | Server → Client | `{ signal: TradingSignal }` |
-| `signal:update` | Server → Client | `{ signalId, updates }` |
-| `credit:change` | Server → Client | `{ agentId, balance, change }` |
-| `cycle:complete` | Server → Client | `{ cycleId, results }` |
-
----
-
-## 7. Frontend Architecture
-
-### 7.1 Application Structure
-
-```
+|---|---|---|
+| agent:thought | Server → Client | { agentId, thought, emotion } |
+| agent:decision | Server → Client | { agentId, decision, reasoning } |
+| signal:new | Server → Client | { signal: TradingSignal } |
+| signal:update | Server → Client | { signalId, updates } |
+| credit:change | Server → Client | { agentId, balance, change } |
+| cycle:complete | Server → Client | { cycleId, results } |
+7. Frontend Architecture
+7.1 Application Structure
 client/src/
 ├── App.tsx                     # Root component with routing
 ├── main.tsx                    # Entry point
@@ -855,15 +724,10 @@ client/src/
     ├── wagmi.ts                # Web3 configuration
     ├── contracts.ts            # Contract ABIs
     └── utils.ts                # Utility functions
-```
 
-### 7.2 Key Components
-
-#### 7.2.1 NeuroNetCore
-
+7.2 Key Components
+7.2.1 NeuroNetCore
 The central visualization showing the Meta-Agent with orbiting sub-agents:
-
-```typescript
 interface NeuroNetCoreProps {
   agents: Agent[];
   connections: Connection[];
@@ -875,13 +739,9 @@ interface NeuroNetCoreProps {
 // - Three orbiting sub-agent nodes
 // - Animated data flow particles
 // - Real-time status updates
-```
 
-#### 7.2.2 LogStream
-
+7.2.2 LogStream
 Real-time log display with agent-specific coloring:
-
-```typescript
 interface LogEntry {
   id: string;
   timestamp: Date;
@@ -896,13 +756,9 @@ interface LogEntry {
 // - Personality-colored accent per agent
 // - Timestamp + Agent Icon + Message format
 // - Filter by agent type
-```
 
-#### 7.2.3 RiskHeatmap
-
+7.2.3 RiskHeatmap
 Visual grid representation of risk levels:
-
-```typescript
 interface RiskCell {
   x: number;
   y: number;
@@ -916,11 +772,8 @@ interface RiskCell {
 // - Gradient intensity (green → yellow → red)
 // - Hover tooltips with metrics
 // - Time-based animation
-```
 
-### 7.3 Routing Configuration
-
-```typescript
+7.3 Routing Configuration
 // App.tsx
 <Switch>
   <Route path="/" component={Dashboard} />
@@ -940,11 +793,8 @@ interface RiskCell {
   <Route path="/airdrops" component={Airdrops} />
   <Route component={NotFound} />
 </Switch>
-```
 
-### 7.4 State Management
-
-```typescript
+7.4 State Management
 // TanStack Query for server state
 const { data: agents, isLoading } = useQuery({
   queryKey: ['/api/ultron/agents'],
@@ -955,15 +805,9 @@ const { messages, connectionStatus } = useWebSocket('/ws');
 
 // Local state for UI
 const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-```
 
----
-
-## 8. Database Schema
-
-### 8.1 Core Tables
-
-```typescript
+8. Database Schema
+8.1 Core Tables
 // shared/schema.ts
 
 // Users table
@@ -1060,11 +904,8 @@ export const alerts = pgTable('alerts', {
   enabled: boolean('enabled').default(true),
   createdAt: timestamp('created_at').defaultNow(),
 });
-```
 
-### 8.2 Entity Relationship Diagram
-
-```
+8.2 Entity Relationship Diagram
 ┌─────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │   users     │     │     agents      │     │ trading_signals │
 ├─────────────┤     ├─────────────────┤     ├─────────────────┤
@@ -1088,22 +929,14 @@ export const alerts = pgTable('alerts', {
                     │ parent_id       │     │ pnl             │
                     │ mutations       │     │ lessons_learned │
                     └─────────────────┘     └─────────────────┘
-```
 
----
-
-## 9. API Reference
-
-### 9.1 Core Endpoints
-
-#### System Status
-```http
+9. API Reference
+9.1 Core Endpoints
+System Status
 GET /api/status
-```
-Returns overall system health and agent status.
 
-#### Ultron System
-```http
+Returns overall system health and agent status.
+Ultron System
 GET /api/ultron/status
 GET /api/ultron/agents
 GET /api/ultron/leaderboard
@@ -1112,10 +945,8 @@ POST /api/ultron/debate
 POST /api/ultron/analyze
 POST /api/ultron/judge
 POST /api/ultron/simulate
-```
 
-#### Trading Village
-```http
+Trading Village
 GET /api/village/signals
 POST /api/village/signals
 GET /api/village/signals/:id
@@ -1123,73 +954,54 @@ POST /api/village/signals/:id/close
 GET /api/village/history
 GET /api/village/agents
 POST /api/village/debate
-```
 
-#### Agents
-```http
+Agents
 GET /api/agents
 GET /api/agents/:id
 GET /api/agents/:id/credits
 POST /api/agents/:id/evolve
-```
 
-#### Parliament
-```http
+Parliament
 GET /api/parliament/sessions
 POST /api/parliament/sessions
 GET /api/parliament/sessions/:id
 POST /api/parliament/sessions/:id/vote
 POST /api/parliament/sessions/:id/close
-```
 
-#### Backtesting
-```http
+Backtesting
 POST /api/backtest
 GET /api/backtest/results/:id
-```
 
-#### Stress Testing
-```http
+Stress Testing
 POST /api/stress/run
 GET /api/stress/scenarios
-```
 
-#### Wallets
-```http
+Wallets
 GET /api/wallets
 POST /api/wallets
 DELETE /api/wallets/:id
 GET /api/wallets/:id/positions
-```
 
-#### Insights
-```http
+Insights
 GET /api/insights
 GET /api/insights/patterns
 GET /api/insights/regime
-```
 
-#### ATP Integration
-```http
+ATP Integration
 GET /api/atp/status
 GET /api/atp/platform-agents
 POST /api/atp/agents
 GET /api/atp/contracts
-```
 
-### 9.2 Response Formats
-
-#### Success Response
-```json
+9.2 Response Formats
+Success Response
 {
   "success": true,
   "data": { ... },
   "timestamp": "2024-12-06T12:00:00Z"
 }
-```
 
-#### Error Response
-```json
+Error Response
 {
   "success": false,
   "error": {
@@ -1199,26 +1011,18 @@ GET /api/atp/contracts
   },
   "timestamp": "2024-12-06T12:00:00Z"
 }
-```
 
----
-
-## 10. Smart Contracts
-
-### 10.1 Deployed Contracts
-
+10. Smart Contracts
+10.1 Deployed Contracts
 | Contract | Network | Address | Purpose |
-|----------|---------|---------|---------|
+|---|---|---|---|
 | NeuroNetRegistry | Base Sepolia | Deployed | Agent registration |
 | MemoryVault | Base Sepolia | Deployed | Strategy storage |
 | AgentNFT | Base Sepolia | Deployed | Soulbound agent tokens |
 | NeuronBadge | Base Sepolia | Deployed | Achievement badges |
 | AgentRegistry | Fraxtal | Pending | ATP integration |
-
-### 10.2 Contract Interfaces
-
-#### NeuroNetRegistry.sol
-```solidity
+10.2 Contract Interfaces
+NeuroNetRegistry.sol
 interface INeuroNetRegistry {
     function registerAgent(
         string calldata agentId,
@@ -1235,10 +1039,8 @@ interface INeuroNetRegistry {
     function getAgent(string calldata agentId) 
         external view returns (AgentData memory);
 }
-```
 
-#### MemoryVault.sol
-```solidity
+MemoryVault.sol
 interface IMemoryVault {
     function recordDecision(
         address agent,
@@ -1253,24 +1055,16 @@ interface IMemoryVault {
     function getDecisionHistory(address agent) 
         external view returns (Decision[] memory);
 }
-```
 
----
-
-## 11. Design System
-
-### 11.1 Design Philosophy
-
-**Command Center Aesthetic**
-- **Sovereign**: User oversees powerful autonomous systems
-- **Precise**: Every element communicates technical information clearly
-- **Cinematic**: Motion and spatial design create immersive experience
-- **Confident**: Bold, decisive layouts
-
-### 11.2 Color System
-
-#### Light Mode
-```css
+11. Design System
+11.1 Design Philosophy
+Command Center Aesthetic
+ * Sovereign: User oversees powerful autonomous systems
+ * Precise: Every element communicates technical information clearly
+ * Cinematic: Motion and spatial design create immersive experience
+ * Confident: Bold, decisive layouts
+11.2 Color System
+Light Mode
 :root {
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
@@ -1283,10 +1077,8 @@ interface IMemoryVault {
   --accent: 210 40% 96.1%;
   --destructive: 0 84.2% 60.2%;
 }
-```
 
-#### Dark Mode
-```css
+Dark Mode
 .dark {
   --background: 222.2 84% 4.9%;
   --foreground: 210 40% 98%;
@@ -1298,55 +1090,41 @@ interface IMemoryVault {
   --muted: 217.2 32.6% 17.5%;
   --accent: 217.2 32.6% 17.5%;
 }
-```
 
-### 11.3 Typography
-
+11.3 Typography
 | Level | Font | Weight | Size | Use |
-|-------|------|--------|------|-----|
+|---|---|---|---|---|
 | Display | Space Grotesk | 700 | 4xl-5xl | Core titles |
 | Heading 1 | Space Grotesk | 500 | xl-2xl | Section headers |
 | Heading 2 | Space Grotesk | 500 | lg | Agent names |
 | Body | Inter | 400-500 | sm-base | Interface text |
 | Data | JetBrains Mono | 400 | xs-sm | Logs, addresses |
 | Micro | Inter | 500 | xs | Labels |
-
-### 11.4 Agent Color Coding
-
+11.4 Agent Color Coding
 | Agent | Primary Color | Accent | Meaning |
-|-------|---------------|--------|---------|
+|---|---|---|---|
 | Meta | Purple (#7C3AED) | Gold | Sovereignty, wisdom |
 | Scout | Cyan (#06B6D4) | Blue | Exploration, discovery |
 | Risk | Amber (#F59E0B) | Red | Caution, warning |
 | Execution | Emerald (#10B981) | Green | Success, action |
-
-### 11.5 Animation Guidelines
-
-**Core Visualization:**
-- Continuous subtle rotation (slow)
-- Pulsing glow effect
-- Orbital motion for sub-agents
-
-**Data Updates:**
-- Number counters animate on change
-- New logs fade in
-- Status changes scale briefly
-
-**Performance Rules:**
-- Use CSS transforms (translate, scale, rotate)
-- Limit simultaneous animations to 3-4
-- Respect prefers-reduced-motion
-
----
-
-## 12. Feature Specifications
-
-### 12.1 AI Insights Engine
-
+11.5 Animation Guidelines
+Core Visualization:
+ * Continuous subtle rotation (slow)
+ * Pulsing glow effect
+ * Orbital motion for sub-agents
+Data Updates:
+ * Number counters animate on change
+ * New logs fade in
+ * Status changes scale briefly
+Performance Rules:
+ * Use CSS transforms (translate, scale, rotate)
+ * Limit simultaneous animations to 3-4
+ * Respect prefers-reduced-motion
+12. Feature Specifications
+12.1 AI Insights Engine
 Detects 9 pattern types using technical indicators:
-
 | Pattern Type | Detection Method | Confidence Range |
-|--------------|------------------|------------------|
+|---|---|---|
 | momentum_shift | RSI + Volume analysis | 60-95% |
 | whale_accumulation | On-chain flow analysis | 70-90% |
 | volatility_cluster | Bollinger Band width | 65-85% |
@@ -1356,58 +1134,44 @@ Detects 9 pattern types using technical indicators:
 | liquidity_squeeze | Order book analysis | 70-95% |
 | correlation_movement | Cross-asset analysis | 60-80% |
 | support_resistance | Historical price levels | 75-95% |
-
-### 12.2 Evolution System
-
-**Mutation Types:**
-1. Personality shift
-2. Risk tolerance adjustment
-3. Strategy optimization
-4. Memory enhancement
-5. Response speed improvement
-6. Pattern recognition upgrade
-7. Confidence calibration
-8. Collaboration enhancement
-9. Specialization deepening
-10. Hybrid capability merge
-
-**Evolution Triggers:**
-- Credit score > 800
-- Success rate > 75%
-- 50+ successful decisions
-
-### 12.3 Parliament Governance
-
-**Voting Mechanism:**
-- Quorum: 60% of active agents
-- Weighted votes based on credit score
-- Debate period: 5 minutes
-- Vote period: 2 minutes
-
-**Session Types:**
-- Strategy approval
-- Risk threshold changes
-- Agent evolution proposals
-- Emergency actions
-
-### 12.4 Stress Testing Scenarios
-
+12.2 Evolution System
+Mutation Types:
+ * Personality shift
+ * Risk tolerance adjustment
+ * Strategy optimization
+ * Memory enhancement
+ * Response speed improvement
+ * Pattern recognition upgrade
+ * Confidence calibration
+ * Collaboration enhancement
+ * Specialization deepening
+ * Hybrid capability merge
+Evolution Triggers:
+ * Credit score > 800
+ * Success rate > 75%
+ * 50+ successful decisions
+12.3 Parliament Governance
+Voting Mechanism:
+ * Quorum: 60% of active agents
+ * Weighted votes based on credit score
+ * Debate period: 5 minutes
+ * Vote period: 2 minutes
+Session Types:
+ * Strategy approval
+ * Risk threshold changes
+ * Agent evolution proposals
+ * Emergency actions
+12.4 Stress Testing Scenarios
 | Scenario | Parameters | Impact Simulation |
-|----------|------------|-------------------|
+|---|---|---|
 | Flash Crash | -30% in 1 hour | Portfolio drawdown |
 | Liquidity Crisis | 80% TVL exit | Slippage impact |
 | Whale Dump | $100M sell | Price cascade |
 | Oracle Failure | Price freeze | Strategy impact |
 | Network Congestion | 1000 gwei gas | Execution delay |
 | Peg Deviation | 5% from peg | Stablecoin exposure |
-
----
-
-## 13. Security Architecture
-
-### 13.1 Security Layers
-
-```
+13. Security Architecture
+13.1 Security Layers
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              SECURITY LAYERS                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -1435,68 +1199,49 @@ Detects 9 pattern types using technical indicators:
 │  └── Complete audit logging                                                 │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-```
 
-### 13.2 Multi-Signature Requirements
-
+13.2 Multi-Signature Requirements
 | Action Type | Required Signatures | Timeout |
-|-------------|---------------------|---------|
+|---|---|---|
 | View-only | 0 | N/A |
 | Low-value trade (<$100) | 1 | Immediate |
 | Medium trade ($100-$10k) | 2 | 5 minutes |
 | High-value trade (>$10k) | 3 | 1 hour |
 | System parameter change | All signers | 24 hours |
-
-### 13.3 Safety Guardrails
-
-1. **Transaction limits**: Max $50k per trade
-2. **Daily limits**: Max $500k total
-3. **Slippage protection**: Max 3%
-4. **Gas caps**: Max 500 gwei
-5. **Cooldown periods**: 5 min between large trades
-6. **Emergency pause**: Instant system halt
-
----
-
-## 14. Performance Optimization
-
-### 14.1 Frontend Optimizations
-
+13.3 Safety Guardrails
+ * Transaction limits: Max $50k per trade
+ * Daily limits: Max $500k total
+ * Slippage protection: Max 3%
+ * Gas caps: Max 500 gwei
+ * Cooldown periods: 5 min between large trades
+ * Emergency pause: Instant system halt
+14. Performance Optimization
+14.1 Frontend Optimizations
 | Technique | Implementation | Impact |
-|-----------|---------------|--------|
+|---|---|---|
 | Code splitting | Dynamic imports | -40% initial load |
 | Lazy loading | Page-level splitting | -30% bundle size |
 | Memoization | React.memo, useMemo | -50% re-renders |
 | Virtual scrolling | For long lists | -80% DOM nodes |
 | Image optimization | WebP, lazy load | -60% image size |
 | Query caching | TanStack Query | -70% API calls |
-
-### 14.2 Backend Optimizations
-
+14.2 Backend Optimizations
 | Technique | Implementation | Impact |
-|-----------|---------------|--------|
+|---|---|---|
 | Connection pooling | Drizzle pools | -40% DB latency |
 | Query optimization | Indexed queries | -60% query time |
 | Response caching | Redis (planned) | -80% repeat calls |
 | Parallel execution | Promise.all | -50% cycle time |
 | WebSocket batching | Debounced updates | -70% messages |
-
-### 14.3 Blockchain Optimizations
-
+14.3 Blockchain Optimizations
 | Technique | Implementation | Impact |
-|-----------|---------------|--------|
+|---|---|---|
 | RPC caching | Local cache | -80% RPC calls |
 | Batch reads | Multicall | -60% read calls |
 | Gas estimation | Simulation | -20% gas costs |
 | MEV protection | Flashbots | -100% MEV loss |
-
----
-
-## 15. Deployment Architecture
-
-### 15.1 Production Deployment
-
-```
+15. Deployment Architecture
+15.1 Production Deployment
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          PRODUCTION ARCHITECTURE                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -1523,27 +1268,20 @@ Detects 9 pattern types using technical indicators:
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
-```
 
-### 15.2 Environment Variables
-
+15.2 Environment Variables
 | Variable | Purpose | Required |
-|----------|---------|----------|
+|---|---|---|
 | DATABASE_URL | PostgreSQL connection | Yes |
 | GOOGLE_GENERATIVE_AI_API_KEY | Gemini API | Yes |
 | OPENAI_API_KEY | GPT-5 API | Yes |
 | ANTHROPIC_API_KEY | Claude API | Optional |
 | STRIPE_SECRET_KEY | Payments | Optional |
 | SESSION_SECRET | Session encryption | Yes |
-
----
-
-## 16. Current Features
-
-### 16.1 Production Ready
-
+16. Current Features
+16.1 Production Ready
 | Feature | Status | Description |
-|---------|--------|-------------|
+|---|---|---|
 | 4-Core Agent System | Live | Scout, Risk, Execution, Meta agents |
 | ADK-TS Integration | Live | Full multi-agent workflow |
 | Multi-Chain Support | Live | Ethereum, Base, Fraxtal, Solana |
@@ -1559,112 +1297,88 @@ Detects 9 pattern types using technical indicators:
 | Evolution System | Live | Agent mutation & growth |
 | Trade History | Live | Full trade tracking |
 | Stress Testing | Live | Scenario simulation |
-
-### 16.2 In Development
-
+16.2 In Development
 | Feature | Progress | Target |
-|---------|----------|--------|
-| Agent Marketplace | 80% | Q1 2025 |
-| IQ Token Staking | 70% | Q1 2025 |
-| ATP Agent Tokenization | 60% | Q1 2025 |
-| Airdrop Tracker | 40% | Q2 2025 |
-
----
-
-## 17. Future Roadmap (2025-2026)
-
-### 17.1 Q1 2025 - Foundation Expansion
-
+|---|---|---|
+| Agent Marketplace | 80% | Q1 2026 |
+| IQ Token Staking | 70% | Q1 2026 |
+| ATP Agent Tokenization | 60% | Q1 2026 |
+| Airdrop Tracker | 40% | Q2 2026 |
+17. Future Roadmap (2026-2028)
+17.1 Q1 2026 - Foundation Expansion
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Agent Marketplace Launch** | Full agent rental economy with Stripe integration | P0 |
-| **IQ Token Integration** | Staking, rewards, and governance tokens | P0 |
-| **ATP Agent Tokenization** | Mint agents as NFTs on Fraxtal | P0 |
-| **Enhanced Backtesting** | Multi-year historical simulations | P1 |
-| **Mobile-Responsive UI** | Full tablet and mobile support | P1 |
-| **Email/SMS Alerts** | Real-time notification system | P1 |
-| **API Rate Limiting v2** | Advanced throttling and quotas | P2 |
-
-### 17.2 Q2 2025 - Intelligence Upgrade
-
+|---|---|---|
+| Agent Marketplace Launch | Full agent rental economy with Stripe integration | P0 |
+| IQ Token Integration | Staking, rewards, and governance tokens | P0 |
+| ATP Agent Tokenization | Mint agents as NFTs on Fraxtal | P0 |
+| Enhanced Backtesting | Multi-year historical simulations | P1 |
+| Mobile-Responsive UI | Full tablet and mobile support | P1 |
+| Email/SMS Alerts | Real-time notification system | P1 |
+| API Rate Limiting v2 | Advanced throttling and quotas | P2 |
+17.2 Q2 2026 - Intelligence Upgrade
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Airdrop Opportunity Engine** | AI-powered airdrop discovery and eligibility | P0 |
-| **Auto-Farming Tasks** | Automated on-chain interactions for eligibility | P0 |
-| **Sybil Detection Avoidance** | Smart strategies for legitimate participation | P1 |
-| **Social Sentiment Analysis** | Twitter/Discord/Telegram monitoring | P1 |
-| **News Event Detection** | Real-time news impact prediction | P1 |
-| **Cross-Protocol Arbitrage** | Multi-DEX opportunity detection | P2 |
-| **Predictive Analytics v2** | Enhanced ML pattern recognition | P2 |
-
-### 17.3 Q3 2025 - Autonomous Expansion
-
+|---|---|---|
+| Airdrop Opportunity Engine | AI-powered airdrop discovery and eligibility | P0 |
+| Auto-Farming Tasks | Automated on-chain interactions for eligibility | P0 |
+| Sybil Detection Avoidance | Smart strategies for legitimate participation | P1 |
+| Social Sentiment Analysis | Twitter/Discord/Telegram monitoring | P1 |
+| News Event Detection | Real-time news impact prediction | P1 |
+| Cross-Protocol Arbitrage | Multi-DEX opportunity detection | P2 |
+| Predictive Analytics v2 | Enhanced ML pattern recognition | P2 |
+17.3 Q3 2026 - Autonomous Expansion
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Cross-Chain Bridge Automation** | Automated asset movement | P0 |
-| **MEV Protection v2** | Advanced Flashbots integration | P0 |
-| **Liquid Staking Optimization** | Auto-stake management | P1 |
-| **Yield Farming Autopilot** | Automated farming strategies | P1 |
-| **Portfolio Rebalancing Bot** | Automated allocation adjustment | P1 |
-| **Risk-Adjusted Returns** | Dynamic risk scoring | P2 |
-| **Impermanent Loss Calculator** | Real-time IL tracking | P2 |
-
-### 17.4 Q4 2025 - Advanced Governance
-
+|---|---|---|
+| Cross-Chain Bridge Automation | Automated asset movement | P0 |
+| MEV Protection v2 | Advanced Flashbots integration | P0 |
+| Liquid Staking Optimization | Auto-stake management | P1 |
+| Yield Farming Autopilot | Automated farming strategies | P1 |
+| Portfolio Rebalancing Bot | Automated allocation adjustment | P1 |
+| Risk-Adjusted Returns | Dynamic risk scoring | P2 |
+| Impermanent Loss Calculator | Real-time IL tracking | P2 |
+17.4 Q4 2026 - Advanced Governance
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Multi-Protocol Governance** | Aave, Compound, Curve integration | P0 |
-| **DAO Voting Automation** | Automated governance participation | P0 |
-| **Treasury Management** | Protocol treasury optimization | P1 |
-| **Grant Proposal Assistance** | AI-written grant applications | P1 |
-| **Governance Analytics** | Voting pattern analysis | P2 |
-| **Proposal Impact Prediction** | Predict proposal outcomes | P2 |
-
-### 17.5 Q1 2026 - Next-Gen Features
-
+|---|---|---|
+| Multi-Protocol Governance | Aave, Compound, Curve integration | P0 |
+| DAO Voting Automation | Automated governance participation | P0 |
+| Treasury Management | Protocol treasury optimization | P1 |
+| Grant Proposal Assistance | AI-written grant applications | P1 |
+| Governance Analytics | Voting pattern analysis | P2 |
+| Proposal Impact Prediction | Predict proposal outcomes | P2 |
+17.5 Q1 2027 - Next-Gen Features
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Agent Breeding** | Create new agents from top performers | P0 |
-| **Decentralized Agent Network** | P2P agent communication | P0 |
-| **Zero-Knowledge Proofs** | Private trading signals | P1 |
-| **Layer 2 Native Deployment** | Deploy agents directly on L2s | P1 |
-| **Real-World Asset Integration** | RWA yield optimization | P1 |
-| **Prediction Markets** | Agent-powered predictions | P2 |
-
-### 17.6 Q2 2026 - Frontier Innovation
-
+|---|---|---|
+| Agent Breeding | Create new agents from top performers | P0 |
+| Decentralized Agent Network | P2P agent communication | P0 |
+| Zero-Knowledge Proofs | Private trading signals | P1 |
+| Layer 2 Native Deployment | Deploy agents directly on L2s | P1 |
+| Real-World Asset Integration | RWA yield optimization | P1 |
+| Prediction Markets | Agent-powered predictions | P2 |
+17.6 Q2 2027 - Frontier Innovation
 | Feature | Description | Priority |
-|---------|-------------|----------|
-| **Autonomous Agent Spawning** | Self-replicating successful agents | P0 |
-| **Inter-Agent Economy** | Agents trading with each other | P0 |
-| **Natural Language Commands** | Voice-controlled trading | P1 |
-| **VR/AR Dashboard** | Immersive trading interface | P1 |
-| **Quantum-Resistant Crypto** | Future-proof security | P2 |
-| **AI Model Fine-Tuning** | Custom-trained trading models | P2 |
-
----
-
-## 18. Appendices
-
-### 18.1 Glossary
-
+|---|---|---|
+| Autonomous Agent Spawning | Self-replicating successful agents | P0 |
+| Inter-Agent Economy | Agents trading with each other | P0 |
+| Natural Language Commands | Voice-controlled trading | P1 |
+| VR/AR Dashboard | Immersive trading interface | P1 |
+| Quantum-Resistant Crypto | Future-proof security | P2 |
+| AI Model Fine-Tuning | Custom-trained trading models | P2 |
+18. Appendices
+18.1 Glossary
 | Term | Definition |
-|------|------------|
-| **ADK-TS** | Agent Development Kit for TypeScript |
-| **ATP** | Agent Transfer Protocol - Fraxtal-based agent tokenization |
-| **Meta-Agent** | Central orchestrating agent that coordinates all others |
-| **Credit Economy** | Internal scoring system for agent performance |
-| **Memory Vault** | On-chain storage for learned strategies |
-| **Sentinel** | 24/7 monitoring system for anomaly detection |
-| **Parliament** | Multi-agent governance voting system |
-| **Evolution** | Agent mutation and improvement process |
-| **Ultron** | 3-layer hybrid AI architecture |
-| **Trading Village** | Collaborative 10-agent trading ecosystem |
-
-### 18.2 Error Codes
-
+|---|---|
+| ADK-TS | Agent Development Kit for TypeScript |
+| ATP | Agent Transfer Protocol - Fraxtal-based agent tokenization |
+| Meta-Agent | Central orchestrating agent that coordinates all others |
+| Credit Economy | Internal scoring system for agent performance |
+| Memory Vault | On-chain storage for learned strategies |
+| Sentinel | 24/7 monitoring system for anomaly detection |
+| Parliament | Multi-agent governance voting system |
+| Evolution | Agent mutation and improvement process |
+| Ultron | 3-layer hybrid AI architecture |
+| Trading Village | Collaborative 10-agent trading ecosystem |
+18.2 Error Codes
 | Code | Meaning | Resolution |
-|------|---------|------------|
+|---|---|---|
 | E001 | Agent not found | Check agent ID |
 | E002 | Insufficient credits | Wait for credit regeneration |
 | E003 | Risk threshold exceeded | Lower trade size |
@@ -1673,34 +1387,24 @@ Detects 9 pattern types using technical indicators:
 | E006 | Invalid signature | Reconnect wallet |
 | E007 | Simulation failed | Check market data |
 | E008 | WebSocket disconnected | Refresh page |
-
-### 18.3 Performance Benchmarks
-
+18.3 Performance Benchmarks
 | Metric | Target | Actual |
-|--------|--------|--------|
+|---|---|---|
 | Page Load Time | <2s | 1.8s |
 | API Response Time | <500ms | 420ms |
 | WebSocket Latency | <100ms | 85ms |
 | Agent Decision Time | <2s | 1.5s |
 | Database Query | <50ms | 35ms |
-
-### 18.4 Support & Resources
-
+18.4 Support & Resources
 | Resource | Link |
-|----------|------|
-| GitHub Repository | [NeuroNet Governor](https://github.com/neuronet) |
+|---|---|
+| GitHub Repository | NeuroNet Governor |
 | Documentation | This document |
-| API Reference | `/docs/API.md` |
-| Architecture | `/docs/ARCHITECTURE.md` |
-| Design Guidelines | `/design_guidelines.md` |
-
----
-
-**Document Version**: 2.0  
-**Last Updated**: December 2024  
-**Authors**: NeuroNet Development Team  
-**License**: MIT
-
----
-
-*This documentation is a living document and will be updated as new features are developed and the system evolves.*
+| API Reference | /docs/API.md |
+| Architecture | /docs/ARCHITECTURE.md |
+| Design Guidelines | /design_guidelines.md |
+Document Version: 2.0
+Last Updated: December 2025
+Authors: NeuroNet Development Team
+License: MIT
+This documentation is a living document and will be updated as new features are developed and the system evolves.
