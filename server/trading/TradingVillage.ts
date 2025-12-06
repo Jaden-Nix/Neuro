@@ -493,16 +493,44 @@ export class TradingVillage extends EventEmitter {
 
     signalsBySymbol.forEach((signals, symbol) => {
       if (signals.length > 1) {
-        const sorted = signals.sort((a, b) => b.confidence - a.confidence);
-        const winner = sorted[0];
+        const longs = signals.filter(s => s.direction === "long");
+        const shorts = signals.filter(s => s.direction === "short");
         
-        sorted.slice(1).forEach(loser => {
-          loser.status = "invalidated";
-          const claimKey = `${loser.symbol}-${loser.direction}`;
-          this.signalClaims.delete(claimKey);
-        });
-        
-        console.log(`[TradingVillage] Cleanup: Kept ${winner.direction} ${symbol} by ${winner.agentName}, invalidated ${signals.length - 1} conflicting signals`);
+        if (longs.length > 0 && shorts.length > 0) {
+          const bestLong = longs.sort((a, b) => b.confidence - a.confidence)[0];
+          const bestShort = shorts.sort((a, b) => b.confidence - a.confidence)[0];
+          
+          const winner = bestLong.confidence >= bestShort.confidence ? bestLong : bestShort;
+          const losingDirection = winner.direction === "long" ? shorts : longs;
+          
+          losingDirection.forEach(loser => {
+            loser.status = "invalidated";
+            const claimKey = `${loser.symbol}-${loser.direction}`;
+            this.signalClaims.delete(claimKey);
+          });
+          
+          const sameDirectionDupes = (winner.direction === "long" ? longs : shorts).filter(s => s.id !== winner.id);
+          sameDirectionDupes.forEach(dupe => {
+            if (dupe.createdAt > winner.createdAt) {
+              dupe.status = "invalidated";
+              const claimKey = `${dupe.symbol}-${dupe.direction}`;
+              this.signalClaims.delete(claimKey);
+            }
+          });
+          
+          console.log(`[TradingVillage] Cleanup: Kept ${winner.direction} ${symbol} by ${winner.agentName}, removed conflicting opposite-direction signals`);
+        } else if (longs.length > 1 || shorts.length > 1) {
+          const sameDir = longs.length > 1 ? longs : shorts;
+          const oldest = sameDir.sort((a, b) => a.createdAt - b.createdAt)[0];
+          
+          sameDir.filter(s => s.id !== oldest.id).forEach(newer => {
+            newer.status = "invalidated";
+            const claimKey = `${newer.symbol}-${newer.direction}`;
+            this.signalClaims.delete(claimKey);
+          });
+          
+          console.log(`[TradingVillage] Cleanup: Kept original ${oldest.direction} ${symbol} by ${oldest.agentName} (entry $${oldest.entry.toFixed(2)}), removed ${sameDir.length - 1} duplicate same-direction signals`);
+        }
       }
     });
 
