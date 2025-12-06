@@ -22,12 +22,15 @@ const allowlist = [
   "nanoid",
   "nodemailer",
   "openai",
+  "p-limit",
+  "p-retry",
   "passport",
   "passport-local",
   "stripe",
   "uuid",
   "ws",
   "xlsx",
+  "yocto-queue",
   "zod",
   "zod-validation-error",
 ];
@@ -58,6 +61,7 @@ async function buildAll() {
     minify: true,
     external: externals,
     logLevel: "info",
+    mainFields: ["main", "module"],
   });
 }
 
