@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import pLimit from "p-limit";
-import pRetry, { AbortError } from "p-retry";
+import { createLimit, retry, AbortError } from "../utils/async-utils";
 
 const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
@@ -19,8 +18,8 @@ const gemini = geminiApiKey ? new GoogleGenAI({
   ...(geminiBaseUrl && { httpOptions: { apiVersion: "", baseUrl: geminiBaseUrl } }),
 }) : null;
 
-const claudeLimit = pLimit(2);
-const geminiLimit = pLimit(2);
+const claudeLimit = createLimit(2);
+const geminiLimit = createLimit(2);
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error?.message || String(error);
@@ -76,7 +75,7 @@ export class HybridAIService {
     }
 
     return claudeLimit(() =>
-      pRetry(
+      retry(
         async () => {
           try {
             const message = await anthropic.messages.create({
@@ -114,7 +113,7 @@ export class HybridAIService {
     }
 
     return geminiLimit(() =>
-      pRetry(
+      retry(
         async () => {
           try {
             const response = await gemini.models.generateContent({

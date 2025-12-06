@@ -1,5 +1,4 @@
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry } from "../../utils/async-utils";
 
 export interface Protocol {
   id: string;
@@ -44,7 +43,7 @@ const DEFILLAMA_BASE_URL = "https://api.llama.fi";
 const YIELDS_BASE_URL = "https://yields.llama.fi";
 const CACHE_TTL = 300000;
 
-const rateLimiter = pLimit(3);
+const rateLimiter = createLimit(3);
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 function getCached<T>(key: string, ttl: number): T | null {
@@ -66,7 +65,7 @@ async function fetchWithRetry<T>(url: string, cacheKey: string, ttl: number = CA
   }
 
   return rateLimiter(() =>
-    pRetry(
+    retry(
       async () => {
         const response = await fetch(url, {
           headers: { 'Accept': 'application/json' },

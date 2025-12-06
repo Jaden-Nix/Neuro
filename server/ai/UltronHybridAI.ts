@@ -1,8 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
-import pLimit from "p-limit";
-import pRetry, { AbortError } from "p-retry";
+import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { EventEmitter } from "events";
 
 // AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
@@ -33,9 +32,9 @@ const openai = openaiApiKey ? new OpenAI({
   ...(openaiBaseUrl && { baseURL: openaiBaseUrl }),
 }) : null;
 
-const geminiLimit = pLimit(5);
-const openaiLimit = pLimit(2);
-const claudeLimit = pLimit(2);
+const geminiLimit = createLimit(5);
+const openaiLimit = createLimit(2);
+const claudeLimit = createLimit(2);
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error?.message || String(error);
@@ -154,7 +153,7 @@ export class UltronHybridAI extends EventEmitter {
     }
 
     return geminiLimit(() =>
-      pRetry(
+      retry(
         async () => {
           try {
             const response = await gemini.models.generateContent({
@@ -183,7 +182,7 @@ export class UltronHybridAI extends EventEmitter {
 
     if (this.isOpenAIReady && openai) {
       return openaiLimit(() =>
-        pRetry(
+        retry(
           async () => {
             try {
               // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
@@ -213,7 +212,7 @@ export class UltronHybridAI extends EventEmitter {
 
     if (this.isClaudeReady && anthropic) {
       return claudeLimit(() =>
-        pRetry(
+        retry(
           async () => {
             try {
               const message = await anthropic.messages.create({
@@ -241,7 +240,7 @@ export class UltronHybridAI extends EventEmitter {
     if (!anthropic) throw new Error("Claude not configured");
     
     return claudeLimit(() =>
-      pRetry(
+      retry(
         async () => {
           const message = await anthropic.messages.create({
             model: "claude-sonnet-4-5",

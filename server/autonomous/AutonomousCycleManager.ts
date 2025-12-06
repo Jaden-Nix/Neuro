@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
-import pRetry from "p-retry";
-import pLimit from "p-limit";
+import { createLimit, retry, type LimitFunction } from "../utils/async-utils";
 import { AgentOrchestrator } from "../agents/AgentOrchestrator";
 import type { NegotiationResult } from "@shared/schema";
 
@@ -36,7 +35,7 @@ export class AutonomousCycleManager extends EventEmitter {
   private config: CycleConfig;
   private cycleInterval?: NodeJS.Timeout;
   private isRunning: boolean = false;
-  private limiter: ReturnType<typeof pLimit>;
+  private limiter: LimitFunction;
   
   private metrics: CycleMetrics = {
     totalCycles: 0,
@@ -55,7 +54,7 @@ export class AutonomousCycleManager extends EventEmitter {
     super();
     this.orchestrator = orchestrator;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.limiter = pLimit(this.config.maxConcurrentCycles);
+    this.limiter = createLimit(this.config.maxConcurrentCycles);
   }
 
   public start(): void {
@@ -103,7 +102,7 @@ export class AutonomousCycleManager extends EventEmitter {
       this.metrics.totalCycles++;
 
       try {
-        const result = await pRetry(
+        const result = await retry(
           async () => {
             return await this.runSingleCycle();
           },
@@ -191,7 +190,7 @@ export class AutonomousCycleManager extends EventEmitter {
     }
 
     this.config = { ...this.config, ...newConfig };
-    this.limiter = pLimit(this.config.maxConcurrentCycles);
+    this.limiter = createLimit(this.config.maxConcurrentCycles);
 
     if (wasRunning) {
       this.start();

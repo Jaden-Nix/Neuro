@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
 import { marketDataService } from "../data/MarketDataService";
@@ -26,7 +25,7 @@ if (isAnthropicConfigured) {
   console.log("[TradingVillage] Anthropic AI not configured - signal generation will use fallbacks");
 }
 
-const rateLimiter = pLimit(2);
+const rateLimiter = createLimit(2);
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error?.message || String(error);
@@ -45,7 +44,7 @@ async function generateWithRetry(prompt: string, maxTokens: number = 1024): Prom
   }
   
   return rateLimiter(() =>
-    pRetry(
+    retry(
       async () => {
         try {
           const message = await anthropic.messages.create({

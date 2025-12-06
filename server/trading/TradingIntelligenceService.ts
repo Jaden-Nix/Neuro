@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry } from "../utils/async-utils";
 import { 
   TradingSignal, 
   TradeOutcome, 
@@ -44,7 +43,7 @@ const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GOOGLE_AI_API_KEY,
 });
 
-const limit = pLimit(2);
+const limit = createLimit(2);
 
 interface CandleData {
   timestamp: number;
@@ -1275,7 +1274,7 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
 
   private async callClaude(prompt: string): Promise<string> {
     return limit(() =>
-      pRetry(
+      retry(
         async () => {
           const message = await anthropic.messages.create({
             model: "claude-sonnet-4-5",
@@ -1300,7 +1299,7 @@ Provide a concise lesson (2-3 sentences) about what the AI should learn from thi
 
   private async callGemini(prompt: string): Promise<string> {
     return limit(() =>
-      pRetry(
+      retry(
         async () => {
           const response = await gemini.models.generateContent({
             model: "gemini-2.0-flash",

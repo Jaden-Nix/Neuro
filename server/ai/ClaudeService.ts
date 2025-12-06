@@ -1,7 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry } from "../utils/async-utils";
 import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 
 const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
@@ -15,7 +14,7 @@ const anthropic = claudeApiKey ? new Anthropic({
 
 const gemini = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
 
-const rateLimiter = pLimit(2);
+const rateLimiter = createLimit(2);
 
 function isRateLimitError(error: any): boolean {
   const errorMsg = error?.message || String(error);
@@ -80,7 +79,7 @@ async function queryClaudeWithRetry(
   
   return anthropicCircuitBreaker.execute(
     () => rateLimiter(() =>
-      pRetry(
+      retry(
         async () => {
           try {
             const message = await anthropic.messages.create({

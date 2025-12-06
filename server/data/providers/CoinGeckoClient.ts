@@ -1,5 +1,4 @@
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry } from "../../utils/async-utils";
 
 export interface OHLCCandle {
   timestamp: number;
@@ -42,7 +41,7 @@ const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
 const CACHE_TTL = 60000;
 const OHLC_CACHE_TTL = 300000;
 
-const rateLimiter = pLimit(5);
+const rateLimiter = createLimit(5);
 
 const cache = new Map<string, { data: any; timestamp: number }>();
 
@@ -65,7 +64,7 @@ async function fetchWithRetry<T>(url: string, cacheKey: string, ttl: number = CA
   }
 
   return rateLimiter(() =>
-    pRetry(
+    retry(
       async () => {
         const response = await fetch(url, {
           headers: {

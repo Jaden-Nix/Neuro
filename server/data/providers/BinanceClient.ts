@@ -1,5 +1,4 @@
-import pLimit from "p-limit";
-import pRetry from "p-retry";
+import { createLimit, retry } from "../../utils/async-utils";
 
 export interface Kline {
   openTime: number;
@@ -34,7 +33,7 @@ const BINANCE_BASE_URL = "https://api.binance.com/api/v3";
 const CACHE_TTL = 30000;
 const KLINE_CACHE_TTL = 60000;
 
-const rateLimiter = pLimit(5);
+const rateLimiter = createLimit(5);
 const cache = new Map<string, { data: any; timestamp: number }>();
 
 function getCached<T>(key: string, ttl: number): T | null {
@@ -56,7 +55,7 @@ async function fetchWithRetry<T>(url: string, cacheKey: string, ttl: number = CA
   }
 
   return rateLimiter(() =>
-    pRetry(
+    retry(
       async () => {
         const response = await fetch(url, {
           headers: { 'Accept': 'application/json' },
