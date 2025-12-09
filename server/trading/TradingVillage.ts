@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI } from "@google/genai";
 import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
@@ -8,8 +9,12 @@ import { villageSignals, villageAgents, agentBirths, tradeHistory } from "@share
 import type { InsertTradeHistory, SelectTradeHistory } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 
-// AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
-// Falls back to user's own API keys if Replit integrations aren't available
+// =============================================================================
+// MULTI-AI ARCHITECTURE: Gemini for chats/debates, Claude for deep reasoning
+// Uses Replit AI Integrations for consolidated billing (no API keys needed)
+// =============================================================================
+
+// Claude (Anthropic) - For CRITICAL decisions: signal analysis, risk evaluation
 const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 
@@ -18,11 +23,37 @@ const anthropic = claudeApiKey ? new Anthropic({
   ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
 }) : null;
 
-const isAnthropicConfigured = !!anthropic;
-if (isAnthropicConfigured) {
-  console.log("[TradingVillage] Anthropic AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
+// Gemini (Google) - For FAST operations: chats, debates, validations, thoughts
+const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
+
+const gemini = geminiApiKey ? new GoogleGenAI({
+  apiKey: geminiApiKey,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: geminiBaseUrl,
+  },
+}) : null;
+
+// Log AI configuration status
+const isClaudeConfigured = !!anthropic;
+const isGeminiConfigured = !!gemini;
+
+if (isClaudeConfigured) {
+  console.log("[TradingVillage] Claude AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
 } else {
-  console.log("[TradingVillage] Anthropic AI not configured - signal generation will use fallbacks");
+  console.log("[TradingVillage] Claude AI not configured - critical analysis will use fallbacks");
+}
+
+if (isGeminiConfigured) {
+  console.log("[TradingVillage] Gemini AI configured -", geminiBaseUrl ? "using Replit integrations" : "using user API key");
+} else {
+  console.log("[TradingVillage] Gemini AI not configured - chats/debates will use fallbacks");
+}
+
+const isAnyAIConfigured = isClaudeConfigured || isGeminiConfigured;
+if (!isAnyAIConfigured) {
+  console.warn("[TradingVillage] WARNING: No AI providers configured - agents will use template-based responses only!");
 }
 
 const rateLimiter = createLimit(2);
@@ -37,10 +68,54 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
-async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
+// Gemini for FAST operations: chats, debates, validations, general thoughts
+// Uses gemini-2.5-flash for speed and cost efficiency
+async function generateWithGemini(prompt: string): Promise<string> {
+  if (!gemini) {
+    // Fallback to Claude if Gemini not available
+    if (anthropic) {
+      return generateWithClaude(prompt, 512);
+    }
+    return "";
+  }
+  
+  return rateLimiter(() =>
+    retry(
+      async () => {
+        try {
+          const response = await gemini.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+          });
+          return response.text || "";
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            throw error;
+          }
+          const abortError = new Error(error?.message || "Gemini request failed");
+          (abortError as any).isAbortError = true;
+          throw abortError;
+        }
+      },
+      {
+        retries: 5,
+        minTimeout: 2000,
+        maxTimeout: 64000,
+        factor: 2,
+      }
+    )
+  );
+}
+
+// Claude for CRITICAL operations: signal identification, risk analysis, deep reasoning
+// Uses claude-sonnet-4-5 for maximum intelligence on important decisions
+async function generateWithClaude(prompt: string, maxTokens: number = 1024): Promise<string> {
   if (!anthropic) {
-    console.warn("[TradingVillage] Anthropic not configured, returning fallback response");
-    return ""; // Return empty string as fallback when AI is not configured
+    // Fallback to Gemini if Claude not available
+    if (gemini) {
+      return generateWithGemini(prompt);
+    }
+    return "";
   }
   
   return rateLimiter(() =>
@@ -56,10 +131,9 @@ async function generateWithRetry(prompt: string, maxTokens: number = 1024): Prom
           return content.type === "text" ? content.text : "";
         } catch (error: any) {
           if (isRateLimitError(error)) {
-            throw error; // Rethrow to trigger retry
+            throw error;
           }
-          // For non-rate-limit errors, create an abort error to stop retrying
-          const abortError = new Error(error?.message || "Request failed");
+          const abortError = new Error(error?.message || "Claude request failed");
           (abortError as any).isAbortError = true;
           throw abortError;
         }
@@ -72,6 +146,12 @@ async function generateWithRetry(prompt: string, maxTokens: number = 1024): Prom
       }
     )
   );
+}
+
+// Legacy function - routes to Gemini for fast chat/debate operations
+async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
+  // Chat/debate operations use Gemini for speed and cost efficiency
+  return generateWithGemini(prompt);
 }
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
@@ -1056,17 +1136,12 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     console.log(`[TradingVillage] ${symbol} price: $${basePrice.toFixed(2)} (${priceSource})`);
 
     try {
-      if (!anthropic) {
-        console.log("[TradingVillage] Anthropic not configured, using fallback signal generation");
-        throw new Error("Anthropic not configured - using fallback");
+      if (!isAnyAIConfigured) {
+        console.log("[TradingVillage] No AI configured, using fallback signal generation");
+        throw new Error("No AI configured - using fallback");
       }
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 400,
-        messages: [{
-          role: "user",
-          content: `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
+      const signalPrompt = `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
 Your specialty: ${agent.specialties.join(", ")}
 
 CRITICAL: The CURRENT LIVE price of ${symbol} is EXACTLY $${basePrice.toFixed(2)}. Do NOT use any other price from your training data. All your entry, stop loss, and take profit levels MUST be based on this current price of $${basePrice.toFixed(2)}.
@@ -1091,11 +1166,10 @@ Respond in this exact JSON format (no markdown):
 
 REMEMBER: Current price is $${basePrice.toFixed(2)}. Entry must be within 1% of this price.
 For ${direction}: SL should be ${(volatility * 100).toFixed(1)}% away from entry.
-TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
-        }]
-      });
+TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
 
-      const text = response.content[0].type === "text" ? response.content[0].text : "";
+      // CRITICAL: Signal generation uses Claude for maximum intelligence
+      const text = await generateWithClaude(signalPrompt, 400);
       
       let parsed;
       try {
@@ -1332,12 +1406,8 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
       }
 
       try {
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 150,
-          messages: [{
-            role: "user",
-            content: `You are ${validator.name}, a ${validator.role} (${validator.personality}).
+        // Use Gemini for fast validation chats (cost-efficient)
+        const validationPrompt = `You are ${validator.name}, a ${validator.role} (${validator.personality}).
 
 ${signal.agentName} proposed: ${signal.direction.toUpperCase()} ${signal.symbol}
 Entry: $${signal.entry.toFixed(2)} | SL: $${signal.stopLoss.toFixed(2)} | TP: $${signal.takeProfit1.toFixed(2)}
@@ -1345,11 +1415,9 @@ Reasoning: ${signal.reasoning}
 
 Do you agree? Reply with:
 - "AGREE: <brief reason>" or "DISAGREE: <brief reason>"
-Keep it under 20 words. Be direct.`
-          }]
-        });
+Keep it under 20 words. Be direct.`;
 
-        const text = response.content[0].type === "text" ? response.content[0].text : "";
+        const text = await generateWithGemini(validationPrompt);
         const agrees = text.toUpperCase().startsWith("AGREE");
 
         const validation = {
@@ -1529,16 +1597,11 @@ Keep it under 20 words. Be direct.`
 
     let evolution = "";
     
-    if (!anthropic) {
+    if (!isAnyAIConfigured) {
       evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}. Learning from experience.`;
     } else {
       try {
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 300,
-          messages: [{
-            role: "user",
-            content: `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
+        const evolutionPrompt = `You are ${agent.name}, a ${agent.role} AI trading agent evolving to generation ${agent.generation}.
           
 Your recent performance:
 - Win rate: ${(agent.winRate * 100).toFixed(1)}%
@@ -1554,11 +1617,10 @@ Evolution trigger: ${trigger}
 Describe your evolution in 2-3 sentences:
 1. What you learned from your mistakes
 2. What you're adopting from top performers
-3. Your new strategy focus`
-          }]
-        });
+3. Your new strategy focus`;
 
-        evolution = response.content[0].type === "text" ? response.content[0].text : "";
+        // Evolution is a chat/reflection task - use Gemini for speed
+        evolution = await generateWithGemini(evolutionPrompt);
       } catch (error) {
         console.error("[TradingVillage] Evolution AI call failed:", error);
         evolution = `Evolved to Gen ${agent.generation}: Adapting strategy based on ${trigger}.`;
@@ -2202,7 +2264,7 @@ Describe your evolution in 2-3 sentences:
   }
 
   private async generateWinAnalysis(agent: VillageAgent, signal: VillageTradeSignal, pnlPercent: number, exitReason: string): Promise<string> {
-    if (!anthropic) {
+    if (!isAnyAIConfigured) {
       return `Successful ${signal.direction} trade. Pattern ${signal.technicalAnalysis.pattern} validated at ${(signal.confidence * 100).toFixed(0)}% confidence.`;
     }
 
@@ -2222,13 +2284,8 @@ You just closed a WINNING trade:
 
 Briefly explain (2-3 sentences) what worked well and what this win teaches you about your strategy. Be specific about the pattern recognition.`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 200,
-        messages: [{ role: "user", content: prompt }]
-      });
-
-      return response.content[0].type === "text" ? response.content[0].text : "";
+      // Win analysis is a reflection/chat task - use Gemini for speed
+      return await generateWithGemini(prompt);
     } catch (error) {
       console.error("[TradingVillage] Win analysis AI call failed:", error);
       return `Strategy confirmed: ${signal.technicalAnalysis.pattern} pattern at ${(signal.confidence * 100).toFixed(0)}% confidence delivered ${pnlPercent.toFixed(2)}% return.`;
@@ -2236,7 +2293,7 @@ Briefly explain (2-3 sentences) what worked well and what this win teaches you a
   }
 
   private async generateLossAnalysis(agent: VillageAgent, signal: VillageTradeSignal, exitPrice: number, pnlPercent: number): Promise<string> {
-    if (!anthropic) {
+    if (!isAnyAIConfigured) {
       return `Stop loss hit. The ${signal.direction} signal at ${(signal.confidence * 100).toFixed(0)}% confidence did not hold. Reviewing ${signal.technicalAnalysis.pattern} pattern recognition.`;
     }
 
@@ -2260,13 +2317,8 @@ Analyze what went wrong (2-3 sentences). Be specific about:
 2. What you should have noticed differently
 3. How you'll adapt your strategy`;
 
-      const response = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 250,
-        messages: [{ role: "user", content: prompt }]
-      });
-
-      return response.content[0].type === "text" ? response.content[0].text : "";
+      // Loss analysis is a reflection/chat task - use Gemini for speed
+      return await generateWithGemini(prompt);
     } catch (error) {
       console.error("[TradingVillage] Loss analysis AI call failed:", error);
       return `Stop loss hit at $${exitPrice.toFixed(2)}. The ${signal.direction} signal based on ${signal.technicalAnalysis.pattern} at ${(signal.confidence * 100).toFixed(0)}% confidence failed. Need to recalibrate pattern recognition for ${signal.symbol}.`;
@@ -2328,7 +2380,7 @@ Analyze what went wrong (2-3 sentences). Be specific about:
     const losingPatterns = losses.map(t => t.technicalAnalysis?.pattern).filter(Boolean);
 
     try {
-      if (anthropic) {
+      if (isAnyAIConfigured) {
         const prompt = `You are ${agent.name}, a ${agent.role} AI trading agent with a ${agent.personality} personality.
 
 Review your recent trade history and share your learnings with the village:
@@ -2356,13 +2408,8 @@ Write a brief reflection (2-3 sentences) sharing:
 
 Stay in character as ${agent.name} with your ${agent.personality} trading style.`;
 
-        const response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5",
-          max_tokens: 250,
-          messages: [{ role: "user", content: prompt }]
-        });
-
-        const reflection = response.content[0].type === "text" ? response.content[0].text : "";
+        // Trade review is a reflection/chat task - use Gemini for speed
+        const reflection = await generateWithGemini(prompt);
 
         this.addThought(agentId, "learning",
           `TRADE REVIEW: ${reflection}`,
