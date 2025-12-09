@@ -6,13 +6,20 @@ import { anthropicCircuitBreaker } from "../utils/circuitBreaker";
 const claudeApiKey = process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 const claudeBaseUrl = process.env.AI_INTEGRATIONS_ANTHROPIC_BASE_URL;
 const geminiApiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL;
 
 const anthropic = claudeApiKey ? new Anthropic({
   apiKey: claudeApiKey,
   ...(claudeBaseUrl && { baseURL: claudeBaseUrl }),
 }) : null;
 
-const gemini = geminiApiKey ? new GoogleGenAI({ apiKey: geminiApiKey }) : null;
+const gemini = geminiApiKey ? new GoogleGenAI({
+  apiKey: geminiApiKey,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: geminiBaseUrl,
+  },
+}) : null;
 
 const rateLimiter = createLimit(2);
 
