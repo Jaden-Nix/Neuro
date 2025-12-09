@@ -1055,12 +1055,12 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     
     console.log(`[TradingVillage] ${symbol} price: $${basePrice.toFixed(2)} (${priceSource})`);
 
-    if (!anthropic) {
-      console.warn("[TradingVillage] Anthropic not configured, using fallback signal generation");
-      throw new Error("Anthropic not configured");
-    }
-
     try {
+      if (!anthropic) {
+        console.log("[TradingVillage] Anthropic not configured, using fallback signal generation");
+        throw new Error("Anthropic not configured - using fallback");
+      }
+
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
         max_tokens: 400,

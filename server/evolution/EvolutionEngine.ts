@@ -218,12 +218,34 @@ export class EvolutionEngine {
   
   constructor() {
     this.initializeMutationStats();
-    // Removed seeded evolution - agents now evolve based on real performance only
+    // Seed core agents for evolution
+    this.seedCoreAgents();
     
     setTimeout(() => {
       this.startAutoEvolution();
-      console.log('[Evolution] Auto-evolution enabled - agents will self-heal and adapt (no seeded data)');
+      console.log('[Evolution] Auto-evolution enabled - agents will self-heal and adapt');
     }, 5000);
+  }
+
+  private seedCoreAgents(): void {
+    const coreAgents = [
+      { name: 'Sentinel', performance: 75 },
+      { name: 'Scout', performance: 65 },
+      { name: 'Risk', performance: 70 },
+      { name: 'Execution', performance: 68 },
+      { name: 'Meta', performance: 72 },
+      { name: 'AlphaHunter', performance: 60 },
+      { name: 'TrendFollower', performance: 62 },
+      { name: 'Contrarian', performance: 58 },
+      { name: 'SwingTrader', performance: 64 },
+      { name: 'Scalper', performance: 55 }
+    ];
+
+    for (const agent of coreAgents) {
+      this.initializeBaseAgent(agent.name, agent.performance);
+    }
+
+    console.log(`[Evolution] Seeded ${coreAgents.length} core agents for evolution`);
   }
 
   onEvolution(callback: EvolutionEventCallback): () => void {
