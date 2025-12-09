@@ -581,8 +581,64 @@ export class TradingVillage extends EventEmitter {
     }
   }
 
+  // ============================================================================
+  // 2FA PRICE VALIDATION: Second layer of validation before saving to database
+  // Prevents hallucinated prices like RUNE $115 (actual: $0.7) from ever being saved
+  // ============================================================================
+  private async validateSignalPrices(signal: VillageTradeSignal): Promise<{ valid: boolean; livePrice: number; deviation: number }> {
+    const STRICT_TOLERANCE = 0.05; // 5% max deviation
+    
+    try {
+      // Re-fetch live price at save time (independent verification)
+      let livePrice = 0;
+      try {
+        const snapshot = await marketDataService.getMarketSnapshot(`${signal.symbol}USDT`);
+        if (snapshot.price > 0) livePrice = snapshot.price;
+      } catch {
+        try {
+          livePrice = await marketDataService.getCurrentPrice(signal.symbol);
+        } catch {
+          // If we can't get live price, allow save but log warning
+          console.warn(`[2FA] Cannot verify ${signal.symbol} price - market data unavailable`);
+          return { valid: true, livePrice: signal.entry, deviation: 0 };
+        }
+      }
+      
+      if (livePrice <= 0) {
+        console.warn(`[2FA] Invalid live price for ${signal.symbol}, allowing save`);
+        return { valid: true, livePrice: signal.entry, deviation: 0 };
+      }
+      
+      const deviation = Math.abs(signal.entry - livePrice) / livePrice;
+      const valid = deviation <= STRICT_TOLERANCE;
+      
+      if (!valid) {
+        console.error(`[2FA] REJECTED SIGNAL ${signal.id}: Entry $${signal.entry.toFixed(4)} deviates ${(deviation * 100).toFixed(1)}% from live $${livePrice.toFixed(4)}`);
+      } else {
+        console.log(`[2FA] VALIDATED ${signal.symbol}: Entry $${signal.entry.toFixed(4)} within ${(deviation * 100).toFixed(1)}% of live $${livePrice.toFixed(4)}`);
+      }
+      
+      return { valid, livePrice, deviation };
+    } catch (error) {
+      console.error("[2FA] Validation error:", error);
+      return { valid: true, livePrice: signal.entry, deviation: 0 }; // Allow on error
+    }
+  }
+
   private async saveSignalToDB(signal: VillageTradeSignal) {
     try {
+      // 2FA: Second validation layer before saving
+      const validation = await this.validateSignalPrices(signal);
+      
+      if (!validation.valid) {
+        console.error(`[TradingVillage] BLOCKED signal ${signal.id} - failed 2FA price validation (${(validation.deviation * 100).toFixed(1)}% deviation)`);
+        // Mark as rejected instead of saving with bad prices
+        signal.status = "rejected";
+        signal.reasoning = `REJECTED: Price validation failed. Entry $${signal.entry.toFixed(4)} deviates ${(validation.deviation * 100).toFixed(1)}% from live price $${validation.livePrice.toFixed(4)}`;
+        this.emit("signalRejected", { signal, reason: "price_validation_failed", deviation: validation.deviation });
+        return;
+      }
+      
       await db.insert(villageSignals).values({
         id: signal.id,
         agentId: signal.agentId,
@@ -604,7 +660,7 @@ export class TradingVillage extends EventEmitter {
         status: signal.status,
         validators: signal.validators,
       }).onConflictDoNothing();
-      console.log(`[TradingVillage] Saved signal ${signal.id} to database`);
+      console.log(`[TradingVillage] Saved signal ${signal.id} to database (2FA passed)`);
     } catch (error) {
       console.error("[TradingVillage] Failed to save signal to DB:", error);
     }
@@ -1197,12 +1253,14 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     direction: "long" | "short", 
     confidence: number
   ): Promise<VillageTradeSignal | null> {
+    // IMPORTANT: Fallback prices are ONLY used if live data fails. Keep these updated!
+    // Last updated: Dec 2024 - RUNE fixed from $5.0 to $0.70 (was causing hallucination bugs)
     const fallbackPrices: Record<string, number> = {
-      BTC: 92000, ETH: 3180, SOL: 145, AVAX: 38, LINK: 24, ARB: 0.75, OP: 1.80, SUI: 3.60,
-      DOGE: 0.32, PEPE: 0.000018, XRP: 2.35, ADA: 1.05, DOT: 7.5, MATIC: 0.52, ATOM: 9.5, UNI: 14,
-      AAVE: 193, LDO: 2.0, CRV: 0.55, MKR: 1800, SNX: 2.5, COMP: 65, INJ: 22, TIA: 5.5,
-      SEI: 0.45, APT: 12, NEAR: 5.5, FTM: 0.75, RUNE: 5.0, RENDER: 8.5, FET: 1.8, TAO: 450,
-      WIF: 2.5, BONK: 0.000025, JUP: 0.85, PYTH: 0.45, W: 0.35, STRK: 0.55, MANTA: 1.2, DYM: 2.5
+      BTC: 100000, ETH: 3800, SOL: 220, AVAX: 50, LINK: 28, ARB: 0.95, OP: 2.20, SUI: 4.50,
+      DOGE: 0.42, PEPE: 0.000022, XRP: 2.40, ADA: 1.10, DOT: 9.0, MATIC: 0.55, ATOM: 11.0, UNI: 16,
+      AAVE: 350, LDO: 2.2, CRV: 1.10, MKR: 2000, SNX: 3.0, COMP: 90, INJ: 28, TIA: 7.0,
+      SEI: 0.55, APT: 13, NEAR: 7.0, FTM: 1.0, RUNE: 0.70, RENDER: 10.0, FET: 2.2, TAO: 550,
+      WIF: 3.0, BONK: 0.00004, JUP: 1.0, PYTH: 0.55, W: 0.40, STRK: 0.65, MANTA: 1.5, DYM: 3.0
     };
     
     let basePrice = fallbackPrices[symbol] || 100;
@@ -1290,9 +1348,11 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
       
       let entry = safeNum(parsed.entry, defaultEntry);
       
+      // STRICT PRICE VALIDATION (5% max tolerance - prevents hallucinated prices like RUNE $115)
+      const PRICE_TOLERANCE = 0.05; // 5% maximum deviation from live price
       const priceDiff = Math.abs(entry - basePrice) / basePrice;
-      if (priceDiff > 0.20) {
-        console.warn(`[TradingVillage] AI returned wrong price $${entry.toFixed(2)} vs actual $${basePrice.toFixed(2)}, using corrected price`);
+      if (priceDiff > PRICE_TOLERANCE) {
+        console.warn(`[TradingVillage] PRICE VALIDATION FAILED: AI returned $${entry.toFixed(4)} vs live $${basePrice.toFixed(4)} (${(priceDiff * 100).toFixed(1)}% deviation > ${PRICE_TOLERANCE * 100}% max)`);
         entry = defaultEntry;
       }
       
@@ -1304,10 +1364,11 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
       const entryToSLRatio = Math.abs(entry - stopLoss) / entry;
       const entryToTP1Ratio = Math.abs(tp1 - entry) / entry;
       
-      const correctedSL = (priceDiff > 0.20 || entryToSLRatio > 0.15) ? defaultSl : stopLoss;
-      const correctedTP1 = (priceDiff > 0.20 || entryToTP1Ratio > 0.30) ? defaultTp1 : tp1;
-      const correctedTP2 = (priceDiff > 0.20) ? defaultTp2 : tp2;
-      const correctedTP3 = (priceDiff > 0.20) ? defaultTp3 : tp3;
+      // STRICT validation: 5% max deviation triggers corrections
+      const correctedSL = (priceDiff > PRICE_TOLERANCE || entryToSLRatio > 0.15) ? defaultSl : stopLoss;
+      const correctedTP1 = (priceDiff > PRICE_TOLERANCE || entryToTP1Ratio > 0.30) ? defaultTp1 : tp1;
+      const correctedTP2 = (priceDiff > PRICE_TOLERANCE) ? defaultTp2 : tp2;
+      const correctedTP3 = (priceDiff > PRICE_TOLERANCE) ? defaultTp3 : tp3;
       
       const rrDenom = Math.abs(entry - correctedSL);
       const riskReward = rrDenom > 0 ? Math.abs(correctedTP2 - entry) / rrDenom : 2.0;
