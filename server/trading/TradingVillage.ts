@@ -1170,11 +1170,48 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     const claimKey = `${symbol}-${direction}`;
     const oppositeDirection = direction === "long" ? "short" : "long";
     const oppositeKey = `${symbol}-${oppositeDirection}`;
+    const agent = this.agents.get(agentId);
+
+    // CRITICAL: Check for ACTIVE signals in tradeSignals first - this is the source of truth
+    // Once a signal is ACTIVE, we DO NOT allow flip-flopping to opposite direction
+    const activeOppositeSignal = this.tradeSignals.find(s => 
+      s.symbol === symbol && 
+      s.direction === oppositeDirection && 
+      s.status === "active"
+    );
+    
+    if (activeOppositeSignal) {
+      console.log(`[TradingVillage] BLOCKED: ${symbol} ${direction} rejected - ACTIVE ${oppositeDirection} signal exists (no flip-flopping)`);
+      if (agent) {
+        this.addThought(agentId, "challenge",
+          `Cannot call ${direction} on ${symbol}. Village is committed to ${oppositeDirection} by @${activeOppositeSignal.agentName}. No flip-flopping on active positions.`,
+          { symbol, direction, blockedBy: activeOppositeSignal.id }
+        );
+      }
+      return false;
+    }
+
+    // Check for existing active/pending signal in SAME direction - avoid duplicates
+    const existingSameSignal = this.tradeSignals.find(s => 
+      s.symbol === symbol && 
+      s.direction === direction && 
+      (s.status === "active" || s.status === "pending")
+    );
+    
+    if (existingSameSignal) {
+      console.log(`[TradingVillage] BLOCKED: Duplicate ${symbol} ${direction} - already exists from ${existingSameSignal.agentName}`);
+      if (agent) {
+        this.addThought(agentId, "observation",
+          `My ${direction} ${symbol} duplicates @${existingSameSignal.agentName}'s existing call. Withdrawing.`,
+          { symbol, direction, duplicateOf: existingSameSignal.id }
+        );
+      }
+      return false;
+    }
 
     if (this.signalClaims.has(claimKey)) {
       const existingClaim = this.signalClaims.get(claimKey)!;
       if (Date.now() - existingClaim.claimedAt < 3600000) {
-        const agent = this.agents.get(agentId);
         const claimer = this.agents.get(existingClaim.claimedBy);
         if (agent && claimer) {
           this.addThought(agentId, "competition",
@@ -1188,27 +1225,32 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
       }
     }
 
+    // Check for PENDING opposite signal - only allow override with significantly higher confidence
     if (this.signalClaims.has(oppositeKey)) {
       const opposingClaim = this.signalClaims.get(oppositeKey)!;
       if (Date.now() - opposingClaim.claimedAt < 3600000) {
-        const agent = this.agents.get(agentId);
         const opposer = this.agents.get(opposingClaim.claimedBy);
         if (agent && opposer) {
-          if (confidence > opposingClaim.confidence + 0.1) {
-            console.log(`[TradingVillage] ${agent.name}'s ${direction} signal (${(confidence*100).toFixed(0)}%) overrides ${opposer.name}'s ${oppositeDirection} (${(opposingClaim.confidence*100).toFixed(0)}%)`);
+          // Require much higher confidence (+15%) to override a pending opposite signal
+          if (confidence > opposingClaim.confidence + 0.15) {
+            console.log(`[TradingVillage] ${agent.name}'s ${direction} signal (${(confidence*100).toFixed(0)}%) overrides PENDING ${opposer.name}'s ${oppositeDirection} (${(opposingClaim.confidence*100).toFixed(0)}%)`);
             this.signalClaims.delete(oppositeKey);
-            this.tradeSignals = this.tradeSignals.filter(s => 
-              !(s.symbol === symbol && s.direction === oppositeDirection && s.status === "active")
-            );
+            // Mark the pending opposite signal as invalidated
+            this.tradeSignals = this.tradeSignals.map(s => {
+              if (s.symbol === symbol && s.direction === oppositeDirection && s.status === "pending") {
+                s.status = "invalidated";
+              }
+              return s;
+            });
             this.addThought(agentId, "challenge",
-              `Overriding @${opposer.name}'s ${oppositeDirection} ${symbol} call. My ${direction} analysis has stronger conviction at ${(confidence*100).toFixed(0)}%.`,
+              `Overriding @${opposer.name}'s pending ${oppositeDirection} ${symbol} call. My ${direction} analysis has significantly stronger conviction at ${(confidence*100).toFixed(0)}%.`,
               { symbol, direction, overriding: opposer.name },
               undefined,
               [opposingClaim.claimedBy]
             );
           } else {
             this.addThought(agentId, "disagreement",
-              `I see ${symbol} ${direction}, but @${opposer.name} already called ${oppositeDirection}. Their conviction is similar - deferring.`,
+              `I see ${symbol} ${direction}, but @${opposer.name} already called ${oppositeDirection}. Not confident enough to override - deferring.`,
               { symbol, direction, existingDirection: oppositeDirection },
               undefined,
               [opposingClaim.claimedBy]
@@ -1230,7 +1272,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
 
     this.signalClaims.set(claimKey, claim);
 
-    const agent = this.agents.get(agentId);
+    // agent already defined at start of function
     if (agent) {
       agent.creditScore += 10;
       
@@ -1495,6 +1537,9 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
       return;
     }
 
+    // Note: Conflict blocking is now handled in claimSignal BEFORE signal creation
+    // This function only handles the validation voting process
+    
     const validators = Array.from(this.agents.values())
       .filter(a => a.id !== signal.agentId && (a.role === "analyst" || a.role === "strategist" || a.role === "sentinel"))
       .slice(0, 3);
@@ -1508,7 +1553,7 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
 
       if (!anthropic) {
         const fallbackAgrees = Math.random() > 0.3;
-        // Generate more detailed fallback validation comments based on agent personality and signal details
+        
         let fallbackComment: string;
         if (fallbackAgrees) {
           const agreeReasons = [
@@ -1538,7 +1583,6 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
         };
         storedSignal.validators.push(validation);
         
-        // Add thought to stream so users can see the validation reasoning
         const thoughtType: ThoughtType = fallbackAgrees ? "agreement" : "challenge";
         this.addThought(validator.id, thoughtType,
           `@${signal.agentName}'s ${signal.symbol} ${signal.direction}: ${fallbackComment}`,
@@ -1547,7 +1591,6 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
           [signal.agentId]
         );
         
-        // Update relationship based on validation
         const relationship = validator.relationships[signal.agentId];
         if (relationship) {
           if (fallbackAgrees) {
@@ -1562,7 +1605,6 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`;
       }
 
       try {
-        // Use Gemini for fast validation chats (cost-efficient)
         const validationPrompt = `You are ${validator.name}, a ${validator.role} (${validator.personality}).
 
 ${signal.agentName} proposed: ${signal.direction.toUpperCase()} ${signal.symbol}
