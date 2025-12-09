@@ -8,6 +8,190 @@ The system operates 24/7, scanning cryptocurrency markets, evaluating risks, and
 
 ---
 
+## ADK-TS Integration (IQ.ai Agent Development Kit)
+
+### How We Used ADK-TS for This Hackathon
+
+NeuroNet Governor is built on top of **@iqai/adk (ADK-TS)** - the Agent Development Kit from IQ.ai. This TypeScript SDK provides the foundation for our multi-agent system, enabling sophisticated AI agent orchestration and inter-agent communication.
+
+### ADK-TS Implementation Details
+
+We implemented ADK-TS across three core integration layers:
+
+#### 1. RealADKAgent (`server/adk/RealADKAgent.ts`)
+
+The primary ADK-TS integration using the `AgentBuilder` pattern from @iqai/adk:
+
+```typescript
+import { AgentBuilder } from '@iqai/adk';
+
+// Scout Agent using ADK-TS AgentBuilder
+const response = await AgentBuilder
+  .withModel('gemini-2.5-flash')  // or 'gpt-4o', 'claude-sonnet-4-5'
+  .withInstruction(`You are SCOUT, an elite DeFi opportunity scanner.
+    Analyze market data and identify trading opportunities.
+    ALWAYS respond with valid JSON containing:
+    {
+      "action": "BUY" or "SELL" or "HOLD",
+      "symbol": "BTC/USD",
+      "direction": "long" or "short",
+      "confidence": 0-100,
+      "entryPrice": number,
+      "stopLoss": number,
+      "takeProfit1": number,
+      "takeProfit2": number,
+      "reasoning": "detailed analysis",
+      "riskScore": 0-100
+    }`)
+  .ask(`Analyze this market data for ${symbol}:
+    - Current Price: $${currentPrice}
+    - 24h Change: ${priceChange24h}%`);
+```
+
+**Key Features Used:**
+- `AgentBuilder.withModel()` - Dynamic model selection (Gemini, GPT, Claude)
+- `AgentBuilder.withInstruction()` - Custom agent personality and behavior
+- `AgentBuilder.ask()` - Natural language queries with structured JSON responses
+- Multi-provider support with automatic fallback
+
+#### 2. ADKIntegration (`server/adk/ADKIntegration.ts`)
+
+Extended ADK pattern for multi-agent workflows with event-driven architecture:
+
+```typescript
+export class ADKIntegration extends EventEmitter {
+  // Pre-configured agents with distinct personalities
+  private agents: Map<string, ADKAgentConfig> = new Map([
+    ['neuronet_scout', { 
+      type: AgentType.SCOUT, 
+      model: 'gemini-2.5-flash',
+      personality: ['curious', 'energetic', 'analytical']
+    }],
+    ['neuronet_risk', { 
+      type: AgentType.RISK, 
+      model: 'claude-sonnet-4-5',
+      personality: ['cautious', 'formal', 'thorough']
+    }],
+    ['neuronet_execution', { 
+      type: AgentType.EXECUTION, 
+      model: 'gemini-2.5-flash',
+      personality: ['precise', 'cold', 'efficient']
+    }],
+    ['neuronet_meta', { 
+      type: AgentType.META, 
+      model: 'claude-sonnet-4-5',
+      personality: ['sovereign', 'calm', 'strategic']
+    }]
+  ]);
+
+  // Multi-agent workflow execution
+  async runMultiAgentWorkflow(input: Record<string, unknown>): Promise<ADKDecision[]> {
+    // Scout -> Risk -> Execution -> Meta pipeline
+    const scoutDecision = await this.queryAgent('neuronet_scout', 'Analyze market...', input);
+    const riskDecision = await this.queryAgent('neuronet_risk', 'Evaluate risk...', { ...input, scoutAnalysis: scoutDecision.data });
+    const executionDecision = await this.queryAgent('neuronet_execution', 'Plan execution...', { ...input, riskAssessment: riskDecision.data });
+    const metaDecision = await this.queryAgent('neuronet_meta', 'Final decision...', { ...input, allAgentData });
+    
+    this.emit('workflowCompleted', { decisions: [scoutDecision, riskDecision, executionDecision, metaDecision] });
+    return decisions;
+  }
+}
+```
+
+**ADK Patterns Implemented:**
+- Event-driven agent communication (`emit('decisionMade', decision)`)
+- Agent registry with typed configurations
+- Workflow orchestration with data passing between agents
+- Confidence scoring and structured decision objects
+
+#### 3. Full ADK Workflow (`runFullWorkflow`)
+
+Complete trading signal generation using ADK-TS:
+
+```typescript
+async runFullWorkflow(marketData: MarketData): Promise<WorkflowResult> {
+  console.log(`[ADK-TS] Running full workflow for ${marketData.symbol}...`);
+
+  // Step 1: Scout analysis using ADK AgentBuilder
+  const signal = await this.scoutAnalysis(marketData);
+  console.log(`[ADK-TS] Scout: ${signal.action} ${signal.symbol} @ ${signal.confidence}% confidence`);
+
+  // Step 2: Risk assessment using ADK AgentBuilder
+  const riskResult = await this.riskAssessment(signal);
+  console.log(`[ADK-TS] Risk: ${riskResult.approved ? 'APPROVED' : 'REJECTED'}`);
+
+  // Step 3: Meta orchestration using ADK AgentBuilder
+  const finalDecision = await this.metaOrchestration(signal, riskResult);
+  console.log(`[ADK-TS] Meta: ${finalDecision.finalDecision}`);
+
+  return { signal, riskAssessment: riskResult, finalDecision, provider: this.model };
+}
+```
+
+### Why We Chose ADK-TS
+
+1. **Multi-Model Support**: ADK-TS allows seamless switching between AI providers (Gemini, OpenAI, Claude) with a unified API
+2. **AgentBuilder Pattern**: Clean, fluent API for defining agent behavior and instructions
+3. **TypeScript Native**: Full type safety for agent configurations and responses
+4. **Structured Outputs**: Built-in support for JSON-formatted agent responses
+5. **Production Ready**: Reliable error handling and fallback mechanisms
+
+### ADK-TS Agent Configurations
+
+Each of our four agents uses ADK-TS with specific model assignments optimized for their roles:
+
+| Agent | ADK Model | Purpose |
+|-------|-----------|---------|
+| Scout | `gemini-2.5-flash` | Fast market scanning (speed-optimized) |
+| Risk | `claude-sonnet-4-5` | Deep risk analysis (reasoning-optimized) |
+| Execution | `gemini-2.5-flash` | Quick transaction planning (speed-optimized) |
+| Meta | `claude-sonnet-4-5` | Strategic decisions (reasoning-optimized) |
+
+### ADK-TS Workflow Output
+
+Example output from the ADK-TS multi-agent workflow:
+
+```json
+{
+  "signal": {
+    "action": "BUY",
+    "symbol": "ETH/USD",
+    "direction": "long",
+    "confidence": 78,
+    "entryPrice": 3450.00,
+    "stopLoss": 3346.50,
+    "takeProfit1": 3553.50,
+    "takeProfit2": 3657.00,
+    "reasoning": "RSI oversold recovery with increasing volume"
+  },
+  "riskAssessment": {
+    "approved": true,
+    "adjustedRiskScore": 35,
+    "maxPositionSize": "5%",
+    "warnings": []
+  },
+  "finalDecision": {
+    "finalDecision": "EXECUTE",
+    "confidence": 82,
+    "tradingCall": { ... },
+    "reasoning": "All agent consensus positive. Risk-adjusted return favorable."
+  },
+  "provider": "gemini-2.5-flash"
+}
+```
+
+### Key Innovation: Hybrid ADK Architecture
+
+We extended ADK-TS beyond standard usage by implementing:
+
+1. **Provider Fallback Chain**: If primary AI fails, automatically falls to next provider
+2. **Agent-Specific Model Routing**: Different agents use different AI models based on their needs
+3. **Intelligent Fallback Decisions**: When AI is unavailable, system generates reasonable defaults based on market data
+4. **Event-Driven Communication**: Agents emit events that other system components can subscribe to
+5. **Credit-Based Agent Economy**: Agent performance tracked and used for future decision weighting
+
+---
+
 ## The Problem We're Solving
 
 ### Current DeFi Challenges
@@ -425,19 +609,19 @@ NeuroNet includes a built-in marketplace for agent trading:
 - Improved risk assessment models
 - Signal conflict prevention
 
-### Phase 3: Expansion (Q1 2025)
+### Phase 3: Expansion (Q1 2026)
 - **Multi-Chain Support**: Expand beyond Ethereum to Solana, Arbitrum, Optimism
 - **Cross-Chain Bridges**: Automated asset movement between chains
 - **MEV Protection**: Flashbots integration for transaction privacy
 - **Advanced ML Models**: Deep learning for pattern recognition
 
-### Phase 4: Governance (Q2 2025)
+### Phase 4: Governance (Q2 2026)
 - **Multi-Signature Governance**: Require multiple approvals for large trades
 - **DAO Integration**: Community governance of system parameters
 - **Token Launch**: Governance token for platform decisions
 - **Staking Mechanisms**: Stake tokens for agent access
 
-### Phase 5: Scale (Q3-Q4 2025)
+### Phase 5: Scale (Q3-Q4 2026)
 - **Agent Marketplace V2**: Full decentralized agent trading
 - **Custom Strategy Builder**: No-code strategy creation
 - **Institutional Features**: Enterprise-grade compliance and reporting
