@@ -33,6 +33,7 @@ import {
   type DataQuality
 } from "./AdvancedIntelligence";
 import { enhancedMarketIntelligence } from "../data/providers";
+import { getLearningSystem } from "../learning/AgentLearningSystem";
 
 const anthropic = new Anthropic({
   apiKey: process.env.AI_INTEGRATIONS_ANTHROPIC_API_KEY,
@@ -1189,6 +1190,26 @@ ${comprehensiveIntel ? `6. Consider Fear & Greed Index: ${comprehensiveIntel.fea
     signal.closedReason = lessonsLearned;
 
     console.log(`[TradingIntelligence] Trade outcome: ${result.toUpperCase()} | PnL: ${pnlPercent.toFixed(2)}% | Evolution: ${evolutionTriggered}`);
+    
+    const learningSystem = getLearningSystem();
+    if (learningSystem) {
+      const signalWithVotes = signal as TradingSignal & { agentVotes?: { agentId: string }[] };
+      learningSystem.recordDecisionOutcome({
+        agentId: signalWithVotes.agentVotes?.length ? signalWithVotes.agentVotes[0].agentId : "trading-intelligence",
+        decision: `${signal.direction.toUpperCase()} ${signal.symbol} @ ${signal.entryPrice}`,
+        context: {
+          symbol: signal.symbol,
+          marketCondition: signal.indicators?.emaTrend === "bullish" ? "bullish" : signal.indicators?.emaTrend === "bearish" ? "bearish" : "sideways",
+          priceLevel: signal.entryPrice,
+          volatility: signal.indicators?.atr,
+        },
+        confidence: signal.confidence,
+        outcome: result === "win" ? "success" : "failure",
+        pnlPercent,
+        timestamp: Date.now(),
+        reasoning: lessonsLearned,
+      });
+    }
     
     return outcome;
   }

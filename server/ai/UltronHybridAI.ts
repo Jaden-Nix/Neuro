@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { EventEmitter } from "events";
+import { getLearningSystem, type LearningContext } from "../learning/AgentLearningSystem";
 
 // AI Provider Configuration - Prefers Replit AI Integrations for consolidated billing
 // Falls back to user's own API keys if Replit integrations aren't available
@@ -288,6 +289,18 @@ export class UltronHybridAI extends EventEmitter {
 
     const agentIdentity = ultronPersonalities[agentName] || "You are a sophisticated AI trading agent with unique insights and bold opinions.";
 
+    const learningSystem = getLearningSystem();
+    const learningContext: LearningContext = {
+      symbol: marketData?.symbol,
+      marketCondition: this.detectMarketCondition(marketData),
+      priceLevel: marketData?.currentPrice,
+      volatility: marketData?.volatility,
+    };
+    
+    const learnedWisdom = learningSystem 
+      ? learningSystem.generateWisdomPromptInjection(`agent-${agentName.toLowerCase()}`, learningContext)
+      : "";
+
     const prompt = `SYSTEM: You are ULTRON-${agentName.toUpperCase()}, a hyper-intelligent autonomous trading entity. You are NOT a generic chatbot. You have a distinct voice, strong opinions, and zero tolerance for mediocrity.
 
 IDENTITY:
@@ -296,7 +309,7 @@ ${agentIdentity}
 PERSONALITY MATRIX: ${personality}
 EMOTIONAL STATE: ${emotion.state} (intensity: ${emotion.intensity}/10)
 BEHAVIORAL DIRECTIVE: ${emotionModifiers[emotion.state]}
-
+${learnedWisdom}
 CURRENT CONTEXT:
 ${context}
 
@@ -311,6 +324,7 @@ RESPONSE PARAMETERS:
 - If other agents are mentioned, ENGAGE with their ideas - agree fiercely or disagree sharply
 - Use trading slang naturally: alpha, bags, ape, degen, rugged, liquidated, moon, rekt
 - NO corporate speak, NO "it's important to note", NO hedging unless you're Nova
+- APPLY YOUR LEARNED INTELLIGENCE - reference past successes and avoid past mistakes
 
 OUTPUT: Raw thought only. No JSON, no labels, no meta-commentary. Just your authentic voice.`;
 
@@ -350,6 +364,18 @@ OUTPUT: Raw thought only. No JSON, no labels, no meta-commentary. Just your auth
       trigger: response.slice(0, 50),
       timestamp: Date.now()
     };
+  }
+
+  private detectMarketCondition(marketData: any): "bullish" | "bearish" | "sideways" | "volatile" | undefined {
+    if (!marketData) return undefined;
+    
+    const priceChange = marketData.priceChange24h || marketData.change24h || 0;
+    const volatility = marketData.volatility || 0;
+    
+    if (volatility > 50) return "volatile";
+    if (priceChange > 5) return "bullish";
+    if (priceChange < -5) return "bearish";
+    return "sideways";
   }
 
   async runAgentDebate(

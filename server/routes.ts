@@ -38,12 +38,14 @@ import { marketDataService } from "./data/MarketDataService";
 import { ccxtAdapter } from "./data/providers/CCXTAdapter";
 import { ultronAI } from "./ai/UltronHybridAI";
 import { ultronAgentManager } from "./agents/UltronAgentPersonality";
+import { initializeLearningSystem, getLearningSystem } from "./learning/AgentLearningSystem";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
 const simulationEngine = new SimulationEngine();
 const creditEconomy = new CreditEconomy();
 const memoryVault = new MemoryVault();
+const learningSystem = initializeLearningSystem(memoryVault);
 const sentinelMonitor = new SentinelMonitor();
 const replayEngine = new ReplayEngine();
 const autonomousCycleManager = new AutonomousCycleManager(orchestrator, {
@@ -4368,6 +4370,48 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to configure auto-evolution:", error);
       res.status(500).json({ error: "Failed to configure auto-evolution" });
+    }
+  });
+
+  // ============================================
+  // Agent Learning System Routes
+  // ============================================
+
+  app.get("/api/learning/metrics", async (req, res) => {
+    try {
+      const ls = getLearningSystem();
+      if (!ls) {
+        return res.status(503).json({ error: "Learning system not initialized" });
+      }
+      res.json(ls.getMetrics());
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get learning metrics" });
+    }
+  });
+
+  app.get("/api/learning/agent/:agentId", async (req, res) => {
+    try {
+      const ls = getLearningSystem();
+      if (!ls) {
+        return res.status(503).json({ error: "Learning system not initialized" });
+      }
+      const summary = ls.getAgentPerformanceSummary(req.params.agentId);
+      res.json(summary);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent learning summary" });
+    }
+  });
+
+  app.get("/api/learning/wisdom/:agentId", async (req, res) => {
+    try {
+      const ls = getLearningSystem();
+      if (!ls) {
+        return res.status(503).json({ error: "Learning system not initialized" });
+      }
+      const wisdom = ls.getLearnedWisdom(req.params.agentId);
+      res.json(wisdom);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get agent wisdom" });
     }
   });
 
