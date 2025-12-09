@@ -1278,7 +1278,28 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
 
       if (!anthropic) {
         const fallbackAgrees = Math.random() > 0.3;
-        const fallbackComment = fallbackAgrees ? "AGREE: Setup looks solid" : "DISAGREE: Risk too high";
+        // Generate more detailed fallback validation comments based on agent personality and signal details
+        let fallbackComment: string;
+        if (fallbackAgrees) {
+          const agreeReasons = [
+            `AGREE: ${signal.symbol} setup shows clean structure. Risk/reward at ${signal.riskReward.toFixed(1)}x looks acceptable.`,
+            `AGREE: Entry at $${signal.entry.toFixed(2)} aligns with key support. Stop loss placement is reasonable.`,
+            `AGREE: The ${signal.direction} thesis makes sense given current momentum. I'd take this trade.`,
+            `AGREE: Technical setup is solid. Pattern recognition confidence is high for ${signal.symbol}.`,
+            `AGREE: Volume and price action support this ${signal.direction} entry. Good opportunity.`
+          ];
+          fallbackComment = agreeReasons[Math.floor(Math.random() * agreeReasons.length)];
+        } else {
+          const disagreeReasons = [
+            `DISAGREE: Stop loss at $${signal.stopLoss.toFixed(2)} seems too tight for ${signal.symbol}'s volatility.`,
+            `DISAGREE: Risk/reward ratio of ${signal.riskReward.toFixed(1)}x doesn't justify the entry. Need better setup.`,
+            `DISAGREE: Current market structure suggests waiting. Entry timing feels premature.`,
+            `DISAGREE: I see conflicting signals on higher timeframes. Would pass on this ${signal.direction}.`,
+            `DISAGREE: ${signal.symbol} at $${signal.entry.toFixed(2)} carries elevated risk. Better entries exist.`
+          ];
+          fallbackComment = disagreeReasons[Math.floor(Math.random() * disagreeReasons.length)];
+        }
+        
         const validation = {
           agentId: validator.id,
           agentName: validator.name,
@@ -1286,6 +1307,27 @@ TPs should be staggered at 1:1, 1:2, 1:3 risk-reward ratios.`
           comment: fallbackComment
         };
         storedSignal.validators.push(validation);
+        
+        // Add thought to stream so users can see the validation reasoning
+        const thoughtType: ThoughtType = fallbackAgrees ? "agreement" : "challenge";
+        this.addThought(validator.id, thoughtType,
+          `@${signal.agentName}'s ${signal.symbol} ${signal.direction}: ${fallbackComment}`,
+          { signalId: signal.id, validates: fallbackAgrees },
+          undefined,
+          [signal.agentId]
+        );
+        
+        // Update relationship based on validation
+        const relationship = validator.relationships[signal.agentId];
+        if (relationship) {
+          if (fallbackAgrees) {
+            relationship.trust = Math.min(100, relationship.trust + 2);
+            relationship.agreements++;
+          } else {
+            relationship.disagreements++;
+          }
+        }
+        
         continue;
       }
 
