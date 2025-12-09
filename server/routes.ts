@@ -3322,10 +3322,38 @@ export async function registerRoutes(
   app.get("/api/adk/status", async (_req, res) => {
     try {
       const { adkIntegration } = await import("./adk/ADKIntegration");
-      res.json(adkIntegration.getStatus());
+      const { realADKAgent } = await import("./adk/RealADKAgent");
+      res.json({
+        wrapper: adkIntegration.getStatus(),
+        realADK: realADKAgent.getStatus(),
+        package: "@iqai/adk",
+        description: "Real ADK-TS integration using AgentBuilder pattern"
+      });
     } catch (error) {
       console.error("Failed to get ADK status:", error);
       res.status(500).json({ error: "Failed to get ADK status" });
+    }
+  });
+
+  app.post("/api/adk/real-workflow", writeLimiter, async (req, res) => {
+    try {
+      const { symbol, currentPrice, priceChange24h, volume24h, trend } = req.body;
+      if (!symbol || !currentPrice) {
+        return res.status(400).json({ error: "symbol and currentPrice are required" });
+      }
+      
+      const { realADKAgent } = await import("./adk/RealADKAgent");
+      const result = await realADKAgent.runFullWorkflow({
+        symbol,
+        currentPrice,
+        priceChange24h: priceChange24h || 0,
+        volume24h,
+        trend
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to run real ADK workflow:", error);
+      res.status(500).json({ error: "Failed to run real ADK workflow" });
     }
   });
 
