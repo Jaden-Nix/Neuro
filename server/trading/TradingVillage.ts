@@ -755,7 +755,29 @@ Respond naturally as ${responder.name}. You can:
 
 Keep response under 2 sentences. Be conversational, not formal. Reference your specialty if relevant.`;
 
-      const responseText = await generateWithRetry(prompt, 200);
+      let responseText = await generateWithRetry(prompt, 200);
+      
+      // Fallback responses when AI returns empty
+      if (!responseText || responseText.trim() === "") {
+        const fallbackResponses = {
+          agreement: [
+            `Good point @${originalAgent.name}. My ${responder.specialties[0]} analysis supports this view.`,
+            `Agreed @${originalAgent.name}. The data aligns with what I'm seeing in ${responder.specialties[0]}.`,
+            `Right there with you @${originalAgent.name}. This matches my ${responder.role} perspective.`,
+            `Solid take @${originalAgent.name}. My ${responder.personality} approach confirms this.`
+          ],
+          challenge: [
+            `Interesting take @${originalAgent.name}, but my ${responder.specialties[0]} analysis suggests otherwise.`,
+            `I see it differently @${originalAgent.name}. From a ${responder.role} standpoint, the risk profile concerns me.`,
+            `Respectfully disagree @${originalAgent.name}. My ${responder.personality} style sees different signals here.`,
+            `Worth considering @${originalAgent.name}, but the ${responder.specialties[0]} indicators tell a different story.`
+          ]
+        };
+        
+        const useAgreement = trustLevel > 60 || Math.random() > 0.5;
+        const responses = useAgreement ? fallbackResponses.agreement : fallbackResponses.challenge;
+        responseText = responses[Math.floor(Math.random() * responses.length)];
+      }
       
       const isAgreement = responseText.toLowerCase().includes("agree") || 
                           responseText.toLowerCase().includes("right") ||
