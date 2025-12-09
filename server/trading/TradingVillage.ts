@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 import { createLimit, retry, AbortError } from "../utils/async-utils";
 import { nanoid } from "nanoid";
 import { EventEmitter } from "events";
@@ -35,25 +36,41 @@ const gemini = geminiApiKey ? new GoogleGenAI({
   },
 }) : null;
 
+// OpenAI (GPT) - BACKUP provider for maximum reliability
+const openaiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+const openaiBaseUrl = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+
+const openai = openaiApiKey ? new OpenAI({
+  apiKey: openaiApiKey,
+  ...(openaiBaseUrl && { baseURL: openaiBaseUrl }),
+}) : null;
+
 // Log AI configuration status
 const isClaudeConfigured = !!anthropic;
 const isGeminiConfigured = !!gemini;
+const isOpenAIConfigured = !!openai;
 
 if (isClaudeConfigured) {
   console.log("[TradingVillage] Claude AI configured -", claudeBaseUrl ? "using Replit integrations" : "using user API key");
 } else {
-  console.log("[TradingVillage] Claude AI not configured - critical analysis will use fallbacks");
+  console.log("[TradingVillage] Claude AI not configured - will use other providers");
 }
 
 if (isGeminiConfigured) {
   console.log("[TradingVillage] Gemini AI configured -", geminiBaseUrl ? "using Replit integrations" : "using user API key");
 } else {
-  console.log("[TradingVillage] Gemini AI not configured - chats/debates will use fallbacks");
+  console.log("[TradingVillage] Gemini AI not configured - will use other providers");
 }
 
-const isAnyAIConfigured = isClaudeConfigured || isGeminiConfigured;
+if (isOpenAIConfigured) {
+  console.log("[TradingVillage] OpenAI configured -", openaiBaseUrl ? "using Replit integrations" : "using user API key");
+} else {
+  console.log("[TradingVillage] OpenAI not configured - will use other providers");
+}
+
+const isAnyAIConfigured = isClaudeConfigured || isGeminiConfigured || isOpenAIConfigured;
 if (!isAnyAIConfigured) {
-  console.warn("[TradingVillage] WARNING: No AI providers configured - agents will use template-based responses only!");
+  console.warn("[TradingVillage] WARNING: No AI providers configured - agents cannot generate responses!");
 }
 
 const rateLimiter = createLimit(2);
@@ -148,10 +165,82 @@ async function generateWithClaude(prompt: string, maxTokens: number = 1024): Pro
   );
 }
 
-// Legacy function - routes to Gemini for fast chat/debate operations
+// OpenAI for BACKUP operations - used when Gemini and Claude fail
+async function generateWithOpenAI(prompt: string, maxTokens: number = 512): Promise<string> {
+  if (!openai) {
+    return "";
+  }
+  
+  return rateLimiter(() =>
+    retry(
+      async () => {
+        try {
+          const response = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            max_tokens: maxTokens,
+            messages: [{ role: "user", content: prompt }],
+          });
+          return response.choices[0]?.message?.content || "";
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            throw error;
+          }
+          const abortError = new Error(error?.message || "OpenAI request failed");
+          (abortError as any).isAbortError = true;
+          throw abortError;
+        }
+      },
+      {
+        retries: 5,
+        minTimeout: 2000,
+        maxTimeout: 64000,
+        factor: 2,
+      }
+    )
+  );
+}
+
+// CASCADE FUNCTION: Tries Gemini -> Claude -> OpenAI until we get valid content
+// NEVER returns empty - keeps trying all providers
+async function generateWithCascade(prompt: string, maxTokens: number = 512): Promise<string> {
+  const providers = [
+    { name: "Gemini", fn: () => generateWithGemini(prompt), available: isGeminiConfigured },
+    { name: "Claude", fn: () => generateWithClaude(prompt, maxTokens), available: isClaudeConfigured },
+    { name: "OpenAI", fn: () => generateWithOpenAI(prompt, maxTokens), available: isOpenAIConfigured },
+  ];
+  
+  for (const provider of providers) {
+    if (!provider.available) continue;
+    
+    try {
+      const result = await provider.fn();
+      if (result && result.trim().length > 10) {
+        return result;
+      }
+      console.log(`[TradingVillage] ${provider.name} returned empty/short response, trying next provider`);
+    } catch (error) {
+      console.log(`[TradingVillage] ${provider.name} failed:`, error);
+    }
+  }
+  
+  // Final attempt: retry Gemini with longer timeout
+  if (isGeminiConfigured) {
+    try {
+      const result = await generateWithGemini(prompt);
+      if (result && result.trim().length > 10) {
+        return result;
+      }
+    } catch (e) {}
+  }
+  
+  // If all providers fail, return a structured error message instead of empty
+  console.warn("[TradingVillage] All AI providers failed - returning error indicator");
+  return "";
+}
+
+// Legacy function - now uses cascade for maximum reliability
 async function generateWithRetry(prompt: string, maxTokens: number = 1024): Promise<string> {
-  // Chat/debate operations use Gemini for speed and cost efficiency
-  return generateWithGemini(prompt);
+  return generateWithCascade(prompt, maxTokens);
 }
 
 export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scout" | "veteran";
