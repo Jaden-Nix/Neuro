@@ -1888,16 +1888,17 @@ Describe your evolution in 2-3 sentences:
   }
 
   private startBackgroundProcesses() {
-    console.log("[TradingVillage] Starting active signal generation and evolution (RATE LIMITED to save credits)...");
+    console.log("[TradingVillage] Starting BALANCED MODE - optimized for cost/performance (~$4-5/day)...");
     
     setTimeout(() => this.runInitialSignalGeneration(), 5000);
     
-    setInterval(() => this.runHuntingCycle(), 5 * 60 * 1000);
-    setInterval(() => this.runDebateCycle(), 15 * 60 * 1000);
-    setInterval(() => this.runKnowledgeSharingCycle(), 20 * 60 * 1000);
-    setInterval(() => this.generateMarketInsights(), 10 * 60 * 1000);
-    setInterval(() => this.runEvolutionCycle(), 30 * 60 * 1000);
-    setInterval(() => this.checkAndTriggerBirths(), 60 * 60 * 1000);
+    // BALANCED MODE: Reduced frequency to save ~50% on AI costs while maintaining good performance
+    setInterval(() => this.runHuntingCycle(), 10 * 60 * 1000);      // 10 min (was 5 min)
+    setInterval(() => this.runDebateCycle(), 20 * 60 * 1000);       // 20 min (was 15 min)
+    setInterval(() => this.runKnowledgeSharingCycle(), 40 * 60 * 1000); // 40 min (was 20 min)
+    setInterval(() => this.generateMarketInsights(), 20 * 60 * 1000);   // 20 min (was 10 min)
+    setInterval(() => this.runEvolutionCycle(), 60 * 60 * 1000);    // 60 min (was 30 min)
+    setInterval(() => this.checkAndTriggerBirths(), 120 * 60 * 1000); // 120 min (was 60 min)
   }
 
   private async runInitialSignalGeneration() {

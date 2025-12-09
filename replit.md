@@ -39,6 +39,22 @@ Agents communicate through a negotiation protocol (Scout→Risk→Execution→Me
 - **Replit AI Integrations**: Preferred provider for consolidated billing
 - **Rate limiting and circuit breakers**: Built-in protection against API limits
 - **Provider-specific routing**: Different agents can use different AI providers
+- **Cost Mode**: BALANCED (~$4-5/day) - optimized cycle frequencies for cost/performance
+
+### AI Cycle Frequencies (Balanced Mode)
+| Cycle | Interval | Purpose |
+|-------|----------|---------|
+| Hunting | 10 min | Find trading opportunities |
+| Debates | 20 min | Validate signals |
+| Market Insights | 20 min | Analyze conditions |
+| Knowledge Sharing | 40 min | Agent learning |
+| Evolution | 60 min | Strategy improvements |
+| Birth Checks | 120 min | New agent spawning |
+
+### Price Validation (2FA)
+- 5% tolerance on all prices
+- Re-fetches live price before saving signals
+- Prevents hallucinated prices (e.g., RUNE $115 bug fixed)
 
 ### Database
 - **ORM**: Drizzle ORM with PostgreSQL dialect
