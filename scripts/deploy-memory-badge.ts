@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { createPublicClient, createWalletClient, http, type Hex, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { sepolia } from "viem/chains";
+import { baseSepolia } from "viem/chains";
 
 interface ContractArtifact {
   contractName: string;
@@ -52,9 +52,9 @@ async function main() {
     process.exit(1);
   }
   
-  const rpcUrl = process.env.SEPOLIA_RPC_URL || "https://gateway.tenderly.co/public/sepolia";
+  const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org";
   
-  console.log(`\n=== Deploying MemoryVault & NeuronBadge to Sepolia ===`);
+  console.log(`\n=== Deploying MemoryVault & NeuronBadge to Base Sepolia ===`);
   console.log(`RPC URL: ${rpcUrl}\n`);
   
   const formattedKey = privateKey.startsWith("0x") ? privateKey : `0x${privateKey}`;
@@ -62,13 +62,13 @@ async function main() {
   console.log(`Deployer address: ${account.address}`);
   
   const publicClient = createPublicClient({
-    chain: sepolia,
+    chain: baseSepolia,
     transport: http(rpcUrl),
   });
   
   const walletClient = createWalletClient({
     account,
-    chain: sepolia,
+    chain: baseSepolia,
     transport: http(rpcUrl),
   });
   
@@ -76,9 +76,9 @@ async function main() {
   console.log(`Balance: ${Number(balance) / 1e18} ETH`);
   
   if (balance === BigInt(0)) {
-    console.error("\nERROR: No ETH balance. Get testnet ETH from:");
-    console.error("  - https://sepoliafaucet.com/");
-    console.error("  - https://www.alchemy.com/faucets/ethereum-sepolia");
+    console.error("\nERROR: No ETH balance. Get Base Sepolia testnet ETH from:");
+    console.error("  - https://www.coinbase.com/faucets/base-ethereum-goerli-faucet");
+    console.error("  - https://faucet.quicknode.com/base/sepolia");
     process.exit(1);
   }
 
@@ -89,30 +89,37 @@ async function main() {
   const memoryVaultAddress = await deployContract(walletClient, publicClient, memoryVault);
   const neuronBadgeAddress = await deployContract(walletClient, publicClient, neuronBadge);
   
-  const existingDeployment = JSON.parse(fs.readFileSync("deployment-sepolia.json", "utf8"));
+  let existingDeployment = {};
+  const deploymentFile = "deployment-base-sepolia.json";
+  if (fs.existsSync(deploymentFile)) {
+    existingDeployment = JSON.parse(fs.readFileSync(deploymentFile, "utf8"));
+  }
   
   const updatedDeployment = {
     ...existingDeployment,
+    network: "base-sepolia",
+    chainId: 84532,
     deployedAt: new Date().toISOString(),
+    deployer: account.address,
     contracts: {
-      ...existingDeployment.contracts,
+      ...(existingDeployment as any).contracts,
       MemoryVault: memoryVaultAddress,
       NeuronBadge: neuronBadgeAddress,
     },
   };
   
-  fs.writeFileSync("deployment-sepolia.json", JSON.stringify(updatedDeployment, null, 2));
+  fs.writeFileSync(deploymentFile, JSON.stringify(updatedDeployment, null, 2));
   
   console.log("\n=== Deployment Complete ===");
   console.log(`MemoryVault: ${memoryVaultAddress}`);
   console.log(`NeuronBadge: ${neuronBadgeAddress}`);
-  console.log(`\nUpdated deployment-sepolia.json`);
+  console.log(`\nSaved to ${deploymentFile}`);
   
   console.log("\n=== Environment Variables to Set ===");
-  console.log(`MEMORY_VAULT_ADDRESS_SEPOLIA=${memoryVaultAddress}`);
-  console.log(`NEURON_BADGE_ADDRESS_SEPOLIA=${neuronBadgeAddress}`);
-  console.log(`VITE_MEMORY_VAULT_ADDRESS_SEPOLIA=${memoryVaultAddress}`);
-  console.log(`VITE_NEURON_BADGE_ADDRESS_SEPOLIA=${neuronBadgeAddress}`);
+  console.log(`MEMORY_VAULT_ADDRESS_BASE_SEPOLIA=${memoryVaultAddress}`);
+  console.log(`NEURON_BADGE_ADDRESS_BASE_SEPOLIA=${neuronBadgeAddress}`);
+  console.log(`VITE_MEMORY_VAULT_ADDRESS_BASE_SEPOLIA=${memoryVaultAddress}`);
+  console.log(`VITE_NEURON_BADGE_ADDRESS_BASE_SEPOLIA=${neuronBadgeAddress}`);
 }
 
 main().catch((error) => {

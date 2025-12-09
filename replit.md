@@ -50,10 +50,21 @@ Solidity contracts for on-chain components:
 - **AgentNFT**: Mintable/rentable agent tokens
 - **AgentRegistry**: On-chain agent registration and credit tracking
 - **MemoryVault**: Persistent strategy storage
-- **NeuronBadge**: Evolution proof NFTs
+- **NeuronBadge**: Evolution proof NFTs (soulbound)
 - **NeuroNetHeartbeat**: System liveness checkpoints
 
 Contracts are compiled with solc and deployed via viem to Sepolia and Base Sepolia testnets.
+
+#### Deployed Contract Addresses
+
+**Sepolia (chainId: 11155111):**
+- NeuroNetRegistry: `0xc4f97d52334f0de35fec958f24fc5af9c450f8dc`
+- NeuroNetStorage: `0x7c2e91efeec7bf481a61a654f36fe6452ca16a07`
+- NeuroNetHeartbeat: `0x7ab69aa7543e9ae43b5d01c5622868392252eaad`
+
+**Base Sepolia (chainId: 84532):**
+- MemoryVault: `0x12b67629cd47f3703dca82b3bec7e576b3a0fb8f`
+- NeuronBadge: `0xb3d0b4aba1d5a482df702edf87dea8b146321d3b`
 
 ### Real-Time Features
 - WebSocket server for live agent logs and status updates

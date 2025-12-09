@@ -1,0 +1,10 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "deployedAt": "2025-12-09T09:17:53.411Z",
+  "deployer": "0xe47Dce1b7e31333329734E24089C0472c030d95B",
+  "contracts": {
+    "MemoryVault": "0x12b67629cd47f3703dca82b3bec7e576b3a0fb8f",
+    "NeuronBadge": "0xb3d0b4aba1d5a482df702edf87dea8b146321d3b"
+  }
+}
