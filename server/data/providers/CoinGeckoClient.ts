@@ -38,10 +38,11 @@ export interface CoinInfo {
 }
 
 const COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3";
-const CACHE_TTL = 60000;
-const OHLC_CACHE_TTL = 300000;
+const CACHE_TTL = 120000; // 2 minutes cache
+const OHLC_CACHE_TTL = 600000; // 10 minutes for OHLC data
 
-const rateLimiter = createLimit(5);
+// CoinGecko free tier: ~10-30 requests/minute - be conservative
+const rateLimiter = createLimit(2);
 
 const cache = new Map<string, { data: any; timestamp: number }>();
 
