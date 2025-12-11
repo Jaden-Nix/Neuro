@@ -996,11 +996,69 @@ export class TradingVillage extends EventEmitter {
     this.tradeSignals = this.tradeSignals.filter(s => s.status !== "invalidated");
   }
 
-  private initializeVillage() {
-    UNIQUE_AGENT_CONFIGS.forEach((config) => {
-      const agent = this.createAgent(config);
-      this.agents.set(agent.id, agent);
-    });
+  private async initializeVillage() {
+    // First try to load existing agents from database (memory persistence)
+    try {
+      const existingAgents = await db.select().from(villageAgents);
+      
+      if (existingAgents.length > 0) {
+        // Load agents with their persisted memory
+        const mottos: Record<AgentPersonality, string> = {
+          aggressive: "Strike fast, strike hard",
+          conservative: "Patience is profit",
+          balanced: "Equilibrium in all trades",
+          contrarian: "When others panic, I profit",
+          momentum: "Ride the wave",
+          experimental: "Innovation drives evolution"
+        };
+        
+        for (const ea of existingAgents) {
+          const agent: VillageAgent = {
+            id: ea.id,
+            name: ea.name,
+            role: ea.role,
+            personality: ea.personality,
+            creditScore: ea.creditScore,
+            experience: ea.experience,
+            generation: ea.generation,
+            wins: ea.wins,
+            losses: ea.losses,
+            winRate: ea.winRate,
+            totalPnl: ea.totalPnl,
+            bestTrade: null,
+            worstTrade: null,
+            currentStreak: { type: "win", count: 0 },
+            specialties: ea.specialties,
+            strategies: ea.strategies,
+            activeExperiments: [],
+            lastActive: Date.now(),
+            status: "hunting",
+            avatar: ea.role,
+            motto: mottos[ea.personality],
+            memory: ea.memory, // Loaded from DB!
+            relationships: {},
+          };
+          this.agents.set(agent.id, agent);
+        }
+        
+        console.log(`[TradingVillage] Loaded ${existingAgents.length} agents with persisted memory from database`);
+      } else {
+        // No agents in DB - create fresh and save to DB
+        for (const config of UNIQUE_AGENT_CONFIGS) {
+          const agent = this.createAgent(config);
+          this.agents.set(agent.id, agent);
+          await this.saveAgentToDB(agent);
+        }
+        console.log(`[TradingVillage] Created ${UNIQUE_AGENT_CONFIGS.length} new agents and saved to database`);
+      }
+    } catch (error) {
+      console.error("[TradingVillage] DB load failed, creating fresh agents:", error);
+      // Fallback: create fresh agents without DB persistence
+      UNIQUE_AGENT_CONFIGS.forEach((config) => {
+        const agent = this.createAgent(config);
+        this.agents.set(agent.id, agent);
+      });
+    }
 
     const agents = Array.from(this.agents.values());
     agents.forEach((agent) => {
@@ -1015,6 +1073,57 @@ export class TradingVillage extends EventEmitter {
       "Village assembled. 10 unique agents ready to hunt alpha. Let the competition begin.",
       { event: "village_init" }
     );
+  }
+
+  // Save agent to DB (for new core agents)
+  private async saveAgentToDB(agent: VillageAgent) {
+    try {
+      await db.insert(villageAgents).values({
+        id: agent.id,
+        name: agent.name,
+        role: agent.role,
+        personality: agent.personality,
+        specialties: agent.specialties,
+        strategies: agent.strategies,
+        generation: agent.generation,
+        creditScore: agent.creditScore,
+        experience: agent.experience,
+        wins: agent.wins,
+        losses: agent.losses,
+        winRate: agent.winRate,
+        totalPnl: agent.totalPnl,
+        parentId: null,
+        isSpawned: false,
+        memory: agent.memory,
+      }).onConflictDoNothing();
+    } catch (error) {
+      console.error(`[TradingVillage] Failed to save agent ${agent.name} to DB:`, error);
+    }
+  }
+
+  // Helper to persist agent memory after any modification
+  private async persistAgentMemory(agent: VillageAgent) {
+    try {
+      await db.update(villageAgents).set({
+        memory: {
+          learnedPatterns: agent.memory.learnedPatterns.slice(-100), // Keep last 100 patterns
+          successfulStrategies: agent.memory.successfulStrategies.slice(-50),
+          failedStrategies: agent.memory.failedStrategies.slice(-50),
+          mentors: agent.memory.mentors,
+          students: agent.memory.students,
+          sharedInsights: agent.memory.sharedInsights.slice(-50),
+          debateHistory: agent.memory.debateHistory.slice(-100)
+        },
+        creditScore: agent.creditScore,
+        experience: agent.experience,
+        wins: agent.wins,
+        losses: agent.losses,
+        winRate: agent.winRate,
+        totalPnl: agent.totalPnl,
+      }).where(eq(villageAgents.id, agent.id));
+    } catch (error) {
+      // Silent fail - don't spam logs for every memory update
+    }
   }
 
   private createAgent(config: { name: string; role: AgentRole; personality: AgentPersonality; specialty: string; backstory: string }): VillageAgent {
@@ -1277,7 +1386,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
     debate.endedAt = Date.now();
 
     const participants = debate.participants.map(id => this.agents.get(id)!).filter(Boolean);
-    participants.forEach(p => {
+    for (const p of participants) {
       p.status = "hunting";
       p.memory.debateHistory.push({
         topic: debate.topic,
@@ -1287,7 +1396,8 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
           "consensus",
         timestamp: Date.now()
       });
-    });
+      await this.persistAgentMemory(p); // Persist debate outcome to DB
+    }
 
     const winner = participants.find(p => 
       debate.messages.filter(m => m.agentId === p.id && m.stance === dominantStance?.[0]).length > 0
@@ -2018,6 +2128,9 @@ Keep it under 20 words. Be direct.`;
     };
     this.competitions.push(competition);
     this.emit("competition", competition);
+    
+    // Persist agent memory and stats to database
+    this.persistAgentMemory(agent);
   }
 
   private findMentor(agent: VillageAgent): VillageAgent | null {
