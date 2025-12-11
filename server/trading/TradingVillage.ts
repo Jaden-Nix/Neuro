@@ -93,6 +93,10 @@ async function generateWithGemini(prompt: string): Promise<string> {
     if (anthropic) {
       return generateWithClaude(prompt, 512);
     }
+    // Fallback to OpenAI if neither Gemini nor Claude available
+    if (openai) {
+      return generateWithOpenAI(prompt, 512);
+    }
     return "";
   }
   
@@ -131,6 +135,10 @@ async function generateWithClaude(prompt: string, maxTokens: number = 1024): Pro
     // Fallback to Gemini if Claude not available
     if (gemini) {
       return generateWithGemini(prompt);
+    }
+    // Fallback to OpenAI if neither Claude nor Gemini available
+    if (openai) {
+      return generateWithOpenAI(prompt, maxTokens);
     }
     return "";
   }

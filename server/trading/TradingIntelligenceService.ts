@@ -41,7 +41,11 @@ const anthropic = new Anthropic({
 });
 
 const gemini = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GOOGLE_AI_API_KEY,
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 const limit = createLimit(2);
