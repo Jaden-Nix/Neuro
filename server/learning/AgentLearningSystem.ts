@@ -2,6 +2,7 @@ import { EventEmitter } from "events";
 import { MemoryVault } from "../memory/MemoryVault";
 import { selfHealingEngine, type EvolutionStrategy, type DecisionRecord } from "../selfhealing/SelfHealingEngine";
 import { evolutionEngine } from "../evolution/EvolutionEngine";
+import { mlPatternRecognition } from "../ml/MLPatternRecognition";
 import type { MemoryEntry, Agent } from "@shared/schema";
 
 export interface LearnedWisdom {
@@ -108,6 +109,20 @@ export class AgentLearningSystem extends EventEmitter {
         pnlPercent: outcome.pnlPercent,
       },
     });
+
+    // Feed outcome to ML pattern recognition for model training
+    if (outcome.context.symbol && outcome.pnlPercent !== undefined) {
+      mlPatternRecognition.addRealTradeOutcome({
+        signalId: `${outcome.agentId}-${outcome.timestamp}`,
+        symbol: outcome.context.symbol,
+        direction: outcome.decision.toLowerCase().includes("short") ? "short" : "long",
+        pnl: outcome.pnlPercent,
+        confidence: outcome.confidence / 100, // Normalize to 0-1
+        marketCondition: outcome.context.marketCondition,
+        volatility: outcome.context.volatility,
+        timestamp: outcome.timestamp,
+      });
+    }
 
     this.updateAgentWisdom(outcome.agentId);
     this.metrics.totalLearnings++;

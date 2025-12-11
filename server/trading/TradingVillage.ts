@@ -9,6 +9,9 @@ import { db } from "../db";
 import { villageSignals, villageAgents, agentBirths, tradeHistory } from "@shared/schema";
 import type { InsertTradeHistory, SelectTradeHistory } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
+import { getLearningSystem, type DecisionOutcome, type LearningContext } from "../learning/AgentLearningSystem";
+import { evolutionEngine } from "../evolution/EvolutionEngine";
+import { SimulationEngine } from "../simulation/SimulationEngine";
 
 // =============================================================================
 // MULTI-AI ARCHITECTURE: Gemini for chats/debates, Claude for deep reasoning
@@ -255,6 +258,15 @@ export type AgentRole = "hunter" | "analyst" | "strategist" | "sentinel" | "scou
 export type AgentPersonality = "aggressive" | "conservative" | "balanced" | "contrarian" | "momentum" | "experimental";
 export type ThoughtType = "observation" | "analysis" | "hypothesis" | "decision" | "learning" | "experiment" | "competition" | "debate" | "agreement" | "challenge" | "insight_share" | "disagreement";
 
+export interface EvolvedParameters {
+  confidenceThreshold: number; // 0.5 - 0.95, higher = more selective
+  riskTolerance: number; // 0.2 - 0.8, higher = more aggressive
+  volatilityMultiplier: number; // 0.8 - 1.3, affects position sizing
+  slippageTolerance: number; // 0.001 - 0.05, max slippage accepted
+  lastEvolution: number; // timestamp
+  evolutionCount: number; // how many times evolved
+}
+
 export interface VillageAgent {
   id: string;
   name: string;
@@ -279,6 +291,7 @@ export interface VillageAgent {
   motto: string;
   memory: AgentMemory;
   relationships: Record<string, { trust: number; agreements: number; disagreements: number }>;
+  evolvedParams?: EvolvedParameters; // NEW: Parameters that evolve over time
 }
 
 export interface AgentMemory {
@@ -437,6 +450,7 @@ export class TradingVillage extends EventEmitter {
   private tradeSignals: VillageTradeSignal[] = [];
   private lastSpawnTime: number = 0;
   private static readonly SPAWN_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours between spawns
+  private simulationEngine: SimulationEngine = new SimulationEngine();
 
   constructor() {
     super();
@@ -446,8 +460,147 @@ export class TradingVillage extends EventEmitter {
     this.startBackgroundProcesses();
     this.startPeriodicTradeReviews();
     this.startPriceMonitoring();
+    this.subscribeToEvolution();
     console.log("[TradingVillage] AI Village initialized with", this.agents.size, "unique agents");
   }
+
+  // ========== EVOLUTION INTEGRATION ==========
+  // Subscribe to evolution events and apply mutations to agent behavior
+  private subscribeToEvolution(): void {
+    evolutionEngine.onEvolution((event) => {
+      this.applyEvolutionMutation(event);
+    });
+    console.log("[TradingVillage] Subscribed to evolution engine - mutations will now affect agent behavior");
+  }
+
+  private applyEvolutionMutation(event: any): void {
+    // Map evolution engine agent types to TradingVillage agent roles
+    const roleMapping: Record<string, AgentRole[]> = {
+      "Scout": ["scout", "hunter"],
+      "Risk": ["sentinel", "strategist"],
+      "Execution": ["hunter", "analyst"],
+      "Meta": ["veteran", "strategist"],
+      "TrendFollower": ["hunter", "momentum" as any],
+      "MeanReversion": ["analyst", "contrarian" as any],
+      "Breakout": ["hunter", "scout"],
+      "Momentum": ["hunter", "scout"],
+      "Volatility": ["analyst", "sentinel"],
+      "Swing": ["analyst", "strategist"],
+    };
+    
+    // Extract base name from evolution agent (e.g., "Scout_v1" -> "Scout")
+    const baseName = event.parentAgentName.replace(/_v\d+$/, "");
+    const targetRoles = roleMapping[baseName] || [];
+    
+    // Find a matching agent by role or by name
+    let agent = Array.from(this.agents.values()).find(a => 
+      a.name === baseName || a.name.startsWith(baseName + "_")
+    );
+    
+    // If no direct name match, find by role
+    if (!agent && targetRoles.length > 0) {
+      agent = Array.from(this.agents.values()).find(a => 
+        targetRoles.includes(a.role) && !a.evolvedParams?.evolutionCount
+      ) || Array.from(this.agents.values()).find(a => 
+        targetRoles.includes(a.role)
+      );
+    }
+    
+    // If still no match, pick a random agent that hasn't evolved recently
+    if (!agent) {
+      const allAgents = Array.from(this.agents.values());
+      const unevolved = allAgents.filter(a => !a.evolvedParams || a.evolvedParams.evolutionCount < 3);
+      agent = unevolved.length > 0 
+        ? unevolved[Math.floor(Math.random() * unevolved.length)]
+        : allAgents[Math.floor(Math.random() * allAgents.length)];
+    }
+    
+    if (!agent) {
+      console.log(`[Evolution] No agent found for ${event.parentAgentName}`);
+      return;
+    }
+
+    // Initialize evolved params if not exists
+    if (!agent.evolvedParams) {
+      agent.evolvedParams = {
+        confidenceThreshold: agent.personality === "conservative" ? 0.8 : agent.personality === "aggressive" ? 0.6 : 0.7,
+        riskTolerance: agent.personality === "aggressive" ? 0.7 : agent.personality === "conservative" ? 0.3 : 0.5,
+        volatilityMultiplier: 1.0,
+        slippageTolerance: 0.02,
+        lastEvolution: Date.now(),
+        evolutionCount: 0,
+      };
+    }
+
+    // Apply the mutation based on type
+    const mutation = event.mutation;
+    const strength = mutation.mutationStrength || 0.1;
+
+    switch (mutation.type) {
+      case "confidence_calibration":
+        agent.evolvedParams.confidenceThreshold = Math.max(0.5, Math.min(0.95, 
+          agent.evolvedParams.confidenceThreshold + (Math.random() > 0.5 ? strength : -strength) * 0.1
+        ));
+        break;
+      case "risk_rebalancing":
+        agent.evolvedParams.riskTolerance = Math.max(0.2, Math.min(0.8,
+          agent.evolvedParams.riskTolerance + (event.performanceImpact.roiChange > 0 ? strength : -strength) * 0.1
+        ));
+        break;
+      case "volatility_adaptation":
+        agent.evolvedParams.volatilityMultiplier = Math.max(0.8, Math.min(1.3,
+          agent.evolvedParams.volatilityMultiplier + (Math.random() > 0.5 ? strength : -strength) * 0.1
+        ));
+        break;
+      case "slippage_optimization":
+        agent.evolvedParams.slippageTolerance = Math.max(0.001, Math.min(0.05,
+          agent.evolvedParams.slippageTolerance + (Math.random() > 0.5 ? strength : -strength) * 0.01
+        ));
+        break;
+      case "threshold_adjustment":
+        // Adjust confidence based on performance
+        if (event.performanceImpact.winRateChange > 0) {
+          agent.evolvedParams.confidenceThreshold = Math.max(0.5, agent.evolvedParams.confidenceThreshold - 0.02);
+        } else {
+          agent.evolvedParams.confidenceThreshold = Math.min(0.95, agent.evolvedParams.confidenceThreshold + 0.02);
+        }
+        break;
+    }
+
+    agent.evolvedParams.lastEvolution = Date.now();
+    agent.evolvedParams.evolutionCount++;
+    agent.generation = event.childGeneration;
+
+    // Update agent's credit score based on evolution impact
+    const creditDelta = Math.round(event.performanceImpact.roiChange);
+    agent.creditScore = Math.max(100, agent.creditScore + creditDelta);
+
+    console.log(`[Evolution] Applied ${mutation.type} to ${agent.name}: confidence=${agent.evolvedParams.confidenceThreshold.toFixed(2)}, risk=${agent.evolvedParams.riskTolerance.toFixed(2)}, gen=${agent.generation}`);
+
+    // Emit event for UI updates
+    this.emit("agentEvolved", { agent, event });
+
+    // Add a learning thought about the evolution
+    this.addThought(agent.id, "learning", 
+      `I evolved! Applied ${mutation.type} mutation. My confidence threshold is now ${(agent.evolvedParams.confidenceThreshold * 100).toFixed(0)}% and risk tolerance is ${(agent.evolvedParams.riskTolerance * 100).toFixed(0)}%. Generation ${agent.generation}.`,
+      { mutation: mutation.type, generation: agent.generation }
+    );
+  }
+
+  // Get evolved confidence threshold for an agent
+  public getAgentConfidenceThreshold(agentId: string): number {
+    const agent = this.agents.get(agentId);
+    if (!agent) return 0.7;
+    return agent.evolvedParams?.confidenceThreshold ?? 0.7;
+  }
+
+  // Get evolved risk tolerance for an agent
+  public getAgentRiskTolerance(agentId: string): number {
+    const agent = this.agents.get(agentId);
+    if (!agent) return 0.5;
+    return agent.evolvedParams?.riskTolerance ?? 0.5;
+  }
+  // ========== END EVOLUTION INTEGRATION ==========
 
   private async loadSignalsFromDB() {
     try {
@@ -646,6 +799,29 @@ export class TradingVillage extends EventEmitter {
         this.emit("signalRejected", { signal, reason: "price_validation_failed", deviation: validation.deviation });
         return;
       }
+
+      // ========== SIMULATION CHECK ==========
+      // Run Monte Carlo simulation to estimate trade outcome
+      try {
+        const simResult = await this.simulationEngine.runMonteCarloSimulation(
+          { timeHorizon: 60, branchCount: 3, predictionInterval: 15 }, // Quick 1-hour sim
+          50, // 50 iterations for speed
+          20,
+          1.0,
+          25
+        );
+        
+        // If simulation shows very poor expected value, add warning to reasoning
+        if (simResult.meanEV < -10 && simResult.successProbability < 0.3) {
+          console.warn(`[Simulation] WARNING: ${signal.symbol} has poor outlook - EV: ${simResult.meanEV.toFixed(1)}, Success: ${(simResult.successProbability * 100).toFixed(0)}%`);
+          signal.reasoning = `[SIM WARNING: EV=${simResult.meanEV.toFixed(1)}, Success=${(simResult.successProbability * 100).toFixed(0)}%] ${signal.reasoning}`;
+        } else {
+          console.log(`[Simulation] ${signal.symbol} simulation OK - EV: ${simResult.meanEV.toFixed(1)}, Success: ${(simResult.successProbability * 100).toFixed(0)}%`);
+        }
+      } catch (simError) {
+        console.log("[Simulation] Quick check skipped:", simError);
+      }
+      // ========== END SIMULATION CHECK ==========
       
       await db.insert(villageSignals).values({
         id: signal.id,
@@ -1344,8 +1520,21 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
         throw new Error("No AI configured - using fallback");
       }
 
+      // ========== INJECT LEARNED WISDOM ==========
+      const learningSystem = getLearningSystem();
+      const learningContext: LearningContext = {
+        symbol,
+        priceLevel: basePrice,
+        volatility,
+      };
+      const wisdomInjection = learningSystem 
+        ? learningSystem.generateWisdomPromptInjection(agent.id, learningContext)
+        : "";
+      // ========== END WISDOM INJECTION ==========
+
       const signalPrompt = `You are ${agent.name}, a ${agent.role} AI trader (${agent.personality} personality).
 Your specialty: ${agent.specialties.join(", ")}
+${wisdomInjection}
 
 CRITICAL: The CURRENT LIVE price of ${symbol} is EXACTLY $${basePrice.toFixed(2)}. Do NOT use any other price from your training data. All your entry, stop loss, and take profit levels MUST be based on this current price of $${basePrice.toFixed(2)}.
 
@@ -2454,6 +2643,50 @@ Describe your evolution in 2-3 sentences:
     });
 
     await this.updateAgentInDB(agent);
+
+    // ========== LEARNING SYSTEM INTEGRATION ==========
+    // Record this trade outcome so the agent learns from it
+    const learningSystem = getLearningSystem();
+    if (learningSystem) {
+      const learningContext: LearningContext = {
+        symbol: signal.symbol,
+        marketCondition: marketConditions.trend === "bullish" ? "bullish" : 
+                         marketConditions.trend === "bearish" ? "bearish" : 
+                         marketConditions.volatility === "high" ? "volatile" : "sideways",
+        timeframe: signal.timeframe,
+        priceLevel: signal.entry,
+        volatility: marketConditions.volatility === "high" ? 0.04 : 
+                    marketConditions.volatility === "medium" ? 0.02 : 0.01,
+      };
+
+      const decisionOutcome: DecisionOutcome = {
+        agentId: agent.id,
+        decision: `${signal.direction.toUpperCase()} ${signal.symbol} via ${signal.technicalAnalysis.pattern}`,
+        context: learningContext,
+        confidence: signal.confidence * 100,
+        outcome: outcome === "win" ? "success" : "failure",
+        pnlPercent,
+        timestamp: Date.now(),
+        reasoning: lessonsLearned,
+      };
+
+      learningSystem.recordDecisionOutcome(decisionOutcome);
+      console.log(`[Learning] Recorded ${outcome} outcome for ${agent.name}: ${signal.symbol} ${signal.direction} (${pnlPercent.toFixed(2)}%)`);
+
+      // Apply evolution based on learning if warranted
+      if (learningSystem.shouldAgentBeMoreConservative(agent.id)) {
+        console.log(`[Learning] ${agent.name} should be more conservative based on recent performance`);
+        evolutionEngine.evolveAgent(
+          agent.name,
+          "performance_threshold",
+          { roi: agent.totalPnl, sharpe: 1.0, winRate: agent.winRate * 100, drawdown: 10, backtestScore: 70 },
+          "Learning system detected need for more conservative approach"
+        );
+      } else if (learningSystem.shouldAgentBeMoreAggressive(agent.id)) {
+        console.log(`[Learning] ${agent.name} can be more aggressive based on strong performance`);
+      }
+    }
+    // ========== END LEARNING INTEGRATION ==========
 
     const competition: CompetitionEvent = {
       id: `comp-${nanoid(8)}`,
