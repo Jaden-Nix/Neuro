@@ -89,6 +89,21 @@ function isRateLimitError(error: any): boolean {
   );
 }
 
+// Adds budget urgency context to prompts when credits are running low
+function addBudgetAwareness(prompt: string): string {
+  const status = costTracker.getStatus();
+  const percentUsed = (status.dailySpent / status.dailyLimit) * 100;
+  
+  if (percentUsed >= 90) {
+    return `[CRITICAL: AI budget at ${percentUsed.toFixed(0)}% - Be extremely concise. Give only essential conclusions. Skip explanations.]\n\n${prompt}`;
+  } else if (percentUsed >= 75) {
+    return `[URGENT: AI budget at ${percentUsed.toFixed(0)}% - Be brief and direct. Wrap up quickly. Focus on key points only.]\n\n${prompt}`;
+  } else if (percentUsed >= 50) {
+    return `[NOTE: AI budget at ${percentUsed.toFixed(0)}% - Keep responses focused and efficient.]\n\n${prompt}`;
+  }
+  return prompt;
+}
+
 // Gemini for FAST operations: chats, debates, validations, general thoughts
 // Uses gemini-2.5-flash for speed and cost efficiency
 async function generateWithGemini(prompt: string): Promise<string> {
@@ -107,13 +122,15 @@ async function generateWithGemini(prompt: string): Promise<string> {
     return "";
   }
   
+  const budgetAwarePrompt = addBudgetAwareness(prompt);
+  
   return rateLimiter(() =>
     retry(
       async () => {
         try {
           const response = await gemini.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: prompt,
+            contents: budgetAwarePrompt,
           });
           const result = response.text || "";
           const inputTokens = costTracker.estimateTokens(prompt);
@@ -157,14 +174,19 @@ async function generateWithClaude(prompt: string, maxTokens: number = 1024): Pro
     return "";
   }
   
+  const budgetAwarePrompt = addBudgetAwareness(prompt);
+  // Reduce max tokens when budget is tight
+  const status = costTracker.getStatus();
+  const adjustedMaxTokens = status.reducedMode ? Math.min(maxTokens, 512) : maxTokens;
+  
   return rateLimiter(() =>
     retry(
       async () => {
         try {
           const message = await anthropic.messages.create({
             model: "claude-sonnet-4-5",
-            max_tokens: maxTokens,
-            messages: [{ role: "user", content: prompt }],
+            max_tokens: adjustedMaxTokens,
+            messages: [{ role: "user", content: budgetAwarePrompt }],
           });
           const content = message.content[0];
           const result = content.type === "text" ? content.text : "";
@@ -202,14 +224,18 @@ async function generateWithOpenAI(prompt: string, maxTokens: number = 512): Prom
     return "";
   }
   
+  const budgetAwarePrompt = addBudgetAwareness(prompt);
+  const status = costTracker.getStatus();
+  const adjustedMaxTokens = status.reducedMode ? Math.min(maxTokens, 256) : maxTokens;
+  
   return rateLimiter(() =>
     retry(
       async () => {
         try {
           const response = await openai.chat.completions.create({
             model: "gpt-4o-mini",
-            max_tokens: maxTokens,
-            messages: [{ role: "user", content: prompt }],
+            max_tokens: adjustedMaxTokens,
+            messages: [{ role: "user", content: budgetAwarePrompt }],
           });
           const result = response.choices[0]?.message?.content || "";
           const inputTokens = costTracker.estimateTokens(prompt);
