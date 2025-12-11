@@ -12,6 +12,7 @@ import { eq, desc } from "drizzle-orm";
 import { getLearningSystem, type DecisionOutcome, type LearningContext } from "../learning/AgentLearningSystem";
 import { evolutionEngine } from "../evolution/EvolutionEngine";
 import { SimulationEngine } from "../simulation/SimulationEngine";
+import { costTracker } from "../ai/CostTracker";
 
 // =============================================================================
 // MULTI-AI ARCHITECTURE: Gemini for chats/debates, Claude for deep reasoning
@@ -91,12 +92,15 @@ function isRateLimitError(error: any): boolean {
 // Gemini for FAST operations: chats, debates, validations, general thoughts
 // Uses gemini-2.5-flash for speed and cost efficiency
 async function generateWithGemini(prompt: string): Promise<string> {
+  if (costTracker.isPaused()) {
+    console.log("[TradingVillage] AI paused - skipping Gemini call");
+    return "";
+  }
+  
   if (!gemini) {
-    // Fallback to Claude if Gemini not available
     if (anthropic) {
       return generateWithClaude(prompt, 512);
     }
-    // Fallback to OpenAI if neither Gemini nor Claude available
     if (openai) {
       return generateWithOpenAI(prompt, 512);
     }
@@ -111,7 +115,11 @@ async function generateWithGemini(prompt: string): Promise<string> {
             model: "gemini-2.5-flash",
             contents: prompt,
           });
-          return response.text || "";
+          const result = response.text || "";
+          const inputTokens = costTracker.estimateTokens(prompt);
+          const outputTokens = costTracker.estimateTokens(result);
+          costTracker.trackUsage("gemini-2.5-flash", inputTokens, outputTokens, "TradingVillage");
+          return result;
         } catch (error: any) {
           if (isRateLimitError(error)) {
             throw error;
@@ -134,12 +142,15 @@ async function generateWithGemini(prompt: string): Promise<string> {
 // Claude for CRITICAL operations: signal identification, risk analysis, deep reasoning
 // Uses claude-sonnet-4-5 for maximum intelligence on important decisions
 async function generateWithClaude(prompt: string, maxTokens: number = 1024): Promise<string> {
+  if (costTracker.isPaused()) {
+    console.log("[TradingVillage] AI paused - skipping Claude call");
+    return "";
+  }
+  
   if (!anthropic) {
-    // Fallback to Gemini if Claude not available
     if (gemini) {
       return generateWithGemini(prompt);
     }
-    // Fallback to OpenAI if neither Claude nor Gemini available
     if (openai) {
       return generateWithOpenAI(prompt, maxTokens);
     }
@@ -156,7 +167,11 @@ async function generateWithClaude(prompt: string, maxTokens: number = 1024): Pro
             messages: [{ role: "user", content: prompt }],
           });
           const content = message.content[0];
-          return content.type === "text" ? content.text : "";
+          const result = content.type === "text" ? content.text : "";
+          const inputTokens = costTracker.estimateTokens(prompt);
+          const outputTokens = costTracker.estimateTokens(result);
+          costTracker.trackUsage("claude-sonnet-4-5", inputTokens, outputTokens, "TradingVillage");
+          return result;
         } catch (error: any) {
           if (isRateLimitError(error)) {
             throw error;
@@ -178,6 +193,11 @@ async function generateWithClaude(prompt: string, maxTokens: number = 1024): Pro
 
 // OpenAI for BACKUP operations - used when Gemini and Claude fail
 async function generateWithOpenAI(prompt: string, maxTokens: number = 512): Promise<string> {
+  if (costTracker.isPaused()) {
+    console.log("[TradingVillage] AI paused - skipping OpenAI call");
+    return "";
+  }
+  
   if (!openai) {
     return "";
   }
@@ -191,7 +211,11 @@ async function generateWithOpenAI(prompt: string, maxTokens: number = 512): Prom
             max_tokens: maxTokens,
             messages: [{ role: "user", content: prompt }],
           });
-          return response.choices[0]?.message?.content || "";
+          const result = response.choices[0]?.message?.content || "";
+          const inputTokens = costTracker.estimateTokens(prompt);
+          const outputTokens = costTracker.estimateTokens(result);
+          costTracker.trackUsage("gpt-4o-mini", inputTokens, outputTokens, "TradingVillage");
+          return result;
         } catch (error: any) {
           if (isRateLimitError(error)) {
             throw error;

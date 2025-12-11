@@ -14,6 +14,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OnboardingWizard, useOnboarding } from "@/components/OnboardingWizard";
+import { AIStatusBanner } from "@/components/AIStatusBanner";
 
 import Dashboard from "@/pages/Dashboard";
 import MLInsights from "@/pages/MLInsights";
@@ -136,6 +137,7 @@ function AppLayout() {
           </div>
         </div>
       </SidebarProvider>
+      <AIStatusBanner />
     </>
   );
 }

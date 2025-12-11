@@ -39,6 +39,7 @@ import { ccxtAdapter } from "./data/providers/CCXTAdapter";
 import { ultronAI } from "./ai/UltronHybridAI";
 import { ultronAgentManager } from "./agents/UltronAgentPersonality";
 import { initializeLearningSystem, getLearningSystem } from "./learning/AgentLearningSystem";
+import { costTracker } from "./ai/CostTracker";
 
 // Initialize all services
 const orchestrator = new AgentOrchestrator();
@@ -463,6 +464,34 @@ export async function registerRoutes(
       res.json(state);
     } catch (error) {
       res.status(500).json({ error: "Failed to get system state" });
+    }
+  });
+
+  // AI Cost Tracker - Status, Pause, Resume
+  app.get("/api/ai/status", async (_req, res) => {
+    try {
+      const status = costTracker.getStatus();
+      res.json(status);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get AI status" });
+    }
+  });
+
+  app.post("/api/ai/resume", async (_req, res) => {
+    try {
+      const result = costTracker.resume();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to resume AI" });
+    }
+  });
+
+  app.post("/api/ai/pause", async (_req, res) => {
+    try {
+      const result = costTracker.pause();
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to pause AI" });
     }
   });
 
