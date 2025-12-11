@@ -1472,6 +1472,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
           adopted: true
         });
         agent.memory.learnedPatterns.push(`adopted_${knowledge.type}`);
+        this.persistAgentMemory(agent); // Persist adopted knowledge
 
         this.addThought(agent.id, "agreement",
           `@${knowledge.contributorName}'s insight resonates with my analysis. Incorporating into my strategy.`,
@@ -1504,6 +1505,7 @@ Share your perspective in 1-2 sentences. Be direct and confident. You can agree,
       if (validationRate > 0.6) {
         contributor.creditScore += 10;
         contributor.memory.successfulStrategies.push(knowledge.content);
+        this.persistAgentMemory(contributor); // Persist validated strategy
       } else if (validationRate < 0.3) {
         contributor.creditScore = Math.max(100, contributor.creditScore - 5);
       }
